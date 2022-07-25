@@ -1,0 +1,242 @@
+#!/bin/bash
+
+# TODO:
+# Quick nifty idea for printing errors in importing/constraint files. We want
+# to be able to reference them by name, but ideally we want to use the shortest
+# name possible. No sense printing the entire path.
+# If we take all of the file names the user has passed, split them on `/` chars,
+# and check for uniqueness starting from the end. E.g.,
+#> files: [
+#>    /home/aurelius/bin/conf
+#>    /home/aurelius/bin/do_stuff.sh
+#>    /home/marcus/bin/do_stuff.sh
+#> ]
+#>
+#> files[0].split('/')[-1]  is unique
+#> files[1].split('/')[-1]  is NOT unique
+#>
+#> files[1].split('/')[-2:-1]  is unique
+#
+# I guess realistically we're doing a slice from [N:-1], in which `N = -1`,
+# decrementing each time until we find a unique value. We cannot end up with
+# non-unique values, as we'll throw a parse error.
+
+declare -g PROGDIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" ; pwd )
+declare -g LIBDIR="${PROGDIR}/lib"
+declare -g INPUT="$1"
+
+if [[ -z "$INPUT" ]] ; then
+   echo "Requires file input" 1>&2
+   exit -1
+fi
+
+# Shouldn't code file names/paths into the generated output. If the user has the
+# same file *data*, but it's in a different place, we shouldn't have to
+# re-compile the output.
+# An array of files allows us to map a static file INDEX (stored in the output
+# data), to the possibly dynamic path to the file.
+declare -ga FILES=()
+
+# Stores the $ROOT after each `parse()`. The idx of a root node here should
+# correspond to it's matching INCLUDE_$n from the INCLUDES[] array. Example:
+#> INCLUDE_ROOT [ NODE_10,    NODE_20    ]
+#> INCLUDES     [ INCLUDE_01, INCLUDE_02 ]
+# Meaning...
+# Take the contents of INCLUDE_ROOT[0].items, and drop them into
+# INCLUDES[0].target.items.
+declare -a INCLUDE_ROOT=()
+
+
+function add_file {
+   # Serves to both ensure we don't have circular imports, as well as resolving
+   # relative paths to their fully qualified path.
+   local -- file=$1
+
+   # The full, absolute path to the file.
+   local -- fq_path 
+   local -- parent
+
+   # The 1st call of `add_file()` will have an empty FILES[] array.
+   if [[ "${#FILES[@]}" -gt 0 ]] ; then
+      parent="${FILES[-1]%/*}"
+   else
+      # If there's nothing in FILES[], it's our first run. Any path that's
+      # relative is inherently relative to our current working directory.
+      parent=$( dirname "${BASH_SOURCE[0]%/*}" )
+   fi
+
+   case "$file" in
+      # Absolute paths.
+      /*)   fq_path="${file}"             ;;
+      ~*)   fq_path="${file/\~/${HOME}}"  ;;
+
+      # Paths relative to the calling file.
+      *)    fq_path=$( realpath -m "${parent}/${file}" -q )
+            ;;
+   esac
+
+   for f in "${FILES[@]}" ; do
+      if [[ "$f" == "$file" ]] ; then
+         echo "Cannot source $file, circular import." 1>&2
+         # TODO: error reporting
+         exit -1
+      fi
+   done
+
+   FILES+=( "$fq_path" )
+}
+
+
+function merge_includes {
+   # Parse all `%include` files.
+   # For some reason a standard for loop won't let me modify the loop itself while
+   # iterating through it. Options are either a while loop, or a C-style for loop.
+   local -i idx
+   while [[ idx -lt ${#INCLUDES[@]} ]] ; do
+      local -- insert_node=${INCLUDES[idx]}
+      local -n node="$insert_node"
+
+      insert_node_to="${node[target]}"
+      insert_node_path="${node[path]}"
+
+      add_file "$insert_node_path"
+
+      # File must exist, must be readable.
+      if [[ ! -r "${FILES[-1]}" ]] ; then
+         echo -e "File \`${FILES[-1]}' not readable or doesn't exist."
+         continue
+      fi
+
+      # Generate AST for the imported file.
+      parse
+
+      # Construct array (backwards) of the $ROOT nodes for each %include statement.
+      # Allows us to iter the INCLUDES backwards, and match $idx to its
+      # corresponding root here.
+      INCLUDE_ROOT=( "$ROOT" ${INCLUDE_ROOT[@]} )
+
+      (( idx++ ))
+   done
+
+   # Iterates bottom-to-top over the %include statements. Appends the 
+   local -i len=${#INCLUDES[@]}
+   for (( idx = (len - 1); idx >= 0; idx-- )) ; do
+      local -- include_name=${INCLUDES[idx]}
+      local -n include_node=${include_name}
+      # e.g., INCLUDE_1(path: './colors.conf', target: NODE_2)
+
+      local -n target_node=${include_node[target]}
+      local -n target_items=${target_node[items]}
+      # e.g., NODE_2(items: NODE_3, name: NODE_1)
+      #       target_items = NODE_3[]
+
+      local -- root_name=${INCLUDE_ROOT[idx]}
+      local -n root_node=${root_name}
+      local -n root_items=${root_node[items]}
+      # e.g., INCLUDE_ROOT[idx] = NODE_16
+      #       NODE_16(items: NODE_17, name: NODE_15)
+      #       root_items = NODE_17[]
+
+      # For each node in the sub-file, append it to the targetted node's .items[].
+      for n in "${root_items[@]}" ; do
+         target_items+=( $n )
+      done
+   done
+}
+
+
+function identify_constraint_file {
+   local -- fq_path
+   local -- constrain_file
+
+   for file in "${CONSTRAINTS[@]}" ; do
+      case "$file" in
+         /*)   fq_path="${file}"            ;;
+         ~*)   fq_path="${file/\~/${HOME}}" ;;
+         *)    fq_path=$( realpath -m "${INPUT%/*}/${file}" -q ) ;;
+      esac
+      [[ -f "$fq_path" ]] && constrain_file="$fq_path"
+   done
+
+   for f in "${FILES[@]}" ; do
+      if [[ "$f" == "$constrain_file" ]] ; then
+         echo "\`$f' may not be both a %constrain and %include" 1>&2
+         # TODO: error recovery
+         exit -1
+         # TODO: error reporting
+      fi
+   done
+
+   declare -g FILES+=( "$constrain_file" )
+}
+
+
+# This toomfoolery is just to isolate all the functions/variables to each
+# respective file. Particularly as the lexer/parser reuse function names like
+#  `advance`, `current`, etc.
+# Only the particular information we *want* to export is.
+function parse {
+   source <(
+      source <(
+         source "${LIBDIR}"/lexer.sh
+         # Exports:
+         #  TOKENS[]             # Array of token names
+         #  TOKEN_$n             # Sequence of all token objects
+         #  FILE_LINES[]         # INPUT_FILE.readlines()
+      )
+
+      # Since the lexer in run in a subshell (to isolate the name stomping)
+      # we need to global these out here.
+      declare -p FILE_LINES  FILES |\
+         sed -E 's;^declare -(-)?;declare -g;' 
+
+      source "${LIBDIR}"/parser.sh
+      # Exports:
+      #  ROOT
+      #  TYPEOF{}
+      #  NODE_*
+   )
+}
+
+# Parse the top-level `base' file.
+add_file "$INPUT"
+parse ; parent_root=$ROOT
+merge_includes
+# Merge all (potentially nested) `%include` statements from the parent file.
+
+# Reset INCLUDE_ROOT[] and INCLUDES[] before parsing the constrain'd file(s).
+declare -a INCLUDE_ROOT=()  INCLUDES=()
+
+_f0=${#FILES[@]}
+identify_constraint_file 
+_f1=${#FILES[@]}
+
+# This is a little nonsense, but it saves us from creating another global var
+# to track if we've hit a valid child file. `identify_constraint_file()` adds
+# the file to the global FILES[] array. Thus, if array is not of the same len,
+# we added a file. Don't want to parse an additional time if it's not needed.
+if [[ ${_f0} != ${_f1} ]] ; then
+   # Now parse all the sub-files we're imposing constraints upon.
+   parse ; child_root=$ROOT
+   merge_includes
+   # Merge all (potentially nested) `%include` statements from the child file.
+fi
+
+# Restore top-level root node.
+ROOT=$parent_root
+
+# DEBUGGING:
+#declare -p ${!NODE_*} | sort -V -k3
+
+source "${LIBDIR}"/compiler.sh
+# Exports (USER ACCESSIBLE):
+#  _DATA_ROOT
+#  _DATA_*
+
+source "${LIBDIR}"/api.sh
+# Exports (USER ACCESSIBLE):
+#  RV
+#  conf()
+
+# Example usage:
+#conf 'global' 'global' 'global' 'key' ; echo "${RV@Q}"

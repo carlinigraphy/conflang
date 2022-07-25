@@ -1,0 +1,207 @@
+= Notes
+:toc:                      left
+:toclevels:                3
+:source-highlighter:       pygments
+:pygments-style:           algol_nu
+:pygments-linenums-mode:   table
+
+Collections of my thinkies, musings, and stuff to refer back to while working on this.
+
+== Bash tomfoolery
+
+Naturally, any project of mine must contain a fair amount of bash tomfoolery.
+
+=== Set, but empty
+
+There are built-in tests for variables that are empty _or_ unset (`test -z`).
+However none for declared _and_ empty.
+Did some testing to verify how all the parameter expansion for unset/empty vars works:
+
+[source,bash]
+----
+declare set_empty=''
+declare set_value='y'
+ 
+# SET, but EMPTY
+[[ ${set_empty:-_}   ]]  # TRUE
+[[ ${set_empty-_}    ]] 
+[[ ${set_empty:+_}   ]] 
+[[ ${set_empty+_}    ]]  # TRUE
+
+# SET, and HAS VALUE
+[[ ${set_value:-_}   ]]  # TRUE
+[[ ${set_value-_}    ]]  # TRUE
+[[ ${set_value:+_}   ]]  # TRUE
+[[ ${set_value+_}    ]]  # TRUE
+
+# UNSET, and EMPTY
+[[ ${unset_empty:-_} ]]  # TRUE
+[[ ${unset_empty-_}  ]]  # TRUE
+[[ ${unset_empty:+_} ]] 
+[[ ${unset_empty+_}  ]] 
+----
+
+
+== Properties vs. asserts
+
+I think I've been low-key struggling to justify the "`assert`" piece of the syntax.
+I know I wanted something to say "`this value should have some required information`".
+Perhaps that was mistakenly ``assert``s, rather than '`properties`'.
+Each type has a set of valid properties (obviously user-extensible) that are enforced at runtime.
+
+[source]
+----
+dirs  array:path  [
+   ~/Desktop
+   ~/Documents
+   ~/Pictures/
+] {
+   create       : true;
+   can('read')  : true;
+   can('write') : false;
+   elements     : 3;
+}
+----
+
+'`Properties`' as a concept I think is much more apt for describing the role they play.
+
+It is the next day, and I am thinking about this further.
+Isn't `create : true` the same thing as just saying `create`?
+We can probably assume a truthy value.
+
+I was thinking maybe there wasn't too much of a practical difference to an `assert` rather than a '`property`'.
+Upon further thinkies I believe there definitely is.
+Asserts can only say that there shouldn't be more than 10 items in a list, or a path should _already_ exist.
+It cannot say to create a path that does _not_ exist.
+Nor to make something writeable if it currently is not.
+
+Need to think through the syntax a little more.
+Right now it's sorta both a function call, and a key:value pair.
+Most of the values are worthless if it's just a true/false.
+
+Are these also tests?
+Should `can('read')` do a `$ chmod +r` if it doesn't already have it?
+Or should it fail if not readable.
+
+Upon rubber duckying with Ginny, I realized that they're not really properties...
+They're '`tests`', or '`directives`'.
+The same key may have different meanings, depending on it's test/directive context.
+
+.Example context
+[cols='1,3,3']
+|===
+| Keyword | Test context | Directive context
+
+| readable
+| File/directory can be read by the current user
+| Make the file readable by the current user (`chmod +r`)
+
+| exists
+| File/directory exists
+| Create (`touch`, `mkdir -p`) if not exists
+|===
+
+Tests should fail on a non-0 status.
+Perhaps a config option for "exit on test failure", else continue running and report errors at the end.
+
+But how to have a concise syntax to determine which is which?
+Ooh, maybe they can become tests if they end with a `?`, else they're a directive.
+
+
+== Casting
+
+There is currently no casting.
+This is a problem if we want to type a directory as a string, to avoid escaping spaces with backslash.
+
+
+== Subtypes
+
+Would be nice to have subtypes for paths.
+`path:file`, `path:directory`, etc.
+
+The typecheck an say it's not a directory, because it doesn't end in a trailing slash.
+But the runtime validation will check if the file itself actually is a directory.
+
+
+== Failing in subshells
+
+If something exits with a non-zero status from a subshell, gotta make sure the rest of the execution does not continue.
+Can set a `EXIT=0` before the subshell.
+Within the sourced `.sh` file, the final line is `SUCCESS=true ; declare -p SUCCESS`.
+The parent shell does a `test $SUCCESS == 'true' || exit 1`.
+
+
+== Basic grammar
+
+----
+program        -> statement EOF
+
+statement      -> parser_directive
+                | declaration
+
+declaration    -> section_decl
+                | variable_decl
+
+section_decl   -> identifier '{' declaration* '}'
+
+variable_decl  -> identifier (type)? (expression)? ';'
+
+expression     -> array
+                | string
+                | integer
+                | boolean
+                | path
+
+array          -> '[' expression* ']'
+----
+
+
+== Basic syntax
+
+[source]
+----
+untyped {
+   key1  "value1";
+   key2  "value2";
+}
+
+
+typed {
+   key1  str  "value1";
+   key2  array:str  [
+      "one"
+      "two"
+      "three"
+   ];
+}
+
+
+context {
+   directories  array:path  [
+      ~/Documents
+      ~/Desktop
+   ] {
+      readable    # directive:  must be readable, `chmod +r`
+      writable?   # test:       is writable? fail if not.
+   }
+}
+----
+
+
+== What do I work on now?
+
+For when I get stuck, what are things I can work on...
+
+.Core features that *do* work
+* Lexing, parsing, and compiling basic (non-directive) .config files
+* Support for basic type checking
+* Accessing variables from .config file
+
+.Core features that *do not* yet work
+* Importing/including/extending to other .config files
+* Directive/test contexts
+* Error handling
+* Error reporting
+* Type casting
+* Referencing bash environment variables
+* Referencing interal variables?

@@ -1,0 +1,4 @@
+syntax: regex
+
+^sample/
+.git

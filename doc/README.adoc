@@ -1,0 +1,57 @@
+= conflang
+:toc:                      left
+:toclevels:                3
+:source-highlighter:       pygments
+:pygments-style:           algol_nu
+:pygments-linenums-mode:   table
+
+Declarative config file "`language`" with built-in validation.
+
+
+== Syntax
+
+First thing anyone wants to see is some example syntax.
+
+.config.cfg
+----
+name  "Marcus";
+age   30;
+
+projects [
+   "shql"
+   "conf"
+];
+
+globals {
+   scope  "outer";
+
+   sub-heading {
+      scope  "inner";
+   }
+}
+
+%include './sub-file.conf';
+----
+
+
+== Theory
+
+Writing small shell files that take configuration parameters can be tricky and tiresome.
+Do you trust the user's input, or validate everything?
+How to handle idempotency?
+For an important utility (backups, managing services) it is vital that input is valid.
+Crashing half way through a backup because an intermediate path does not exist is bad.
+There are often many ways to handle data type mismatches, or invalid input.
+
+I hope to resolve some of those problems with:
+
+. Declarative, validated, strongly-typed configuration files
+. Easily accessible parameters for the developer
+. Simple to configure for end users
+  .. With _optional_ room to add validation & complexity
+. Good error reporting for everyone
+
+
+== Use
+=== Developers
+=== End users
