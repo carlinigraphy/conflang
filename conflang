@@ -23,11 +23,11 @@
 
 declare -g PROGDIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" ; pwd )
 declare -g LIBDIR="${PROGDIR}/lib"
-declare -g INPUT="$1"
+source "${LIBDIR}"/errors.sh
 
+declare -g INPUT="$1"
 if [[ -z "$INPUT" ]] ; then
-   echo "Requires file input" 1>&2
-   exit -1
+   raise no_input
 fi
 
 # Shouldn't code file names/paths into the generated output. If the user has the
@@ -76,14 +76,10 @@ function add_file {
    esac
 
    for f in "${FILES[@]}" ; do
-      if [[ "$f" == "$file" ]] ; then
-         echo "Cannot source $file, circular import." 1>&2
-         # TODO: error reporting
-         exit -1
-      fi
+      [[ "$f" == "$file" ]] && raise circular_import "$file"
    done
 
-   FILES+=( "$fq_path" )
+   declare -p FILES 1>&2
 }
 
 
@@ -160,14 +156,13 @@ function identify_constraint_file {
 
    for f in "${FILES[@]}" ; do
       if [[ "$f" == "$constrain_file" ]] ; then
-         echo "\`$f' may not be both a %constrain and %include" 1>&2
-         # TODO: error recovery
-         exit -1
-         # TODO: error reporting
+         raise parse_error "\`$f' may not be both a %constrain and %include"  
       fi
    done
 
-   declare -g FILES+=( "$constrain_file" )
+   if [[ $constrain_file ]] ; then
+      FILES+=( "$constrain_file" )
+   fi
 }
 
 

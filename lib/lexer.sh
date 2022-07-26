@@ -1,6 +1,5 @@
 #!/bin/bash
 
-INPUT_FILE="$1"
 (( FILE_IDX = ${#FILES[@]} - 1 ))
 
 declare -a TOKENS=()
