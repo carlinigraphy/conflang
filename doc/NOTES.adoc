@@ -19,26 +19,45 @@ Did some testing to verify how all the parameter expansion for unset/empty vars 
 
 [source,bash]
 ----
-declare set_empty=''
-declare set_value='y'
- 
-# SET, but EMPTY
-[[ ${set_empty:-_}   ]]  # TRUE
-[[ ${set_empty-_}    ]] 
-[[ ${set_empty:+_}   ]] 
-[[ ${set_empty+_}    ]]  # TRUE
+# Set, empty.
+declare -- se=
 
-# SET, and HAS VALUE
-[[ ${set_value:-_}   ]]  # TRUE
-[[ ${set_value-_}    ]]  # TRUE
-[[ ${set_value:+_}   ]]  # TRUE
-[[ ${set_value+_}    ]]  # TRUE
+# Set, non-empty.
+declare -- ne='set'
 
-# UNSET, and EMPTY
-[[ ${unset_empty:-_} ]]  # TRUE
-[[ ${unset_empty-_}  ]]  # TRUE
-[[ ${unset_empty:+_} ]] 
-[[ ${unset_empty+_}  ]] 
+# Non-set
+#declare -- ns
+
+#    TEST                          #      SET      VALUE     RESULT   
+#---------------------------------------------------------------------
+[[ ${ne}     ]] && echo  "ne"      #      YES       YES      TRUE
+[[ ${se}     ]] && echo  "se"      #      YES        NO      FALSE
+[[ ${ns}     ]] && echo  "ns"      #       NO       ---      FALSE
+
+[[ ${ne-_}   ]] && echo  "ne-_"    #      YES       YES      TRUE
+[[ ${se-_}   ]] && echo  "se-_"    #      YES        NO      FALSE
+[[ ${ns-_}   ]] && echo  "ns-_"    #       NO       ---      TRUE
+
+[[ ${ne:-_}  ]] && echo  "ne:-_"   #      YES       YES      TRUE
+[[ ${se:-_}  ]] && echo  "se:-_"   #      YES        NO      TRUE
+[[ ${ns:-_}  ]] && echo  "ns:-_"   #       NO       ---      TRUE
+
+[[ ${ne+_}   ]] && echo  "ne+_"    #      YES       YES      TRUE
+[[ ${se+_}   ]] && echo  "se+_"    #      YES        NO      TRUE
+[[ ${ns+_}   ]] && echo  "ns+_"    #       NO       ---      FALSE
+
+[[ ${ne:+_}  ]] && echo  "ne:+_"   #      YES       YES      TRUE
+[[ ${se:+_}  ]] && echo  "se:+_"   #      YES        NO      FALSE
+[[ ${ns:+_}  ]] && echo  "ns:+_"   #       NO       ---      FALSE
+
+# TO USE...
+# Find a section in which the desired value has a unique result. E.g., where
+# the result of ${ns...} is not the same as the result of `ne` or `se`.
+
+# Results...
+#  UNSET              [[ ! ${var+_} ]]
+#  SET AND EMPTY      [[ ! ${var-_} ]]
+#  SET AND NONEMPTY   [[   ${var}   ]]
 ----
 
 
@@ -196,12 +215,14 @@ For when I get stuck, what are things I can work on...
 * Lexing, parsing, and compiling basic (non-directive) .config files
 * Support for basic type checking
 * Accessing variables from .config file
-
-.Core features that *do not* yet work
 * Importing/including/extending to other .config files
 * Directive/test contexts
-* Error handling
 * Error reporting
+
+.Core features that *do not* yet work
+* Merging child file -> parent
+* BATS tests
+* Error handling
 * Type casting
 * Referencing bash environment variables
 * Referencing interal variables?
