@@ -1,6 +1,6 @@
 #!/bin/bash
 
-declare -ga EXIT_STATUS=(
+declare -gA EXIT_STATUS=(
    [no_input]=1
    [syntax_error]=2
    [parse_error]=3
@@ -12,7 +12,8 @@ declare -ga EXIT_STATUS=(
 function raise {
    local type="$1" ; shift
    print_${type} "$@"
-   exit ${EXIT_STATUS[type]}
+
+   exit "${EXIT_STATUS[$type]}"
 }
 
 function print_no_input {
