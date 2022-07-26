@@ -871,7 +871,12 @@ function unary {
 #════════════════════════════════════╡ GO ╞═════════════════════════════════════
 parse
 
+# If we haven't thrown an exception, I've either catastrophically missed an
+# error, or we've completed the run successfully.
+PARSE_SUCCESS='yes'
+
 (
+   declare -p PARSE_SUCCESS
    declare -p CONSTRAINTS
    declare -p INCLUDES   ${!INCLUDE_*}
    declare -p _NODE_NUM  _INCLUDE_NUM

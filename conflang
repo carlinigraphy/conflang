@@ -79,7 +79,7 @@ function add_file {
       [[ "$f" == "$file" ]] && raise circular_import "$file"
    done
 
-   declare -p FILES 1>&2
+   FILES+=( "$fq_path" )
 }
 
 
@@ -180,9 +180,11 @@ function parse {
          #  FILE_LINES[]         # INPUT_FILE.readlines()
       )
 
+      [[ $LEX_SUCCESS ]] || exit 1
+
       # Since the lexer in run in a subshell (to isolate the name stomping)
       # we need to global these out here.
-      declare -p FILE_LINES  FILES |\
+      declare -p LEX_SUCCESS  FILE_LINES  FILES |\
          sed -E 's;^declare -(-)?;declare -g;' 
 
       source "${LIBDIR}"/parser.sh
@@ -191,6 +193,8 @@ function parse {
       #  TYPEOF{}
       #  NODE_*
    )
+
+   [[ $LEX_SUCCESS && $PARSE_SUCCESS ]] || exit 1
 }
 
 # Parse the top-level `base' file.
@@ -234,4 +238,4 @@ source "${LIBDIR}"/api.sh
 #  conf()
 
 # Example usage:
-#conf 'global' 'global' 'global' 'key' ; echo "${RV@Q}"
+conf sub2 ; echo "${RV@Q}"
