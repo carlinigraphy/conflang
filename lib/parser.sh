@@ -354,8 +354,7 @@ function advance {
       fi
 
       if [[ ${CURRENT[type]} == 'ERROR' ]] ; then
-         declare -p $CURRENT_NAME 1>&2
-         raise_syntax_error
+         raise syntax_error "$CURRENT_NAME"
       else
          break
       fi
@@ -402,8 +401,10 @@ function match {
 
 
 function munch {
+   local -n t=$CURRENT_NAME
+
    if ! check $1 ; then
-      raise_parse_error "$1" "$2"
+      raise parse_error "[${t[lineno]}:${t[colno]}] $1"
    fi
    
    advance
@@ -451,26 +452,24 @@ function program {
 
 function statement {
    if match 'PERCENT' ; then
-      parser_directive
+      parser_statement
    else
       declaration
    fi
 }
 
 
-function parser_directive {
+function parser_statement {
    # Saved node referencing the parent Section.
    if match 'INCLUDE' ; then
       include
    elif match 'CONSTRAIN' ; then
       constrain
    else
-      # TODO: error reporting
-      echo "${CURRENT[value]} is not a parser directive." 1>&2
-      exit -1
+      raise parse_error "${CURENT[value]} is not a parser statement."
    fi
 
-   munch 'SEMI' "expecting \`;' after parser directive."
+   munch 'SEMI' "expecting \`;' after parser statement."
 }
 
 
@@ -498,19 +497,11 @@ function constrain {
    local -n name=${section_ptr[name]}
 
    if [[ ${name[value]} != '%inline' ]] ; then
-      echo "Constrain blocks may not occur anywhere but the top level" 1>&2
-      # TODO: error reporting
-      exit -1
-      # TODO: error recovery
-      # Probably shouldn't just straight up exit here. Can set flag that we've
-      # hit an error, skip the constrain, and continue parsing.
+      raise parse_error "constrain blocks may only occur in the top level." 
    fi
 
    if [[ "${#CONSTRAINTS[@]}" -gt 0 ]] ; then
-      echo "May not specify multiple constrain blocks." 1>&2
-      # TODO: error reporting
-      exit -1
-      # TODO: error recovery
+      raise parse_error "may not specify multiple constrain blocks." 
    fi
 
    munch 'L_BRACKET' "expecting \`[' to begin array of paths."
@@ -590,9 +581,7 @@ function decl_variable {
       node[context]=$NODE
    fi
 
-   # TODO: error reporting
    munch 'SEMI' "expecting \`;' after declaration."
-
    declare -g NODE=$save
 }
 
@@ -801,8 +790,7 @@ function expression {
    local -- fn=${NUD[${CURRENT[type]}]}
 
    if [[ -z $fn ]] ; then
-      echo "No NUD defined for ${CURRENT[type]}." 1>&2
-      exit -1 # TODO: issue#6
+      raise parse_error "not an expression: ${CURRENT[type]}."
    fi
 
    $fn ; lhs=$NODE
@@ -831,8 +819,7 @@ function expression {
 
       fn=${LED[${CURRENT[type]}]}
       if [[ -z $fn ]] ; then
-         echo "No LED defined for ${CURRENT[type]}." 1>&2
-         exit -2 # TODO: Real escape codes here.
+         raise parse_error "not an infix expression: ${CURRENT[type]}."
       fi
       $fn  "$lhs"  "$op"  "$rbp"
 

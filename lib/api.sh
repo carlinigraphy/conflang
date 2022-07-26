@@ -22,10 +22,7 @@ function conf {
       # Test if the selector exists. If it's trying to query an index that's
       # *UNSET*, rather than just declared as an empty string, it explodes.
       if [[ ! "${d[$arg]+_}" ]] ; then
-         echo "selector '$arg' not found." 1>&2
-         exit -1
-         # TODO: error reporting
-         # Tracebacks would be A+ here.
+         raise index_error "$arg"
       fi
 
       RV="${d[$arg]}"
