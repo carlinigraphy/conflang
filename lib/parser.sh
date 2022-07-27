@@ -336,7 +336,6 @@ function mk_identifier {
 #═══════════════════════════════════╡ utils ╞═══════════════════════════════════
 declare -gi IDX=0
 declare -g  CURRENT  CURRENT_NAME
-declare -g  PEEK     PEEK_NAME
 # Calls to `advance' both globally set the name of the current/next node(s),
 # e.g., `TOKEN_1', as well as declaring a nameref to the variable itself.
 
@@ -346,13 +345,6 @@ function advance {
       declare -g  CURRENT_NAME=${TOKENS[IDX]}
       declare -gn CURRENT=$CURRENT_NAME
 
-      declare -g  PEEK_NAME=${TOKENS[IDX+1]}
-      if [[ -n $PEEK_NAME ]] ; then
-         declare -gn PEEK=$PEEK_NAME
-      else
-         declare -g PEEK=
-      fi
-
       if [[ ${CURRENT[type]} == 'ERROR' ]] ; then
          raise syntax_error "$CURRENT_NAME"
       else
@@ -361,27 +353,6 @@ function advance {
    done
 
    (( ++IDX ))
-}
-
-
-function raise_syntax_error {
-   local -- tname=${1:-$CURRENT_NAME}
-   local -n t=$tname
-
-   declare -p $CURRENT_NAME
-   printf "[${t[lineno]}:${t[colno]}] There was an error.\n" 1<&2
-   exit -1
-}
-
-
-function raise_parse_error {
-   local -n t=$CURRENT_NAME
-   local -- exp=$1
-   local -- msg="${2:-Expected something else.}"
-
-   declare -p $CURRENT_NAME
-   printf "[${t[lineno]}:${t[colno]}] ${msg}\n" 1<&2
-   exit -1
 }
 
 
@@ -466,7 +437,7 @@ function parser_statement {
    elif match 'CONSTRAIN' ; then
       constrain
    else
-      raise parse_error "${CURENT[value]} is not a parser statement."
+      raise parse_error "${CURRENT[value]} is not a parser statement."
    fi
 
    munch 'SEMI' "expecting \`;' after parser statement."
@@ -784,7 +755,7 @@ declare -gA LED=(
 function expression {
    local -i min_bp=${1:-1}
 
-   local -- lhs rhs op
+   local -- lhs op
    local -i lbp rbp
 
    local -- fn=${NUD[${CURRENT[type]}]}

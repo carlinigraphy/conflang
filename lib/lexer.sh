@@ -177,7 +177,7 @@ function scan {
 
       # Can do a dedicated error pass, scanning for error tokens, and assembling
       # the context to print useful debug messages.
-      Token 'ERROR' $CURRENT
+      Token 'ERROR' "$CURRENT"
    done
 
    Token 'EOF'

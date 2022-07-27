@@ -22,21 +22,17 @@ function print_no_input {
 
 function print_syntax_error {
    local -n node="$1"
-   echo "Syntax Error: [${node[lineno]}:${line[colno]}] \`${node[value]}." 1>&2
+   echo "Syntax Error: [${node[lineno]}:${node[colno]}] \`${node[value]}." 1>&2
 }
 
 function print_parse_error {
    echo "Parse Error: ${1}" 1>&2
 }
 
-function print_type_error {
-   local wants_type="$1"
-   local got_type="$2"
-}
+function print_type_error { :; }
 
 function print_index_error {
-   local index="$arg"
-   echo "Key Error: \`$arg' not found." 1>&2
+   echo "Key Error: \`$1' not found." 1>&2
 }
 
 function print_circular_import {

@@ -204,11 +204,9 @@ function semantics_decl_variable {
    [[ -z ${node[type]} || -z ${node[expr]} ]] && return
 
    walk_semantics ${node[type]}
-   local -- target_name=$TARGET_TYPE
    local -n target=$TARGET_TYPE
 
    walk_semantics ${node[expr]}
-   local -- expr_type_name=$TYPE
    local -n expr_type=$TYPE
 
    if [[ "${target[kind]}" != "${expr_type[kind]}" ]] ; then
@@ -268,7 +266,6 @@ function semantics_array {
 
    for nname in "${node[@]}"; do
       walk_semantics $nname
-      local -- child_name=$TYPE
       local -n child=$TYPE
 
       if [[ ${subtype[kind]} != ${child[kind]} ]] ; then
