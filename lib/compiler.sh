@@ -136,6 +136,27 @@ function data_identifier {
 }
 
 
+#───────────────────────────────( symbol table )────────────────────────────────
+# CURRENT:
+# I think merging the trees is going to require 3-phases:
+#  1. Generate symbol table for parent tree
+#  2. Generate symbol table for child tree
+#  3. Iterate parent symbol table stack
+#     - Each name in that scope should have a matching name in the corresponding
+#       child scope
+#     - If a parent type is specified, the child value should match
+#       - The child cannot overwrite a parent's type declaration
+#     - If the child has a value, it *overwrites* the parent's value
+#     - (Later) If the child has directives, they're *append* to the parent's
+#     - Any *additional* names in the child's scope are merged to the parent
+#       - It may actually be easier to generate a completely separate resulting
+#         tree, rather than moving from one to the other
+#
+# The third phase of this will clearly be the most difficult, and will likely
+# take the place of the current semantic analysis, as we will need to do type
+# checking to merge the two trees. Though maybe we fully ignore types here, and
+# do a completely separate typechecking pass.
+
 #─────────────────────────────( semantic analysis )─────────────────────────────
 # Easy way of doing semantic analysis is actually similar to how we did the node
 # traversal in the `conf()` function. Globally point to a Type() node.
@@ -334,166 +355,6 @@ function semantics_identifier {
 # No semantics to be checked here. Identifiers can only occur as names to
 # elements, or function calls.
 
-#───────────────────────────────( compilation )─────────────────────────────────
-# Generating values & opcodes, to be executed by the VM.
-
-declare -i VALUE_NUM
-declare -- VALUE_NAME
-declare -- VALUE
-
-function mk_value {
-   (( VALUE_NUM++ ))
-   local --  vname="VALUE_${VALUE_NUM}"
-
-   declare -gA $vname
-   declare -g  VALUE_NAME=$tname
-   declare -gn VALUE=$tname
-
-   local -n value=$vname
-   value[type]=
-   value[data]=
-}
-
-
-declare -i OP_NUM
-declare -- OP_NAME
-declare -- OP
-
-function mk_op {
-   (( OP_NUM++ ))
-   local --  oname="OP_${OP_NUM}"
-
-   declare -gA $oname
-   declare -gA OP_NAME=$oname
-   declare -gn OP=$oname
-
-   local -n op=$oname
-   op=()
-}
-
-
-function walk_compile {
-   declare -g NODE="$1"
-   compile_${TYPEOF[$NODE]}
-}
-
-
-function compile_decl_section {
-   local -- save=$NODE
-   local -n node=$save
-
-   declare -n items="${node[items]}" 
-   for each in "${items[@]}"; do
-      walk_compile $each
-   done
-
-   declare -g NODE=$save
-}
-
-
-function compile_decl_variable {
-   local -- save=$NODE
-   local -n node=$save
-
-   walk ${node[expr]}
-
-   declare -g NODE=$save
-}
-
-
-# Pass, nothing to do.
-function compile_typedef { :; }
-
-
-#function compile_binary {
-#   local -- save=$NODE
-#   local -n node=$save
-#   local -n op=${node[op]}
-#
-#   walk_compile ${node[left]}
-#   local -- type_left=$TYPE
-#
-#   walk_compile ${node[right]}
-#   local -- type_right=$TYPE
-#
-#   declare -g NODE=$save
-#}
-
-
-# This can only occur within a validation section. Validation expressions must
-# return a boolean.
-function compile_unary {
-   local -- save=$NODE
-   local -n node=$save
-
-   walk_compile ${node[right]}
-
-   declare -g NODE=$save
-}
-
-
-function compile_array {
-   local -- save=$NODE
-   local -n node=$save
-
-   # I don't actually think you need to compile shit here, per se.
-   #for nname in "${node[@]}"; do
-   #   walk_compile $nname
-   #done
-
-   declare -g NODE=$save
-}
-
-
-function compile_boolean {
-   mk_type
-   local -- tname=$TYPE
-   local -n type=$TYPE
-   type[kind]='BOOLEAN'
-}
-
-
-function compile_integer {
-   mk_type
-   local -- tname=$TYPE
-   local -n type=$TYPE
-   type[kind]='INTEGER'
-}
-
-
-function compile_string {
-   mk_type
-   local -- tname=$TYPE
-   local -n type=$TYPE
-   type[kind]='STRING'
-}
-
-
-function compile_path {
-   mk_type
-   local -- tname=$TYPE
-   local -n type=$TYPE
-   type[kind]='PATH'
-}
-
-
-function compile_identifier {
-   mk_type
-   local -- tname=$TYPE
-   local -n type=$TYPE
-
-   local -n node=$NODE
-   local -- kind=${BUILT_INS[${node[value]}]}
-   if [[ -z $kind ]] ; then
-      echo "Invalid type \`${node[value]}\`" 1>&2
-      exit -1
-   fi
-
-   type[kind]=$kind
-}
-
-
-#function compile_func_call { :; }
 
 #──────────────────────────────────( engage )───────────────────────────────────
 walk_data $ROOT
