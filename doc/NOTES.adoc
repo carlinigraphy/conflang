@@ -207,22 +207,69 @@ context {
 ----
 
 
+== Rethink nested ``source``ing structure
+
+Sourcing from a process substitution is really neat, and has clear benefits.
+Can re-use common names across multiple files (`advance`, `peek`, etc.).
+
+I'm running into clear drawbacks:
+
+. Difficulty troubleshooting (sources all output to `stdout`)
+. Difficulty testing
+
+If each file does not contain *executable* code (kinda), it would be more testable.
+Only variable & function declarations.
+Each function can then be called from a `main.sh` file or something.
+
+.parser.sh
+[source,bash]
+----
+declare -gA TOKENS=()
+declare -g  TOKEN=
+
+function parse     { :; }
+function p_advance { :; }
+function p_peek    { :; }
+function p_number  { ;: }
+----
+
+.main.sh
+[source,bash]
+----
+function make_ast {
+   scan
+   parse
+}
+
+source 'parser.sh'
+source 'lexer.sh'
+----
+
+There are some global variables that are not kept run-to-run.
+Those should be explicitly reset each time.
+For example, file/cursor information in the lexer.
+
+I do feel that we lose a little bit of '`cleverness`' from our current approach.
+However in the end, it's certainly more important to be testable and well written.
+
+This, unlikely many of the other `hre-utils`, I want to be *good*, rather than just *neat*.
+
+
 == What do I work on now?
 
 For when I get stuck, what are things I can work on...
 
+.Core features that *do not* yet work
+* BATS tests
+* Error handling
+* Referencing bash environment variables
+* Referencing interal variables?
+
 .Core features that *do* work
+* Merging child file -> parent
 * Lexing, parsing, and compiling basic (non-directive) .config files
 * Support for basic type checking
 * Accessing variables from .config file
 * Importing/including/extending to other .config files
 * Directive/test contexts
 * Error reporting
-
-.Core features that *do not* yet work
-* Merging child file -> parent
-* BATS tests
-* Error handling
-* Type casting
-* Referencing bash environment variables
-* Referencing interal variables?
