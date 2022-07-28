@@ -6,11 +6,11 @@
 #  NODE_*
 
 
-declare -- NODE
+declare -- NODE=
 
 #────────────────────────────────( build data )─────────────────────────────────
 # TODO: documentation
-declare -- KEY DATA
+declare -- KEY= DATA=
 
 declare -i DATA_NUM=0
 declare -- _DATA_ROOT='_DATA_1'
@@ -157,6 +157,12 @@ function data_identifier {
 # checking to merge the two trees. Though maybe we fully ignore types here, and
 # do a completely separate typechecking pass.
 
+declare -a SCOPE=()
+declare -- SYMTAB=
+declare -i SYMTAB_NUM=0
+
+
+
 #─────────────────────────────( semantic analysis )─────────────────────────────
 # Easy way of doing semantic analysis is actually similar to how we did the node
 # traversal in the `conf()` function. Globally point to a Type() node.
@@ -166,11 +172,11 @@ function data_identifier {
  
 # Pointer to the Type object of the currently selected Node. This will be
 # compared to the $TARGET_TYPE.
-declare -- TYPE
+declare -- TYPE=
 declare -i TYPE_NUM=0
 
 # Holds the intended target from a typedef. Compared to sub-expression's Types.
-declare -- TARGET_TYPE
+declare -- TARGET_TYPE=
 
 declare -A BUILT_INS=(
    [int]='INTEGER'
