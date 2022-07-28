@@ -1,5 +1,7 @@
 #!/bin/bash
 
+declare -p FILES
+
 (( FILE_IDX = ${#FILES[@]} - 1 ))
 
 declare -a TOKENS=()

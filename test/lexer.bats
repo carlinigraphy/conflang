@@ -14,8 +14,6 @@ function setup {
 
 @test "lexer correctly identifies integers" { skip; }
 @test "lexer correctly identifies keywords" {
-   declare -a FILES=( "${files}"/keywords.conf )
    run $lexer
-
    echo "$output" 1>&3
 }
