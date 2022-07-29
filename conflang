@@ -167,11 +167,23 @@ function identify_constraint_file {
 }
 
 
-# This toomfoolery is just to isolate all the functions/variables to each
-# respective file. Particularly as the lexer/parser reuse function names like
-#  `advance`, `current`, etc.
-# Only the particular information we *want* to export is.
 function parse {
+   # TODO: rewrite
+   # 100% need to rethink this current implementation. I have enjoyed the
+   # niftiness of keeping all of the state isolated to its little scope, but
+   # it's honestly causing a lot of problems.
+   #  - Need to re-source the whole lexer/parser on every run
+   #  - Error handling becomes very tricky
+   #  - Testability goes out the fucking window
+   #
+   # Lexer & parser files should not have any executable code that changes
+   # state.
+   #
+   # When we only ran the lexer, parser, and compiler *once* each, it was a
+   # very cool approach. Less good now. Though this is going to result in us
+   # polluting the global namespace with variable/function name collisions.
+   # Hence my `source`ing nonsense below.
+
    source <(
       source <(
          source "${LIBDIR}"/lexer.sh
@@ -196,6 +208,10 @@ function parse {
 
    )
 
+   # TODO:
+   # This is a fine intermediate solution while I'm running into all sorts of
+   # errors in the lexer/parser, and don't have a good way of handling them...
+   # Needs a rewrite though.
    [[ $LEX_SUCCESS && $PARSE_SUCCESS ]] || exit 1
 }
 
@@ -210,14 +226,9 @@ merge_includes
 # Reset INCLUDE_ROOT[] and INCLUDES[] before parsing the constrain'd file(s).
 declare -a INCLUDE_ROOT=()  INCLUDES=()
 
-declare -p CONSTRAINTS FILES 1>&2
-
 _f0=${#FILES[@]}
 identify_constraint_file 
 _f1=${#FILES[@]}
-
-declare -p CONSTRAINTS FILES 1>&2
-
 
 # This is a little nonsense, but it saves us from creating another global var
 # to track if we've hit a valid child file. `identify_constraint_file()` adds
