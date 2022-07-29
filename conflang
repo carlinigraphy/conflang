@@ -149,17 +149,20 @@ function identify_constraint_file {
          ~*)   fq_path="${file/\~/${HOME}}" ;;
          *)    fq_path=$( realpath -m "${INPUT%/*}/${file}" -q ) ;;
       esac
-      [[ -f "$fq_path" ]] && constrain_file="$fq_path"
    done
 
+   if [[ ! -f "$fq_path" ]] ; then
+      raise missing_file "$fq_path"
+   fi
+
    for f in "${FILES[@]}" ; do
-      if [[ "$f" == "$constrain_file" ]] ; then
+      if [[ "$f" == "$fq_path" ]] ; then
          raise parse_error "\`$f' may not be both a %constrain and %include"  
       fi
    done
 
-   if [[ $constrain_file ]] ; then
-      FILES+=( "$constrain_file" )
+   if [[ $fq_path ]] ; then
+      FILES+=( "$fq_path" )
    fi
 }
 
@@ -190,11 +193,14 @@ function parse {
       #  ROOT
       #  TYPEOF{}
       #  NODE_*
+
    )
 
    [[ $LEX_SUCCESS && $PARSE_SUCCESS ]] || exit 1
 }
 
+
+#──────────────────────────────────( parser )───────────────────────────────────
 # Parse the top-level `base' file.
 add_file "$INPUT"
 parse ; parent_root=$ROOT
@@ -204,9 +210,14 @@ merge_includes
 # Reset INCLUDE_ROOT[] and INCLUDES[] before parsing the constrain'd file(s).
 declare -a INCLUDE_ROOT=()  INCLUDES=()
 
+declare -p CONSTRAINTS FILES 1>&2
+
 _f0=${#FILES[@]}
 identify_constraint_file 
 _f1=${#FILES[@]}
+
+declare -p CONSTRAINTS FILES 1>&2
+
 
 # This is a little nonsense, but it saves us from creating another global var
 # to track if we've hit a valid child file. `identify_constraint_file()` adds
@@ -225,15 +236,37 @@ ROOT=$parent_root
 # DEBUGGING:
 #declare -p ${!NODE_*} | sort -V -k3
 
+
+#─────────────────────────────────( compiler )──────────────────────────────────
 source "${LIBDIR}"/compiler.sh
 # Exports (USER ACCESSIBLE):
 #  _DATA_ROOT
 #  _DATA_*
 
-source "${LIBDIR}"/api.sh
+walk_data $ROOT
+
+# Each section assumes there's a scope above it. There is a "hidden" top-
+# level section `%inline'. Need to create a parent scope above to hold it.
+mk_scope ; parent_scope=$SCOPE
+walk_scope $parent_root
+
+if [[ $child_root ]] ; then
+   mk_scope ; parent_scope=$SCOPE
+   walk_scope $child_root
+fi
+
+#declare -p ${!SCOPE_*}
+#declare -p SYMBOL_1
+#declare -p SYMBOL_2
+
+#───────────────────────────────────( api )─────────────────────────────────────
+## DISABLED API WHILE WORKING ON MERGING TREES AND WHATNOT.
+
+#child_data_root=$_DATA_ROOT
+#source "${LIBDIR}"/api.sh
 # Exports (USER ACCESSIBLE):
 #  RV
 #  conf()
 
 # Example usage:
-conf sub2 ; echo "${RV@Q}"
+#conf sub2 ; echo "${RV@Q}"
