@@ -148,6 +148,8 @@ function data_identifier {
 #       - The child cannot overwrite a parent's type declaration
 #     - If the child has a value, it *overwrites* the parent's value
 #     - (Later) If the child has directives, they're *append* to the parent's
+#       - Should probably compare if the directive/test does not currently
+#         exist, so we're not duplicating.
 #     - Any *additional* names in the child's scope are merged to the parent
 #       - It may actually be easier to generate a completely separate resulting
 #         tree, rather than moving from one to the other
@@ -156,11 +158,44 @@ function data_identifier {
 # take the place of the current semantic analysis, as we will need to do type
 # checking to merge the two trees. Though maybe we fully ignore types here, and
 # do a completely separate typechecking pass.
+#
+# 2022-07-28
+# I don't actually think symbol tables are the right approach for this. We don't
+# have the same sort of lexical scoping that a programming language does. There
+# is not any way of referring to declared identifiers.
+# It would also be nice if we could strip things down to dicts of the raw
+# values:
+#
+# ## Top parent scope
+# SCOPE_01=(
+#     [global] = Type(Section, subtype: None, next: SCOPE_02),
+#     [dirs]   = Type(Array, subtype: Type(String), next: None)
+# )
+#
+# But how to handle the child's ADDITIONAL nodes that must be appended. Would
+# need more information.
+#  - Type
+#    - kind
+#    - subtype
+#  - node         # name of that variable/section declaration node (e.g. NODE_1)
+#  - next         # name of nested scope to descend into (for section decls)
 
-declare -a SCOPE=()
-declare -- SYMTAB=
-declare -i SYMTAB_NUM=0
+# Dict(s) of name -> Type mappings... and other information.
+declare -- SCOPE=
+declare -i SCOPE_NUM=0
 
+function pop_scope {
+   SCOPES=( ${SCOPES[@]::${#SCOPES[@]}-1} )
+}
+
+
+function mk_symtab {
+   (( SCOPE_NUM++ ))
+   local   --  sname="SCOPE_${SCOPE_NUM}"
+   declare -gA sname
+   declare -g  SCOPE=$sname
+   local   -n  scope=$sname
+}
 
 
 #─────────────────────────────( semantic analysis )─────────────────────────────
