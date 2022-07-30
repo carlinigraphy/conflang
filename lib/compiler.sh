@@ -245,6 +245,118 @@ function scope_identifier {
    type[kind]=$kind
 }
 
+#───────────────────────────────( merge trees )─────────────────────────────────
+# After generating the symbol tables for the parent & child, iterate over the
+# parent's, merging in nodes. I'm not 100% sure if this should be in the
+# compiler.
+#
+# Merging is only necessary if the parent has %constrain statements.
+
+# Gives friendly means of reporting to the user where an error has occurred.
+# As we descend into each scope, push its name to the stack. Print by doing a
+# SCOPE_STR.join('.'). Example:
+#
+#> SCOPE_STR=([0]='global' [1]='subsection')
+#> identifier=${node[name]}
+#>
+#> for s in "${SCOPE_STR[@]}" ; do
+#>    echo -n "${s}."
+#> done
+#> echo "${identifier}"       # "global.subsection.$identifier"
+declare -a SCOPE_STR=()
+
+# Don't want to exit instantly on the first missing key. Collect them all,
+# report and fail at the end.
+declare -a MISSING_KEYS=()
+
+# Currently just logs the `path' to the identifier whose type was incorrect.
+# Need to also display file/line/column/expected type information.
+declare -a TYPE_MISMATCH=()
+
+
+function merge_typedef {
+   # A child cannot modify the typedef of a parent. However if the parent does
+   # not provide any type definitions, substitute in the child's.
+}
+
+
+# Need to think this this through a little bit more. What am I actually trying
+# to do here? We're iterating SCOPES, not sections or variables necessarily.
+# Keep falling back to forgetting what we're actually iterating through lol.
+function merge_scope {
+   local -- parent_scope_root=$1
+   local -n parent_scope=$1
+
+   local -- child_scope_root=$2
+   local -n child_scope=$2
+
+   # We iterate over the parent scope. So we're guaranteed to hit every key
+   # there. The child scope may contain *extra* keys that we need to merge in.
+   # Every time we match a key from the parent->child, we can pop it from this
+   # copy. Anything left is a duplicate that must be merged.
+   local -a child_keys=( "${!child_scope[@]}" )
+
+   for p_key in "${!parent_scope[@]}" ; do
+      # Parent Symbol.
+      local -- p_sym_name="${parent_scope[$p_key]}"
+      local -n p_sym=$p_sym_name
+      local -n p_node=${p_sym[node]}
+
+      # Child Symbol.
+      local -- c_sym_name="${child_scope[$p_key]}"
+
+      # For error reporting, build a "fully qualified" path to this node.
+      local fq_name=''
+      for s in "${SCOPE_STR[@]}" ; do
+         fq_name+="${s}."
+      done
+      fq_name+="${p_key}"
+
+      # NOTES:
+      # Since I'm a goon, I didn't use an `ANY` type if left blank. So we need
+      # to explicitly check if there is a type node. Trying to nameref to an
+      # empty value will throw an exception.
+
+      # Parent type information.
+      local p_type_name="${p_sym[type]}"
+      if [[ $p_type_name ]] ; then
+         local -n p_type=$p_type_name
+      fi
+
+   done
+}
+
+
+
+function merge_variable {
+   # We don't want to report a child key as being `missing' if the parent has a
+   # default value. We can just keep the default value and continue.
+   # Unfortunately there is not a good way to do this for sections. Could allow
+   # a section to be missing if the parent doesn't contain any non-default
+   # variable declarations. Maybe if we did something bottom-to-top? Need to
+   # recurse all the way to the bottom? Need to think through a good way of
+   # going about this.
+
+   local fq_name=''
+   for s in "${SCOPE_STR[@]}" ; do
+      fq_name+="${s}."
+   done
+   fq_name+="${p_key}"
+
+   # A child node must either not have a type declaration, or have one that
+   # matches the parent.
+   local -n c_node=${c_sym[node]}
+   if [[ ! "${p_sym[type]}" && ${c_node[expr]} ]] ; then
+      # Realistically we likely want to make sure if we're copying the
+      # child's typedef over, they should ALSO have provided an expression.
+      # It would not make sense to throw an error if the parent's default
+      # value does not adhere to the child's typedef.
+      p_sym[type]=${c_sym[type]}
+      p_node[expr]=${c_sym[expr]}
+   else
+   fi
+}
+
 
 #────────────────────────────────( build data )─────────────────────────────────
 # TODO: documentation
@@ -390,7 +502,31 @@ function data_identifier {
 # 
 ## Holds the intended target from a typedef. Compared to sub-expression's Types.
 #declare -- TARGET_TYPE=
+
+
+
+#function type_equality {
+#   [[ "$1" ]] || return 1
+#   local -- t1_name="$1"
+#   local -n t1="$1"
 #
+#   [[ "$2" ]] || return 1
+#   local -- t2_name="$2"
+#   local -n t2="$2"
+#
+#   if [[ ${t1[kind]} != ${t2[kind]} ]] ; then
+#      return 1
+#   fi
+#
+#   if [[ ${t1[subtype]} ]] ; then
+#      type_equality "${t1[subtype]}" "${t2[subtype]}" 
+#      return $?
+#   fi
+#
+#   return 0
+#}
+
+
 #
 #function walk_semantics {
 #   declare -g NODE="$1"
