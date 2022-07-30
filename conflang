@@ -264,12 +264,17 @@ walk_scope $parent_root
 if [[ $child_root ]] ; then
    mk_scope ; child_scope=$SCOPE
    walk_scope $child_root
+
+   merge_scope "$parent_scope" "$child_scope"
 fi
 
 #declare -p parent_scope child_scope
 #declare -p ${!SCOPE_*}
 #declare -p SYMBOL_1
 #declare -p SYMBOL_2
+#declare -p ${!NODE_*}
+
+walk_pprint "$parent_root"
 
 #───────────────────────────────────( api )─────────────────────────────────────
 ## DISABLED API WHILE WORKING ON MERGING TREES AND WHATNOT.

@@ -205,6 +205,13 @@ function scope_decl_variable {
    if [[ ${node[type]} ]] ; then
       walk_scope ${node[type]}
       symbol[type]=$TYPE
+   else
+      # If user does not specify a type declaration, it gets an implicit ANY
+      # type that matches anything.
+      mk_type
+      local -n type=$TYPE
+      type[kind]='ANY'
+      symbol[type]=$TYPE
    fi
 
    declare -g NODE=$node_name
@@ -231,11 +238,11 @@ function scope_typedef {
 
 # Identifiers in this context are used only as type names.
 function scope_identifier {
-   local -n nname=$NODE
-   local -- node=$NODE
+   local -- nname=$NODE
+   local -n node=$NODE
 
    local -- kind=${DEFAULT_TYPES[${node[value]}]}
-   if [[ -z $kind ]] ; then
+   if [[ ! $kind ]] ; then
       raise invalid_type_error "${node[value]}"
    fi
 
@@ -273,16 +280,29 @@ declare -a MISSING_KEYS=()
 # Need to also display file/line/column/expected type information.
 declare -a TYPE_MISMATCH=()
 
+# Cannot re-declare a typedef that's already been defined.
+declare -a TYPE_REDECLARE=()
 
-function merge_typedef {
-   # A child cannot modify the typedef of a parent. However if the parent does
-   # not provide any type definitions, substitute in the child's.
+
+function merge_type {
+   [[ ! $1 || ! $2 ]] ; return 1
+
+   local -- t1_name="$1" t2_name="$2"
+   local -n t1="$1"      t2="$2"
+
+   if [[ ${t1[kind]} != ${t2[kind]} ]] ; then
+      return 1
+   fi
+
+   if [[ ${t1[subtype]} ]] ; then
+      merge_type "${t1[subtype]}" "${t2[subtype]}"
+      return $?
+   fi
+
+   return 0
 }
 
 
-# Need to think this this through a little bit more. What am I actually trying
-# to do here? We're iterating SCOPES, not sections or variables necessarily.
-# Keep falling back to forgetting what we're actually iterating through lol.
 function merge_scope {
    local -- parent_scope_root=$1
    local -n parent_scope=$1
@@ -302,9 +322,6 @@ function merge_scope {
       local -n p_sym=$p_sym_name
       local -n p_node=${p_sym[node]}
 
-      # Child Symbol.
-      local -- c_sym_name="${child_scope[$p_key]}"
-
       # For error reporting, build a "fully qualified" path to this node.
       local fq_name=''
       for s in "${SCOPE_STR[@]}" ; do
@@ -312,49 +329,71 @@ function merge_scope {
       done
       fq_name+="${p_key}"
 
-      # NOTES:
-      # Since I'm a goon, I didn't use an `ANY` type if left blank. So we need
-      # to explicitly check if there is a type node. Trying to nameref to an
-      # empty value will throw an exception.
-
       # Parent type information.
       local p_type_name="${p_sym[type]}"
-      if [[ $p_type_name ]] ; then
-         local -n p_type=$p_type_name
+
+      # Child Symbol.
+      local -- c_sym_name="${child_scope[$p_key]}"
+
+      # If child exists, declare type information and namerefs.
+      if [[ $c_sym_name ]] ; then
+         local child_exists='yes'
+         # Just little helper var to make it a little more clear in tests what
+         # we're actually checking for.
+         local -n c_sym=$c_sym_name
+         local -- c_type_name=${c_sym[type]}
+         local -- c_node_name=${c_sym[node]}
+         local -n c_node=$c_node_name
       fi
 
+      # Section declarations are fairly straightforward: Any section defined in
+      # the parent must also exist in the child.
+      if [[ ${TYPEOF[${p_sym[node]}]} == 'SECTION' ]] ; then
+         if [[ ! $child_exists ]] ; then
+            MISSING_KEYS+=( "$fq_name" )
+            continue
+            # TODO:
+            # Instead of skipping we may honestly want to just create an empty
+            # scope for the child. If the parent has nested sections, but the
+            # child is missing the top-most of them, this would allow us to
+            # continue checking the sub-sections.
+         fi
+
+         if [[ ${TYPEOF[${c_sym[node]}]} == 'SECTION' ]] ; then
+            TYPE_MISMATCH+=( "$fq_name" )
+            continue
+         fi
+
+         merge_scope "${p_sym[scope]}" "${c_sym[scope]}"
+         continue
+      else
+         # The only types of symbols are section or variable declarations. If
+         # the current node is not a section, it must be a variable.
+
+         # Helper var for more clarification in tests.
+         if [[ ${p_node[expr]} ]] ; then
+            local has_default='yes'
+         fi
+
+         if [[ ! $child_exists ]] ; then
+            # If the parent has not defined a default value for the variable,
+            # then the key is missing.
+            if [[ ! $has_default ]] ; then
+               MISSING_KEYS+=( "$fq_name" )
+            fi
+
+            continue
+         fi
+
+         if ! merge_type "$p_type_name" "$c_type_name" ; then
+            TYPE_REDECLARE+=( "$fq_name" )
+         fi
+
+         # Always overwrite a parent's expression with the child's. Even if the
+         # child has an empty declaration.
+         p_node[expr]=${c_node[expr]}
+      fi
    done
-}
-
-
-
-function merge_variable {
-   # We don't want to report a child key as being `missing' if the parent has a
-   # default value. We can just keep the default value and continue.
-   # Unfortunately there is not a good way to do this for sections. Could allow
-   # a section to be missing if the parent doesn't contain any non-default
-   # variable declarations. Maybe if we did something bottom-to-top? Need to
-   # recurse all the way to the bottom? Need to think through a good way of
-   # going about this.
-
-   local fq_name=''
-   for s in "${SCOPE_STR[@]}" ; do
-      fq_name+="${s}."
-   done
-   fq_name+="${p_key}"
-
-   # A child node must either not have a type declaration, or have one that
-   # matches the parent.
-   local -n c_node=${c_sym[node]}
-   if [[ ! "${p_sym[type]}" && ${c_node[expr]} ]] ; then
-      # Realistically we likely want to make sure if we're copying the
-      # child's typedef over, they should ALSO have provided an expression.
-      # It would not make sense to throw an error if the parent's default
-      # value does not adhere to the child's typedef.
-      p_sym[type]=${c_sym[type]}
-      p_node[expr]=${c_sym[expr]}
-   else
-   fi
 }
 
 
@@ -689,3 +728,125 @@ function data_identifier {
 ## pass.
 ## No semantics to be checked here. Identifiers can only occur as names to
 ## elements, or function calls.
+
+
+#───────────────────────────────( pretty print )────────────────────────────────
+# For debugging, having a pretty printer is super useful. Also supes good down
+# the line when we want to make a function for script-writers to dump a base
+# skeleton config for users.
+
+declare -i INDENT_FACTOR=2
+declare -i INDENTATION=0
+
+
+function walk_pprint {
+   declare -g NODE="$1"
+   pprint_${TYPEOF[$NODE]}
+}
+
+
+function pprint_decl_section {
+   # Save reference to current NODE. Restored at the end.
+   local -- save=$NODE
+   local -n node=$save
+
+   walk_pprint ${node[name]}
+   printf '{\n'
+
+   (( INDENTATION++ ))
+
+   local -n items="${node[items]}" 
+   for nname in "${items[@]}"; do
+      walk_pprint $nname
+   done
+
+   (( INDENTATION-- ))
+   printf "%$(( INDENTATION * INDENT_FACTOR ))s}\n" ''
+
+   declare -g NODE="$save"
+}
+
+
+function pprint_decl_variable {
+   local -- save=$NODE
+   local -n node=$save
+
+   printf "%$(( INDENTATION * INDENT_FACTOR ))s" ''
+   walk_pprint ${node[name]}
+
+   if [[ ${node[type]} ]] ; then
+      printf '('
+      walk_pprint "${node[type]}"
+      printf ') '
+   fi
+
+   if [[ ${node[expr]} ]] ; then
+      walk_pprint ${node[expr]}
+      printf ';\n'
+   fi
+
+   declare -g NODE=$save
+}
+
+
+function pprint_typedef {
+   local -- save=$NODE
+   local -n node=$save
+
+   printf '%s' "${node[kind]}"
+
+   if [[ "${node[subtype]}" ]] ; then
+      printf ':'
+      walk_pprint "${node[subtype]}"
+   fi
+
+   declare -g NODE=$save
+}
+
+
+function pprint_array {
+   local -- save=$NODE
+   local -n node=$save
+
+   (( INDENTATION++ ))
+   printf '['
+
+   for nname in "${node[@]}"; do
+      walk_pprint $nname
+   done
+
+   printf "%$(( INDENTATION * INDENT_FACTOR ))s]" ''
+   (( INDENTATION-- ))
+
+   declare -g NODE=$save
+}
+
+
+function pprint_boolean {
+   local -n node=$NODE
+   printf '%s' "${node[value]}"
+}
+
+
+function pprint_integer {
+   local -n node=$NODE
+   printf '%s' "${node[value]}"
+}
+
+
+function pprint_string {
+   local -n node=$NODE
+   printf '"%s"' "${node[value]}"
+}
+
+
+function pprint_path {
+   local -n node=$NODE
+   printf "'%s'" "${node[value]}"
+}
+
+
+function pprint_identifier {
+   local -n node=$NODE
+   printf '%s ' "${node[value]}"
+}
