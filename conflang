@@ -140,6 +140,8 @@ function merge_includes {
 
 
 function identify_constraint_file {
+   [[ ${#CONSTRAINTS[@]} -eq 0 ]] && return 0
+
    local -- fq_path
    local -- constrain_file
 
@@ -244,17 +246,12 @@ fi
 # Restore top-level root node.
 ROOT=$parent_root
 
-# DEBUGGING:
-#declare -p ${!NODE_*} | sort -V -k3
-
 
 #─────────────────────────────────( compiler )──────────────────────────────────
 source "${LIBDIR}"/compiler.sh
 # Exports (USER ACCESSIBLE):
 #  _DATA_ROOT
 #  _DATA_*
-
-walk_data $ROOT
 
 # Each section assumes there's a scope above it. There is a "hidden" top-
 # level section `%inline'. Need to create a parent scope above to hold it.
@@ -268,13 +265,19 @@ if [[ $child_root ]] ; then
    merge_scope "$parent_scope" "$child_scope"
 fi
 
-#declare -p parent_scope child_scope
-#declare -p ${!SCOPE_*}
-#declare -p SYMBOL_1
-#declare -p SYMBOL_2
-#declare -p ${!NODE_*}
+# DEBUGGING:
+#(
+#   #declare -p parent_scope child_scope
+#   #declare -p ${!SCOPE_*}
+#   #declare -p SYMBOL_1
+#   #declare -p SYMBOL_2
+#   #declare -p ${!NODE_*}
+#) | sort -V -k3
 
 walk_pprint "$parent_root"
+
+exit 0
+walk_data $ROOT
 
 #───────────────────────────────────( api )─────────────────────────────────────
 ## DISABLED API WHILE WORKING ON MERGING TREES AND WHATNOT.

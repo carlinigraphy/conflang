@@ -224,9 +224,8 @@ function scope_typedef {
 
    walk_scope ${node[kind]}
    local -- tname=$TYPE
-   local -n type=$TYPE
 
-   if [[ -n ${node[subtype]} ]] ; then
+   if [[ ${node[subtype]} ]] ; then
       walk_scope ${node[subtype]}
       type[subtype]=$TYPE
    fi
@@ -249,7 +248,7 @@ function scope_identifier {
    mk_type
    local -- tname=$TYPE
    local -n type=$TYPE
-   type[kind]=$kind
+   type[kind]="$kind"
 }
 
 #───────────────────────────────( merge trees )─────────────────────────────────
@@ -348,7 +347,7 @@ function merge_scope {
 
       # Section declarations are fairly straightforward: Any section defined in
       # the parent must also exist in the child.
-      if [[ ${TYPEOF[${p_sym[node]}]} == 'SECTION' ]] ; then
+      if [[ ${TYPEOF[${p_sym[node]}]} == 'decl_section' ]] ; then
          if [[ ! $child_exists ]] ; then
             MISSING_KEYS+=( "$fq_name" )
             continue
@@ -751,7 +750,7 @@ function pprint_decl_section {
    local -n node=$save
 
    walk_pprint ${node[name]}
-   printf '{\n'
+   printf ' {\n'
 
    (( INDENTATION++ ))
 
@@ -775,12 +774,13 @@ function pprint_decl_variable {
    walk_pprint ${node[name]}
 
    if [[ ${node[type]} ]] ; then
-      printf '('
+      printf ' ('
       walk_pprint "${node[type]}"
-      printf ') '
+      printf ')'
    fi
 
    if [[ ${node[expr]} ]] ; then
+      printf ' '
       walk_pprint ${node[expr]}
       printf ';\n'
    fi
@@ -793,7 +793,7 @@ function pprint_typedef {
    local -- save=$NODE
    local -n node=$save
 
-   printf '%s' "${node[kind]}"
+   walk_pprint "${node[kind]}"
 
    if [[ "${node[subtype]}" ]] ; then
       printf ':'
@@ -812,11 +812,12 @@ function pprint_array {
    printf '['
 
    for nname in "${node[@]}"; do
+      printf "\n%$(( INDENTATION * INDENT_FACTOR ))s" ''
       walk_pprint $nname
    done
 
-   printf "%$(( INDENTATION * INDENT_FACTOR ))s]" ''
    (( INDENTATION-- ))
+   printf "\n%$(( INDENTATION * INDENT_FACTOR ))s]" ''
 
    declare -g NODE=$save
 }
@@ -848,5 +849,5 @@ function pprint_path {
 
 function pprint_identifier {
    local -n node=$NODE
-   printf '%s ' "${node[value]}"
+   printf '%s' "${node[value]}"
 }
