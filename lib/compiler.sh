@@ -284,21 +284,39 @@ declare -a TYPE_REDECLARE=()
 
 
 function merge_type {
-   [[ ! $1 || ! $2 ]] ; return 1
+   # Needed to rethink the merge_type() function. It's not a semantic typecheck.
+   # It needs to fail if the child has attempted to re-declare a typedef. Thus,
+   # the child's type must always EITHER:
+   #  1. Match exactly
+   #  2. Be 'ANY'
+   #  3. Not exist (in the case of a parent subtype, and the child's is empty)
+
+   # case 3.
+   # If there's a defined parent type, but no child.
+   # This is acceptable.
+   [[ $1 || ! $2 ]] && return 0
 
    local -- t1_name="$1" t2_name="$2"
    local -n t1="$1"      t2="$2"
 
-   if [[ ${t1[kind]} != ${t2[kind]} ]] ; then
-      return 1
+   # case 2.
+   # Doesn't matter what the parent's type was. The child is not declaring it,
+   # thus respecting the imposed type.
+   [[ "${t2[kind]}" == 'ANY' ]] && return 0
+
+   # case 1.
+   # Parent and child's types match exactly.
+   if [[ ${t1[kind]} == ${t2[kind]} ]] ; then
+      return 0
    fi
 
+   # Same as above, but for any subtypes.
    if [[ ${t1[subtype]} ]] ; then
       merge_type "${t1[subtype]}" "${t2[subtype]}"
       return $?
    fi
 
-   return 0
+   return 1
 }
 
 
