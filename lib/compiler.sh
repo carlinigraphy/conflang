@@ -9,49 +9,6 @@
 declare -- NODE=
 
 #───────────────────────────────( symbol table )────────────────────────────────
-# CURRENT:
-# I think merging the trees is going to require 3-phases:
-#  1. Generate symbol table for parent tree
-#  2. Generate symbol table for child tree
-#  3. Iterate parent symbol table stack
-#     - Each name in that scope should have a matching name in the corresponding
-#       child scope
-#     - If a parent type is specified, the child value should match
-#       - The child cannot overwrite a parent's type declaration
-#     - If the child has a value, it *overwrites* the parent's value
-#     - (Later) If the child has directives, they're *append* to the parent's
-#       - Should probably compare if the directive/test does not currently
-#         exist, so we're not duplicating.
-#     - Any *additional* names in the child's scope are merged to the parent
-#       - It may actually be easier to generate a completely separate resulting
-#         tree, rather than moving from one to the other
-#
-# The third phase of this will clearly be the most difficult, and will likely
-# take the place of the current semantic analysis, as we will need to do type
-# checking to merge the two trees. Though maybe we fully ignore types here, and
-# do a completely separate typechecking pass.
-#
-# 2022-07-28
-# I don't actually think symbol tables are the right approach for this. We don't
-# have the same sort of lexical scoping that a programming language does. There
-# is not any way of referring to declared identifiers.
-# It would also be nice if we could strip things down to dicts of the raw
-# values:
-#
-# ## Top parent scope
-# SCOPE_01=(
-#     [global] = Type(Section, subtype: None, next: SCOPE_02),
-#     [dirs]   = Type(Array, subtype: Type(String), next: None)
-# )
-#
-# But how to handle the child's ADDITIONAL nodes that must be appended. Would
-# need more information.
-#  - Type
-#    - kind
-#    - subtype
-#  - node         # name of that variable/section declaration node (e.g. NODE_1)
-#  - scope        # name of nested scope to descend into (for section decls)
-
 declare -A DEFAULT_TYPES=(
    [int]='INTEGER'
    [str]='STRING'
@@ -62,20 +19,20 @@ declare -A DEFAULT_TYPES=(
 
 
 # Dict(s) of name -> Type mappings... and other information.
-declare -- SCOPE=
-declare -i SCOPE_NUM=${SCOPE_NUM:-0}
+declare -- SYMTAB=
+declare -i SYMTAB_NUM=${SYMTAB_NUM:-0}
 
-function mk_scope {
-   (( SCOPE_NUM++ ))
-   # A scope maps the string identifier names to a Symbol, containing Type
+function mk_symtab {
+   (( SYMTAB_NUM++ ))
+   # A symtab maps the string identifier names to a Symbol, containing Type
    # information, as well as references to the current node, and nested (?)
-   # scopes.
+   # symtab.
 
-   local   --  sname="SCOPE_${SCOPE_NUM}"
+   local   --  sname="SYMTAB_${SYMTAB_NUM}"
    declare -gA $sname
-   declare -g  SCOPE=$sname
-   local   -n  scope=$sname
-   scope=()
+   declare -g  SYMTAB=$sname
+   local   -n  symtab=$sname
+   symtab=()
 }
 
 
@@ -106,22 +63,22 @@ function mk_symbol {
 
    symbol[type]=
    symbol[node]=
-   symbol[scope]=
+   symbol[symtab]=
 }
 
 
-function walk_scope {
+function walk_symtab {
    declare -g NODE="$1"
-   scope_${TYPEOF[$NODE]}
+   symtab_${TYPEOF[$NODE]}
 }
 
 
-function scope_decl_section {
-   # Save references: current SCOPE & NODE
-   local -- scope_name=$SCOPE
+function symtab_decl_section {
+   # Save references: current SYMTAB & NODE
+   local -- symtab_name=$SYMTAB
    local -- node_name=$NODE
    local -n node=$NODE
-   local -n scope=$SCOPE
+   local -n symtab=$SYMTAB
 
    # Create symbol referring to this section.
    mk_symbol
@@ -130,7 +87,7 @@ function scope_decl_section {
 
    # Save reference to this declaration NODE in the symbol. Needed when merging
    # a child tree into the parent's. Any identifiers that are present in a
-   # child's scope but not a parents are directly appended into the parent's
+   # child's symtab but not a parents are directly appended into the parent's
    # tree. The only way that's possible is with a reference to the node itself.
    symbol[node]=$node_name
 
@@ -139,12 +96,12 @@ function scope_decl_section {
    local -n identifier=$identifier_node
    local -- name="${identifier[value]}"
 
-   # Add reference to current symbol in parent's SCOPE. First check if the user
-   # has already defined a variable with the same name in this scope.
-   if [[ ${scope[$name]} ]] ; then
+   # Add reference to current symbol in parent's SYMTAB. First check if the user
+   # has already defined a variable with the same name in this symtab.
+   if [[ ${symtab[$name]} ]] ; then
       raise name_error "$name"
    else
-      scope[$name]=$symbol_name
+      symtab[$name]=$symbol_name
    fi
 
    # Create Type(kind: 'Section') for this node. Used in semantic analysis to
@@ -155,28 +112,28 @@ function scope_decl_section {
    type[kind]='SECTION'
    symbol[type]=$type_name
 
-   # Create new scope for children of this section. Populate parent's scope
+   # Create new symtab for children of this section. Populate parent's symtab
    # with a reference to this one.
-   mk_scope
-   symbol[scope]=$SCOPE
+   mk_symtab
+   symbol[symtab]=$SYMTAB
 
    local -n items="${node[items]}" 
    for nname in "${items[@]}"; do
-      walk_scope $nname
+      walk_symtab $nname
    done
 
-   # Restore saved refs to the parent SCOPE, and current NODE.
+   # Restore saved refs to the parent SYMTAB, and current NODE.
    declare -g NODE=$node_name
-   declare -g SCOPE=$scope_name
+   declare -g SYMTAB=$symtab_name
 }
 
 
-function scope_decl_variable {
-   # Save references: current SCOPE & NODE
-   local -- scope_name=$SCOPE
+function symtab_decl_variable {
+   # Save references: current SYMTAB & NODE
+   local -- symtab_name=$SYMTAB
    local -- node_name=$NODE
    local -n node=$NODE
-   local -n scope=$SCOPE
+   local -n symtab=$SYMTAB
 
    # Create symbol referring to this section.
    mk_symbol
@@ -185,7 +142,7 @@ function scope_decl_variable {
 
    # Save reference to this declaration NODE in the symbol. Needed when merging
    # a child tree into the parent's. Any identifiers that are present in a
-   # child's scope but not a parents are directly appended into the parent's
+   # child's symtab but not a parents are directly appended into the parent's
    # tree. The only way that's possible is with a reference to the node itself.
    symbol[node]=$node_name
 
@@ -194,16 +151,16 @@ function scope_decl_variable {
    local -n identifier=$identifier_node
    local -- name="${identifier[value]}"
 
-   # Add reference to current symbol in parent's SCOPE. First check if the user
-   # has already defined a variable with the same name in this scope.
-   if [[ ${scope[$name]} ]] ; then
+   # Add reference to current symbol in parent's SYMTAB. First check if the user
+   # has already defined a variable with the same name in this symtab.
+   if [[ ${symtab[$name]} ]] ; then
       raise name_error "$name"
    else
-      scope[$name]=$symbol_name
+      symtab[$name]=$symbol_name
    fi
 
    if [[ ${node[type]} ]] ; then
-      walk_scope ${node[type]}
+      walk_symtab ${node[type]}
       symbol[type]=$TYPE
    else
       # If user does not specify a type declaration, it gets an implicit ANY
@@ -218,15 +175,15 @@ function scope_decl_variable {
 }
 
 
-function scope_typedef {
+function symtab_typedef {
    local -- save=$NODE
    local -n node=$save
 
-   walk_scope ${node[kind]}
+   walk_symtab ${node[kind]}
    local -- tname=$TYPE
 
    if [[ ${node[subtype]} ]] ; then
-      walk_scope ${node[subtype]}
+      walk_symtab ${node[subtype]}
       type[subtype]=$TYPE
    fi
 
@@ -236,7 +193,7 @@ function scope_typedef {
 
 
 # Identifiers in this context are used only as type names.
-function scope_identifier {
+function symtab_identifier {
    local -- nname=$NODE
    local -n node=$NODE
 
@@ -259,17 +216,17 @@ function scope_identifier {
 # Merging is only necessary if the parent has %constrain statements.
 
 # Gives friendly means of reporting to the user where an error has occurred.
-# As we descend into each scope, push its name to the stack. Print by doing a
-# SCOPE_STR.join('.'). Example:
+# As we descend into each symtab, push its name to the stack. Print by doing a
+# FQ_LOCATION.join('.'). Example:
 #
-#> SCOPE_STR=([0]='global' [1]='subsection')
+#> FQ_LOCATION=([0]='global' [1]='subsection')
 #> identifier=${node[name]}
 #>
-#> for s in "${SCOPE_STR[@]}" ; do
+#> for s in "${FQ_LOCATION[@]}" ; do
 #>    echo -n "${s}."
 #> done
 #> echo "${identifier}"       # "global.subsection.$identifier"
-declare -a SCOPE_STR=()
+declare -a FQ_LOCATION=()
 
 # Don't want to exit instantly on the first missing key. Collect them all,
 # report and fail at the end.
@@ -320,28 +277,28 @@ function merge_type {
 }
 
 
-function merge_scope {
-   local -- parent_scope_root=$1
-   local -n parent_scope=$1
+function merge_symtab {
+   local -- parent_symtab_root=$1
+   local -n parent_symtab=$1
 
-   local -- child_scope_root=$2
-   local -n child_scope=$2
+   local -- child_symtab_root=$2
+   local -n child_symtab=$2
 
-   # We iterate over the parent scope. So we're guaranteed to hit every key
-   # there. The child scope may contain *extra* keys that we need to merge in.
+   # We iterate over the parent symtab. So we're guaranteed to hit every key
+   # there. The child symtab may contain *extra* keys that we need to merge in.
    # Every time we match a key from the parent->child, we can pop it from this
    # copy. Anything left is a duplicate that must be merged.
-   local -a child_keys=( "${!child_scope[@]}" )
+   local -a child_keys=( "${!child_symtab[@]}" )
 
-   for p_key in "${!parent_scope[@]}" ; do
+   for p_key in "${!parent_symtab[@]}" ; do
       # Parent Symbol.
-      local -- p_sym_name="${parent_scope[$p_key]}"
+      local -- p_sym_name="${parent_symtab[$p_key]}"
       local -n p_sym=$p_sym_name
       local -n p_node=${p_sym[node]}
 
       # For error reporting, build a "fully qualified" path to this node.
       local fq_name=''
-      for s in "${SCOPE_STR[@]}" ; do
+      for s in "${FQ_LOCATION[@]}" ; do
          fq_name+="${s}."
       done
       fq_name+="${p_key}"
@@ -350,7 +307,7 @@ function merge_scope {
       local p_type_name="${p_sym[type]}"
 
       # Child Symbol.
-      local -- c_sym_name="${child_scope[$p_key]}"
+      local -- c_sym_name="${child_symtab[$p_key]}"
 
       # If child exists, declare type information and namerefs.
       if [[ $c_sym_name ]] ; then
@@ -371,7 +328,7 @@ function merge_scope {
             continue
             # TODO:
             # Instead of skipping we may honestly want to just create an empty
-            # scope for the child. If the parent has nested sections, but the
+            # symtab for the child. If the parent has nested sections, but the
             # child is missing the top-most of them, this would allow us to
             # continue checking the sub-sections.
          fi
@@ -381,7 +338,7 @@ function merge_scope {
             continue
          fi
 
-         merge_scope "${p_sym[scope]}" "${c_sym[scope]}"
+         merge_symtab "${p_sym[symtab]}" "${c_sym[symtab]}"
          continue
       else
          # The only types of symbols are section or variable declarations. If

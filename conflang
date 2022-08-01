@@ -253,16 +253,16 @@ source "${LIBDIR}"/compiler.sh
 #  _DATA_ROOT
 #  _DATA_*
 
-# Each section assumes there's a scope above it. There is a "hidden" top-
-# level section `%inline'. Need to create a parent scope above to hold it.
-mk_scope ; parent_scope=$SCOPE
-walk_scope $parent_root
+# Each section assumes there's a symtab above it. There is a "hidden" top-
+# level section `%inline'. Need to create a parent symtab above to hold it.
+mk_symtab ; parent_symtab=$SYMTAB
+walk_symtab $parent_root
 
 if [[ $child_root ]] ; then
-   mk_scope ; child_scope=$SCOPE
-   walk_scope $child_root
+   mk_symtab ; child_symtab=$SYMTAB
+   walk_symtab $child_root
 
-   merge_scope "$parent_scope" "$child_scope"
+   merge_symtab "$parent_symtab" "$child_symtab"
 fi
 
 # DEBUGGING:
@@ -278,9 +278,9 @@ fi
 #)
 #
 #(
-#   #declare -p parent_scope child_scope
+#   #declare -p parent_symtab child_symtab
 #   declare -p ${!NODE_*}
-#   declare -p ${!SCOPE_*}
+#   declare -p ${!SYMTAB*}
 #   declare -p ${!SYMBOL_*}
 #   declare -p ${!TYPE_*}
 #) | sort -V -k3 | sed "${sed_params[@]}"
