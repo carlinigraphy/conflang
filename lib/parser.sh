@@ -541,7 +541,7 @@ function decl_variable {
    fi
 
    # Expressions.
-   if ! check 'L_BRACE' ; then
+   if ! check 'L_BRACE' && ! check 'SEMI' ; then
       expression
       node[expr]=$NODE
    fi

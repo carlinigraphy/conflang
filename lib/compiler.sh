@@ -107,6 +107,10 @@ function mk_symbol {
    symbol[type]=
    symbol[node]=
    symbol[scope]=
+   symbol[required]=
+   # Variable declaration symbols are `required' if its NODE has no expression.
+   # A Section is considered to be `required' if *any* of its children are
+   # required. This is only needed when enforcing constraints upon a child file.
 }
 
 
@@ -165,6 +169,17 @@ function scope_decl_section {
       walk_scope $nname
    done
 
+   # Check if this section is `required'. If any of its children are required,
+   # it must be present in a child file.
+   local -n child_scope="${symbol[scope]}"
+   for c_sym_name in "${child_scope[@]}" ; do
+      local -n c_sym=$c_sym_name
+      if [[ "${c_sym[required]}" ]] ; then
+         symbol[required]='yes'
+         break
+      fi
+   done
+
    # Restore saved refs to the parent SCOPE, and current NODE.
    declare -g NODE=$node_name
    declare -g SCOPE=$scope_name
@@ -212,6 +227,12 @@ function scope_decl_variable {
       local -n type=$TYPE
       type[kind]='ANY'
       symbol[type]=$TYPE
+   fi
+
+   # Variables are `required' when they do not contain an expression. A child
+   # must fill in the value.
+   if [[ ! ${node[expr]} ]] ; then
+      symbol[required]='yes'
    fi
 
    declare -g NODE=$node_name

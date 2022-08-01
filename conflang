@@ -268,22 +268,20 @@ fi
 # DEBUGGING:
 # I certainly could've done this with fewer expressions, but at this point that's
 # not really my main concern.
-#sed_params=(
-#   -E
-#   -e 's,([[:alnum:]_])=\(,\1,'           # (strip opening paren)
-#   -e 's,\)$,,'                           # (strip closing paren)
-#   -e 's,\[,\n  [,g'                      # (puts keys on new line)
-#   -e 's,^declare\s-[-Aaig]+\s,,'         # declare -a NODE    ->  NODE
-#   -e 's,\[([[:alpha:]%]+)\]=,\1: ,g'     # [file]="value"     ->  file: "value"
-#)
-#
-#(
-#   #declare -p parent_scope child_scope
-#   declare -p ${!NODE_*}
-#   declare -p ${!SCOPE_*}
-#   declare -p ${!SYMBOL_*}
-#   declare -p ${!TYPE_*}
-#) | sort -V -k3 | sed "${sed_params[@]}"
+sed_params=(
+   -E
+   -e 's,([[:alnum:]_])=\(,\1,'           # (strip opening paren)
+   -e 's,\)$,,'                           # (strip closing paren)
+   -e 's,\[,\n  [,g'                      # (puts keys on new line)
+   -e 's,^declare\s-[-Aaig]+\s,,'         # declare -a NODE    ->  NODE
+   -e 's,\[([[:alnum:]%]+)\]=,\1: ,g'     # [file]="value"     ->  file: "value"
+) ; (
+   #declare -p parent_scope child_scope
+   declare -p ${!NODE_*}
+   declare -p ${!SCOPE_*}
+   declare -p ${!SYMBOL_*}
+   declare -p ${!TYPE_*}
+) | sort -V -k3 | sed "${sed_params[@]}"
 
 #walk_pprint "$parent_root"
 
