@@ -3,7 +3,6 @@
 # All the functions for debugging, or otherwise printing intermediate data as
 # to check things aren't burninatored.
 
-
 declare -i INDENT_FACTOR=2
 declare -i INDENTATION=0
 
@@ -14,10 +13,16 @@ function pprint_symtab {
    (( INDENTATION++ ))
 
    for key in "${!symtab[@]}" ; do
-      printf "%$(( INDENTATION * INDENT_FACTOR ))s%s" '' "$key"
-
       local -n symbol="${symtab[$key]}"
       local -n type="${symbol[type]}"
+      local -n node="${symbol[node]}"
+
+      if [[ "$key" == '%inline' ]] ; then
+         local -n name="${node[name]}"
+         printf "${FILES[${name[file]}]##*/}"
+      else
+         printf "%$(( INDENTATION * INDENT_FACTOR ))s%s" '' "$key"
+      fi
 
       if [[ "${type[kind]}" == 'SECTION' ]] ; then
          printf '\n'
