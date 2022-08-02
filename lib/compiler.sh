@@ -4,7 +4,12 @@
 #  ROOT
 #  TYPEOF{}
 #  NODE_*
-
+#  SECTION
+#  ^-- Name of the section we're currently in. After we've iterated through a
+#    pair of symtabs, any keys remaining in the child should be copied over to
+#    the parent. We must both copy the key:value from the symtab (for semantic
+#    analysis in the next phase), but also need to append the nodes themselves
+#    to the parent section's .items array.
 
 declare -- NODE=
 
@@ -26,7 +31,7 @@ function mk_symtab {
    (( SYMTAB_NUM++ ))
    # A symtab maps the string identifier names to a Symbol, containing Type
    # information, as well as references to the current node, and nested (?)
-   # symtab.
+   # symtabs.
 
    local   --  sname="SYMTAB_${SYMTAB_NUM}"
    declare -gA $sname
@@ -64,6 +69,10 @@ function mk_symbol {
    symbol[type]=
    symbol[node]=
    symbol[symtab]=
+   symbol[required]=
+   # Variable declaration symbols are `required' if its NODE has no expression.
+   # A Section is considered to be `required' if *any* of its children are
+   # required. This is only needed when enforcing constraints upon a child file.
 }
 
 
@@ -122,6 +131,17 @@ function symtab_decl_section {
       walk_symtab $nname
    done
 
+   # Check if this section is `required'. If any of its children are required,
+   # it must be present in a child file.
+   local -n child_symtab="${symbol[symtab]}"
+   for c_sym_name in "${child_symtab[@]}" ; do
+      local -n c_sym=$c_sym_name
+      if [[ "${c_sym[required]}" ]] ; then
+         symbol[required]='yes'
+         break
+      fi
+   done
+
    # Restore saved refs to the parent SYMTAB, and current NODE.
    declare -g NODE=$node_name
    declare -g SYMTAB=$symtab_name
@@ -169,6 +189,12 @@ function symtab_decl_variable {
       local -n type=$TYPE
       type[kind]='ANY'
       symbol[type]=$TYPE
+   fi
+
+   # Variables are `required' when they do not contain an expression. A child
+   # must fill in the value.
+   if [[ ! ${node[expr]} ]] ; then
+      symbol[required]='yes'
    fi
 
    declare -g NODE=$node_name
@@ -225,33 +251,200 @@ function symtab_identifier {
 #> for s in "${FQ_LOCATION[@]}" ; do
 #>    echo -n "${s}."
 #> done
-#> echo "${identifier}"       # "global.subsection.$identifier"
+#> echo "${identifier}"  # -> [$section.]+$identifier -> sect1.sect2.key
 declare -a FQ_LOCATION=()
+declare -- FQ_NAME=
 
 # Don't want to exit instantly on the first missing key. Collect them all,
 # report and fail at the end.
 declare -a MISSING_KEYS=()
 
 # Currently just logs the `path' to the identifier whose type was incorrect.
-# Need to also display file/line/column/expected type information.
-declare -a TYPE_MISMATCH=()
+# Need to also display file/line/column/expected type information. This is
+# different from a semantic typecheck. We're checking that a parent node is a
+# Section, and the child is as well. Or the parent is a variable declaration,
+# and the child matches.
+declare -a SYMBOL_MISMATCH=()
 
 # Cannot re-declare a typedef that's already been defined.
 declare -a TYPE_REDECLARE=()
 
 
+function merge_symtab {
+   local -- parent_symtab_root=$1
+   local -n parent_symtab=$1
+
+   local -- child_symtab_root=$2
+   local -n child_symtab=$2
+
+   # We iterate over the parent symtab. So we're guaranteed to hit every key
+   # there. The child symtab may contain *extra* keys that we need to merge in.
+   # Every time we match a key from the parent->child, we can pop it from this
+   # copy. Anything left is a duplicate that must be merged.
+   local -A child_keys=( "${!child_symtab[@]}" )
+   for k in "${!child_symtab[@]}" ; do
+      child_keys[$k]=
+   done
+   
+   for p_key in "${!parent_symtab[@]}" ; do
+      FQ_LOCATION+=( "$p_key" )
+
+      # Parent Symbol.
+      local -- p_sym_name="${parent_symtab[$p_key]}"
+      local -n p_sym=$p_sym_name
+      local -- p_node=${p_sym[node]}
+
+      # For error reporting, build a "fully qualified" path to this node.
+      local fq_name=''
+      for s in "${FQ_LOCATION[@]}" ; do
+         fq_name+="${s}."
+      done
+      fq_name+="${p_key}"
+      FQ_NAME="$fq_name"
+
+      # Parent type information.
+      local -- p_type_name="${p_sym[type]}"
+      local -n p_type=$p_type_name
+
+      # Child Symbol.
+      local -- c_sym_name="${child_symtab[$p_key]}"
+      
+      # Pop reference to child symbol from the `child_keys[]` copy. Will allow
+      # us to check at the end if there are leftover keys that are defined in
+      # the child, but not in the parent.
+      unset child_keys[$p_key]
+
+      if [[ "${p_type[kind]}" == 'SECTION' ]] ; then
+         merge_section  "$p_sym_name" "$c_sym_name"
+      else
+         merge_variable "$p_sym_name" "$c_sym_name"
+      fi
+
+      FQ_LOCATION=( "${FQ_LOCATION[@]::${#FQ_LOCATION[@]}-1}" )
+   done
+
+   # Any additional keys from the child need to be copied into both...
+   #  1. the parent's .items[] array
+   #  2. the parent's symbol table
+   for c_key in "${child_keys[@]}" ; do
+      # Add to symtab.
+      parent_symtab[$c_key]="${child_symtab[$c_key]}" 
+
+      local -n c_sym="${child_symtab[$c_key]}"
+      local -n section=$SECTION
+      local -n items="${section[items]}"
+
+      # Add to items.
+      items+=( "${c_sym[node]}" )
+   done
+}
+
+
+function merge_section {
+   # It's easier to think about the conditions in which a merge *fails*. A
+   # section merge fails when:
+   #  1. It is required in the parent, and missing in the child
+   #  2. It is of a non-Section type in the child
+
+   local -- p_sym_name="$1"
+   local -- c_sym_name="$2"
+
+   # We know the parent symbol exists. Can safely nameref it.
+   local -n p_sym="$p_sym_name"
+
+   # case 1.
+   # Child section is missing, but was required in the parent.
+   if [[ ! "$c_sym_name" ]] ; then
+      if [[ "${p_sym[required]}" ]] ; then
+         MISSING_KEYS+=( "$FQ_NAME" )
+         return 1
+      fi
+
+      # If child section was missing, but not required... nothing to do. We
+      # gucci & scoochie.
+      return 0
+   fi
+
+   local -n c_sym="$c_sym_name"
+   local -n c_type="${c_sym[type]}"
+   
+   # case 2.
+   # Found child node under the same identifier, but not a Section.
+   if [[ ${c_type[kind]} != 'SECTION' ]] ; then
+      SYMBOL_MISMATCH+=( "$FQ_NAME" )
+      return 1
+   fi
+
+   SECTION="${p_sym[node]}"
+   merge_symtab "${p_sym[symtab]}" "${c_sym[symtab]}"
+}
+
+
+function merge_variable {
+   # It's easier to think about the conditions in which a merge *fails*. A
+   # variable merge fails when:
+   #  1. If the child does not exist, and...
+   #     a. the parent was required
+   #  2. If the child exist, and...
+   #     a. it's not also a type(var_decl)
+   #     b. it's declaring a different type
+
+   local -- p_sym_name="$1"
+   local -- c_sym_name="$2"
+
+   # We know the parent symbol exists. Can safely nameref it.
+   local -n p_sym="$p_sym_name"
+
+   # case 1a.
+   if [[ ! "$c_sym_name" ]] ; then
+      if [[ "${p_sym[required]}" ]] ; then
+         MISSING_KEYS+=( "$FQ_NAME" )
+         return 1
+      fi
+      return 0
+   fi
+
+   local -n c_sym="$c_sym_name"
+
+   # case 2a.
+   # Expecting a variable declaration, child is actually a Section.
+   local -n c_type="${c_sym[type]}" 
+   if [[ "${c_type[kind]}" == 'SECTION' ]] ; then
+      SYMBOL_MISMATCH+=( "$FQ_NAME" )
+      return 1
+   fi
+
+   # case 2b.
+   # The type of the child must defer to the type of the parent.
+   if ! merge_type "${p_sym[type]}" "${c_sym[type]}" ; then
+      TYPE_REDECLARE+=( "$FQ_NAME" )
+      return 1
+   fi
+
+   # If we haven't hit any errors, can safely copy over the child's value to the
+   # parent.
+   local -n p_node="${p_sym[node]}" 
+   local -n c_node="${c_sym[node]}" 
+   if [[ "${c_node[expr]}" ]] ; then
+      p_node[expr]="${c_node[expr]}" 
+   fi
+
+   # TODO: feature
+   # This is where we would also append the directive/test context information
+   # over. But it doesn't exist yet.
+}
+
+
 function merge_type {
-   # Needed to rethink the merge_type() function. It's not a semantic typecheck.
-   # It needs to fail if the child has attempted to re-declare a typedef. Thus,
-   # the child's type must always EITHER:
-   #  1. Match exactly
-   #  2. Be 'ANY'
-   #  3. Not exist (in the case of a parent subtype, and the child's is empty)
+   # This it's not a semantic typecheck. It only enforces the deference in a
+   # child's typedef. The child must either...
+   #  1. match exactly
+   #  2. be 'ANY'
+   #  3. not exist (in the case of a parent subtype, and the child's is empty)
 
    # case 3.
    # If there's a defined parent type, but no child.
-   # This is acceptable.
-   [[ $1 || ! $2 ]] && return 0
+   [[ $1 && ! $2 ]] && return 0
 
    local -- t1_name="$1" t2_name="$2"
    local -n t1="$1"      t2="$2"
@@ -274,100 +467,6 @@ function merge_type {
    fi
 
    return 1
-}
-
-
-function merge_symtab {
-   local -- parent_symtab_root=$1
-   local -n parent_symtab=$1
-
-   local -- child_symtab_root=$2
-   local -n child_symtab=$2
-
-   # We iterate over the parent symtab. So we're guaranteed to hit every key
-   # there. The child symtab may contain *extra* keys that we need to merge in.
-   # Every time we match a key from the parent->child, we can pop it from this
-   # copy. Anything left is a duplicate that must be merged.
-   local -a child_keys=( "${!child_symtab[@]}" )
-
-   for p_key in "${!parent_symtab[@]}" ; do
-      # Parent Symbol.
-      local -- p_sym_name="${parent_symtab[$p_key]}"
-      local -n p_sym=$p_sym_name
-      local -n p_node=${p_sym[node]}
-
-      # For error reporting, build a "fully qualified" path to this node.
-      local fq_name=''
-      for s in "${FQ_LOCATION[@]}" ; do
-         fq_name+="${s}."
-      done
-      fq_name+="${p_key}"
-
-      # Parent type information.
-      local p_type_name="${p_sym[type]}"
-
-      # Child Symbol.
-      local -- c_sym_name="${child_symtab[$p_key]}"
-
-      # If child exists, declare type information and namerefs.
-      if [[ $c_sym_name ]] ; then
-         local child_exists='yes'
-         # Just little helper var to make it a little more clear in tests what
-         # we're actually checking for.
-         local -n c_sym=$c_sym_name
-         local -- c_type_name=${c_sym[type]}
-         local -- c_node_name=${c_sym[node]}
-         local -n c_node=$c_node_name
-      fi
-
-      # Section declarations are fairly straightforward: Any section defined in
-      # the parent must also exist in the child.
-      if [[ ${TYPEOF[${p_sym[node]}]} == 'decl_section' ]] ; then
-         if [[ ! $child_exists ]] ; then
-            MISSING_KEYS+=( "$fq_name" )
-            continue
-            # TODO:
-            # Instead of skipping we may honestly want to just create an empty
-            # symtab for the child. If the parent has nested sections, but the
-            # child is missing the top-most of them, this would allow us to
-            # continue checking the sub-sections.
-         fi
-
-         if [[ ${TYPEOF[${c_sym[node]}]} == 'SECTION' ]] ; then
-            TYPE_MISMATCH+=( "$fq_name" )
-            continue
-         fi
-
-         merge_symtab "${p_sym[symtab]}" "${c_sym[symtab]}"
-         continue
-      else
-         # The only types of symbols are section or variable declarations. If
-         # the current node is not a section, it must be a variable.
-
-         # Helper var for more clarification in tests.
-         if [[ ${p_node[expr]} ]] ; then
-            local has_default='yes'
-         fi
-
-         if [[ ! $child_exists ]] ; then
-            # If the parent has not defined a default value for the variable,
-            # then the key is missing.
-            if [[ ! $has_default ]] ; then
-               MISSING_KEYS+=( "$fq_name" )
-            fi
-
-            continue
-         fi
-
-         if ! merge_type "$p_type_name" "$c_type_name" ; then
-            TYPE_REDECLARE+=( "$fq_name" )
-         fi
-
-         # Always overwrite a parent's expression with the child's. Even if the
-         # child has an empty declaration.
-         p_node[expr]=${c_node[expr]}
-      fi
-   done
 }
 
 
@@ -702,3 +801,127 @@ function data_identifier {
 ## pass.
 ## No semantics to be checked here. Identifiers can only occur as names to
 ## elements, or function calls.
+
+
+#───────────────────────────────( pretty print )────────────────────────────────
+# For debugging, having a pretty printer is super useful. Also supes good down
+# the line when we want to make a function for script-writers to dump a base
+# skeleton config for users.
+
+declare -i INDENT_FACTOR=2
+declare -i INDENTATION=0
+
+
+function walk_pprint {
+   declare -g NODE="$1"
+   pprint_${TYPEOF[$NODE]}
+}
+
+
+function pprint_decl_section {
+   # Save reference to current NODE. Restored at the end.
+   local -- save=$NODE
+   local -n node=$save
+
+   walk_pprint ${node[name]}
+   printf ' {\n'
+
+   (( INDENTATION++ ))
+
+   local -n items="${node[items]}" 
+   for nname in "${items[@]}"; do
+      walk_pprint $nname
+   done
+
+   (( INDENTATION-- ))
+   printf "%$(( INDENTATION * INDENT_FACTOR ))s}\n" ''
+
+   declare -g NODE="$save"
+}
+
+
+function pprint_decl_variable {
+   local -- save=$NODE
+   local -n node=$save
+
+   printf "%$(( INDENTATION * INDENT_FACTOR ))s" ''
+   walk_pprint ${node[name]}
+
+   if [[ ${node[type]} ]] ; then
+      printf ' ('
+      walk_pprint "${node[type]}"
+      printf ')'
+   fi
+
+   if [[ ${node[expr]} ]] ; then
+      printf ' '
+      walk_pprint ${node[expr]}
+      printf ';\n'
+   fi
+
+   declare -g NODE=$save
+}
+
+
+function pprint_typedef {
+   local -- save=$NODE
+   local -n node=$save
+
+   walk_pprint "${node[kind]}"
+
+   if [[ "${node[subtype]}" ]] ; then
+      printf ':'
+      walk_pprint "${node[subtype]}"
+   fi
+
+   declare -g NODE=$save
+}
+
+
+function pprint_array {
+   local -- save=$NODE
+   local -n node=$save
+
+   (( INDENTATION++ ))
+   printf '['
+
+   for nname in "${node[@]}"; do
+      printf "\n%$(( INDENTATION * INDENT_FACTOR ))s" ''
+      walk_pprint $nname
+   done
+
+   (( INDENTATION-- ))
+   printf "\n%$(( INDENTATION * INDENT_FACTOR ))s]" ''
+
+   declare -g NODE=$save
+}
+
+
+function pprint_boolean {
+   local -n node=$NODE
+   printf '%s' "${node[value]}"
+}
+
+
+function pprint_integer {
+   local -n node=$NODE
+   printf '%s' "${node[value]}"
+}
+
+
+function pprint_string {
+   local -n node=$NODE
+   printf '"%s"' "${node[value]}"
+}
+
+
+function pprint_path {
+   local -n node=$NODE
+   printf "'%s'" "${node[value]}"
+}
+
+
+function pprint_identifier {
+   local -n node=$NODE
+   printf '%s' "${node[value]}"
+}
