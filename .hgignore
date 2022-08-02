@@ -1,4 +1,5 @@
 syntax: regexp
 
+doc/html
 ^sample/
 .git
