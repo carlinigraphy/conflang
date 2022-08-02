@@ -107,7 +107,7 @@ function merge_includes {
       # Construct array (backwards) of the $ROOT nodes for each %include statement.
       # Allows us to iter the INCLUDES backwards, and match $idx to its
       # corresponding root here.
-      INCLUDE_ROOT=( "$ROOT" ${INCLUDE_ROOT[@]} )
+      INCLUDE_ROOT=( "$ROOT" "${INCLUDE_ROOT[@]}" )
 
       (( idx++ ))
    done
@@ -133,7 +133,7 @@ function merge_includes {
 
       # For each node in the sub-file, append it to the targetted node's .items[].
       for n in "${root_items[@]}" ; do
-         target_items+=( $n )
+         target_items+=( "$n" )
       done
    done
 }
@@ -143,8 +143,6 @@ function identify_constraint_file {
    [[ ${#CONSTRAINTS[@]} -eq 0 ]] && return 0
 
    local -- fq_path
-   local -- constrain_file
-
    for file in "${CONSTRAINTS[@]}" ; do
       case "$file" in
          /*)   fq_path="${file}"            ;;
@@ -236,7 +234,7 @@ _f1=${#FILES[@]}
 # to track if we've hit a valid child file. `identify_constraint_file()` adds
 # the file to the global FILES[] array. Thus, if array is not of the same len,
 # we added a file. Don't want to parse an additional time if it's not needed.
-if [[ ${_f0} != ${_f1} ]] ; then
+if [[ "${_f0}" != "${_f1}" ]] ; then
    # Now parse all the sub-files we're imposing constraints upon.
    parse ; child_root=$ROOT
    merge_includes
@@ -258,9 +256,9 @@ source "${LIBDIR}"/compiler.sh
 mk_symtab ; parent_symtab=$SYMTAB
 walk_symtab $parent_root
 
-if [[ $child_root ]] ; then
+if [[ "$child_root" ]] ; then
    mk_symtab ; child_symtab=$SYMTAB
-   walk_symtab $child_root
+   walk_symtab "$child_root"
 
    merge_symtab "$parent_symtab" "$child_symtab"
 fi
@@ -270,7 +268,7 @@ source "${LIBDIR}"/debug.sh
 pprint_symtab "${parent_symtab}"
 
 exit 0
-walk_data $ROOT
+walk_data "$ROOT"
 
 #───────────────────────────────────( api )─────────────────────────────────────
 ## DISABLED API WHILE WORKING ON MERGING TREES AND WHATNOT.
