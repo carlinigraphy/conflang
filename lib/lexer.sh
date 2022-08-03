@@ -1,37 +1,34 @@
 #!/bin/bash
-#
-# The following must be reset prior to every run.
-#  int      FILE_IDX
-#  array    CHARRAY[]
-#  array    TOKENS[]
-#  int      TOKEN_NUM
-#  dict     CURSOR{}
 
-declare -i FILE_IDX
-declare -a TOKENS=()
-declare -i TOKEN_NUM=0
+function init_scanner {
+   : 'Some variables need to be reset at the start of every run. They hold
+      information that should not be carried from file to file.'
 
-# `Cursor' object to track our position when iterating through the input.
-# `Freeze' saves the position at the start of each scanner loop, recording the
-# start position of each Token.
-declare -A FREEZE CURSOR=(
-   [offset]=-1    # Starts at -1, as the first call to advance increments to 0.
-   [lineno]=1
-   [colno]=0
-)
+   # Reset global vars prior to each run.
+   (( FILE_IDX = ${#FILES[@]} - 1 ))
 
-declare -A KEYWORD=(
-   [true]=true
-   [false]=true
-   [and]=true
-   [or]=true
-   [not]=true
-   [include]=true
-   [constrain]=true
-)
+   # File & character information.
+   declare -ga  CHARRAY=()
+   #declare -ga  FILE_LINES=()
+   # TODO: error reporting
+   # Currently 
+
+   # Token information.
+   declare -ga  TOKENS=()
+   declare -gi  TOKEN_NUM=0
+
+   declare -gA  FREEZE CURSOR=(
+      [offset]=-1
+      [lineno]=1
+      [colno]=0
+   )
+}
 
 
 function Token {
+   : 'Effectively a `class`. Creates instances of Token with information for
+      the position in the file, as well as the character type/value.'
+
    local type=$1  value=$2
    
    # Realistically we can just do "TOKEN_$(( ${#TOKEN_NUM[@]} + 1 ))". Feel like
@@ -58,6 +55,17 @@ function Token {
 
                                      
 #══════════════════════════════════╡ SCANNER ╞══════════════════════════════════
+declare -A KEYWORD=(
+   [true]=true
+   [false]=true
+   [and]=true
+   [or]=true
+   [not]=true
+   [include]=true
+   [constrain]=true
+)
+
+
 declare -- CURRENT PEEK
 declare -a CHARRAY=()      # Array of each character in the file.
 

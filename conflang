@@ -170,40 +170,19 @@ source "${LIBDIR}"/lexer.sh
 source "${LIBDIR}"/parser.sh
 
 function _parse {
-   #──────────────────────────────( scanner )───────────────────────────────────
-   # Reset global vars prior to each run.
-   (( FILE_IDX = ${#FILES[@]} - 1 ))
-
-   # File & character information.
-   declare -ga  CHARRAY=()
-   #declare -ga  FILE_LINES=()
-   # TODO: error reporting
-   # Currently 
-
-   # Token information.
-   declare -ga  TOKENS=()
-   declare -gi  TOKEN_NUM=0
-
-   declare -gA  CURSOR=(
-      [offset]=-1
-      [lineno]=1
-      [colno]=0
-   )
+   # Some elements of the scanner need to be reset before every run. Vars that
+   # hold file-specific information.
+   init_scanner
 
    scan
    # Exports:
    #  list  TOKENS[]
 
-
-   #───────────────────────────────( parser )───────────────────────────────────
    parse
    # Exports:
    #  str   ROOT
    #  dict  TYPEOF{}
    #  dict  NODE_*
-
-   # I don't think there's anything that needs to be reset explicitly on every
-   # run for the parser.
 }
 
 
