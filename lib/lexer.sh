@@ -1,4 +1,7 @@
 #!/bin/bash
+#
+# Requires from ENV:
+#  list:path   FILES[]
 
 function init_scanner {
    : 'Some variables need to be reset at the start of every run. They hold
@@ -30,7 +33,7 @@ function Token {
       the position in the file, as well as the character type/value.'
 
    local type=$1  value=$2
-   
+
    # Realistically we can just do "TOKEN_$(( ${#TOKEN_NUM[@]} + 1 ))". Feel like
    # that add visual complexity here, despite removing slight complexity of yet
    # another global variable.
@@ -282,7 +285,7 @@ function l_number {
    local number=''
 
    while [[ $PEEK =~ [[:digit:]] ]] ; do
-      p_advance ; number+="$CURRENT"
+      l_advance ; number+="$CURRENT"
    done
 
    Token 'INTEGER' "$number"
