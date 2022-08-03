@@ -1,11 +1,15 @@
 #!/bin/bash
+#
+# The following must be reset prior to every run.
+#  int      FILE_IDX
+#  array    CHARRAY[]
+#  array    TOKENS[]
+#  int      TOKEN_NUM
+#  dict     CURSOR{}
 
-declare -p FILES
-
-(( FILE_IDX = ${#FILES[@]} - 1 ))
-
+declare -i FILE_IDX
 declare -a TOKENS=()
-declare -i _TOKEN_NUM=0
+declare -i TOKEN_NUM=0
 
 # `Cursor' object to track our position when iterating through the input.
 # `Freeze' saves the position at the start of each scanner loop, recording the
@@ -15,7 +19,6 @@ declare -A FREEZE CURSOR=(
    [lineno]=1
    [colno]=0
 )
-
 
 declare -A KEYWORD=(
    [true]=true
@@ -31,10 +34,10 @@ declare -A KEYWORD=(
 function Token {
    local type=$1  value=$2
    
-   # Realistically we can just do "TOKEN_$(( ${#_TOKEN_NUM[@]} + 1 ))". Feel like
+   # Realistically we can just do "TOKEN_$(( ${#TOKEN_NUM[@]} + 1 ))". Feel like
    # that add visual complexity here, despite removing slight complexity of yet
    # another global variable.
-   local tname="TOKEN_${_TOKEN_NUM}"
+   local tname="TOKEN_${TOKEN_NUM}"
    declare -gA "${tname}"
 
    # Nameref to newly created global token.
@@ -50,17 +53,15 @@ function Token {
    t[colno]=${FREEZE[colno]}
    t[file]="${FILE_IDX}"
 
-   TOKENS+=( "$tname" ) ; (( _TOKEN_NUM++ ))
-   #echo "[${t[lineno]}:${t[colno]}] ${type} [${value}]"
+   TOKENS+=( "$tname" ) ; (( TOKEN_NUM++ ))
 }
 
                                      
 #══════════════════════════════════╡ SCANNER ╞══════════════════════════════════
 declare -- CURRENT PEEK
 declare -a CHARRAY=()      # Array of each character in the file.
-declare -a FILE_LINES=()   # The input file lines, for better error reporting.
 
-function advance {
+function l_advance {
    # Advance cursor position, pointing to each sequential character. Also incr.
    # the column number indicator. If we go to a new line, it's reset to 0.
    #
@@ -88,7 +89,11 @@ function scan {
    # Creating secondary line buffer to do better debug output printing. It would
    # be more efficient to *only* hold a buffer of lines up until each newline.
    # Unpon an error, we'd only need to save the singular line, then can resume
-   mapfile -td $'\n' FILE_LINES < "${FILES[-1]}"
+   #mapfile -td $'\n' FILE_LINES < "${FILES[-1]}"
+   # TODO: error reporting
+   # Will need a separate array for each file. Probably have a second array
+   # parallel to FILES[]. The index of the FILE will match the name of the
+   # array holding the lines.
 
    # For easier lookahead, read all characters first into an array. Allows us
    # to seek/index very easily.
@@ -97,7 +102,7 @@ function scan {
    done < "${FILES[-1]}"
 
    while [[ ${CURSOR[offset]} -lt ${#CHARRAY[@]} ]] ; do
-      advance ; [[ -z "$CURRENT" ]] && break
+      l_advance ; [[ -z "$CURRENT" ]] && break
 
       # Save current cursor information.
       FREEZE[offset]=${CURSOR[offset]}
@@ -106,7 +111,7 @@ function scan {
 
       # Skip comments.
       if [[ $CURRENT == '#' ]] ; then
-         comment ; continue
+         l_comment ; continue
       fi
 
       # Skip whitespace.
@@ -135,7 +140,7 @@ function scan {
 
       if [[ $CURRENT == '<' ]] ; then
          if [[ $PEEK == '=' ]] ; then
-            advance ; Token 'LE_EQ' '<='
+            l_advance ; Token 'LE_EQ' '<='
             continue
          else
             Token 'LT' '<'
@@ -145,7 +150,7 @@ function scan {
 
       if [[ $CURRENT == '>' ]] ; then
          if [[ $PEEK == '=' ]] ; then
-            advance ; Token 'GT_EQ' '>='
+            l_advance ; Token 'GT_EQ' '>='
             continue
          else
             Token 'GT' '>'
@@ -155,17 +160,17 @@ function scan {
 
       # Identifiers.
       if [[ $CURRENT =~ [[:alpha:]_] ]] ; then
-         identifier ; continue
+         l_identifier ; continue
       fi
 
       # Strings. Surrounded by `"`.
       if [[ $CURRENT == '"' ]] ; then
-         string ; continue
+         l_string ; continue
       fi
 
       # Paths. Surrounded by `'`.
       if [[ $CURRENT == "'" ]] ; then
-         path ; continue
+         l_path ; continue
       fi
 
       # Numbers.
@@ -174,7 +179,7 @@ function scan {
          # without bringing `bc` or something. For now, that's all we'll also
          # support. Maybe later I'll add a float type, just so I can write some
          # external functions that support float comparisons.
-         number ; continue
+         l_number ; continue
       fi
 
       # Can do a dedicated error pass, scanning for error tokens, and assembling
@@ -186,21 +191,21 @@ function scan {
 }
 
 
-function comment {
+function l_comment {
    # There are no multiline comments. Seeks from '#' to the end of the line.
    while [[ -n $CURRENT ]] ; do
       [[ "$PEEK" =~ $'\n' ]] && break
-      advance
+      l_advance
    done
 }
 
 
-function identifier {
+function l_identifier {
    local buffer="$CURRENT"
 
    while [[ -n $CURRENT ]] ; do
       [[ $PEEK =~ [^[:alnum:]_] ]] && break
-      advance ; buffer+="$CURRENT"
+      l_advance ; buffer+="$CURRENT"
    done
 
    if [[ -n ${KEYWORD[$buffer]} ]] ; then
@@ -211,8 +216,8 @@ function identifier {
 }
 
 
-function string {
-   declare -a buffer=()
+function l_string {
+   local -a buffer=()
 
    while [[ -n $CURRENT ]] ; do
       if [[ $PEEK == '"' ]] ; then
@@ -222,7 +227,7 @@ function string {
             break
          fi
       fi
-      advance ; buffer+=( "$CURRENT" )
+      l_advance ; buffer+=( "$CURRENT" )
    done
 
    local join=''
@@ -234,12 +239,12 @@ function string {
    Token 'STRING' "$join"
 
    # Skip final closing `'`.
-   advance
+   l_advance
 }
 
 
-function path {
-   declare -a buffer=()
+function l_path {
+   local -a buffer=()
 
    while [[ -n $CURRENT ]] ; do
       if [[ $PEEK == "'" ]] ; then
@@ -249,7 +254,7 @@ function path {
             break
          fi
       fi
-      advance ; buffer+=( "$CURRENT" )
+      l_advance ; buffer+=( "$CURRENT" )
    done
 
    local join=''
@@ -261,32 +266,16 @@ function path {
    Token 'PATH' "$join"
 
    # Skip final closing `'`.
-   advance
+   l_advance
 }
 
 
-function number {
+function l_number {
    local number=''
 
    while [[ $PEEK =~ [[:digit:]] ]] ; do
-      advance ; number+="$CURRENT"
+      p_advance ; number+="$CURRENT"
    done
 
-   Token 'INTEGER'
+   Token 'INTEGER' "$number"
 }
-
-
-scan
-
-# If we haven't thrown an exception, I've either catastrophically missed an
-# error, or we've completed the run successfully.
-LEX_SUCCESS='yes'
-
-# Dumps the tokens generated by the scanner, such that they can be used by the
-# parser. This helps not polute too much the global namespace. Able to just
-# import that which we need.
-(
-   declare -p LEX_SUCCESS
-   declare -p FILE_LINES  FILES
-   declare -p TOKENS  ${!TOKEN_*}
-) | sort -V -k3

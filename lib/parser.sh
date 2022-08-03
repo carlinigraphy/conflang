@@ -8,36 +8,29 @@
 # }
 
 #═════════════════════════════════╡ AST NODES ╞═════════════════════════════════
-# Must only set the node count on the *first* run. Else we'll overwrite every
-# time we import another file.
-if [[ ${#FILES[@]} -eq 1 ]] ; then
-   declare -gi _NODE_NUM=0
-   declare -gi _INCLUDE_NUM=0
+declare -gi  NODE_NUM=0
+declare -gi  INCLUDE_NUM=0
 
-   # `include` & `constrain` directives are handled by the parser. They don't
-   # actually create any "real" nodes. They leave sentinel values that are later
-   # resolved.
-   declare -ga INCLUDES=() CONSTRAINTS=()
-   # Both hold lists.
-   # Sub-objects:
-   #> INCLUDES=([0]='INCLUDE_1', [1]='INCLUDE_2')
-   #> INCLUDE_1=([path]='./colors.conf' [target]='NODE_01')
-   #> INCLUDE_1=([path]='./keybinds.conf' [target]='NODE_25')
-   #>
-   # Raw values:
-   #> CONSTRAINTS=('./subfile1.conf', './subfile2.conf')
+# `include` & `constrain` directives are handled by the parser. They don't
+# actually create any "real" nodes. They leave sentinel values that are later
+# resolved.
+declare -ga  INCLUDES=() CONSTRAINTS=()
+# Both hold lists.
+# Sub-objects:
+#> INCLUDES=([0]='INCLUDE_1', [1]='INCLUDE_2')
+#> INCLUDE_1=([path]='./colors.conf' [target]='NODE_01')
+#> INCLUDE_1=([path]='./keybinds.conf' [target]='NODE_25')
+#>
+# Raw values:
+#> CONSTRAINTS=('./subfile1.conf', './subfile2.conf')
 
-   # Saves us from a get_type() function call, or some equivalent.
-   declare -gA TYPEOF=()
-fi
-
-# Index of currently parsing file.
-(( FILE_IDX = ${#FILES[@]} - 1 ))
+# Saves us from a get_type() function call, or some equivalent.
+declare -gA  TYPEOF=()
 
 # Should be reset on every run, as it's unique to this instance of the parser.
-declare -g ROOT  # Solely used to indicate the root of the AST.
-declare -g NODE
-declare -g INCLUDE
+declare -g  ROOT  # Solely used to indicate the root of the AST.
+declare -g  NODE
+declare -g  INCLUDE
 
 # Need to take note of the section.
 # `%include` blocks must reference the target Section to include any included
@@ -49,8 +42,8 @@ declare -g SECTION
 
 function mk_decl_section {
    # 1) create parent
-   (( _NODE_NUM++ ))
-   local   --  nname="NODE_${_NODE_NUM}"
+   (( NODE_NUM++ ))
+   local   --  nname="NODE_${NODE_NUM}"
    declare -gA $nname
    declare -g  NODE=$nname
    local   -n  node=$nname
@@ -60,8 +53,8 @@ function mk_decl_section {
    declare -g  SECTION=$nname
 
    # 2) create list to hold the items within the section.
-   (( _NODE_NUM++ ))
-   local nname_items="NODE_${_NODE_NUM}"
+   (( NODE_NUM++ ))
+   local nname_items="NODE_${NODE_NUM}"
    declare -ga $nname_items
    local   -n  node_items=$nname_items
    node_items=()
@@ -76,8 +69,8 @@ function mk_decl_section {
 
 
 function mk_include {
-   (( _INCLUDE_NUM++ ))
-   local   --  iname="INCLUDE_${_INCLUDE_NUM}"
+   (( INCLUDE_NUM++ ))
+   local   --  iname="INCLUDE_${INCLUDE_NUM}"
    declare -gA $iname
    declare -g  INCLUDE=$iname
    local   -n  include=$iname
@@ -90,8 +83,8 @@ function mk_include {
 
 
 function mk_decl_variable {
-   (( _NODE_NUM++ ))
-   local   --  nname="NODE_${_NODE_NUM}"
+   (( NODE_NUM++ ))
+   local   --  nname="NODE_${NODE_NUM}"
    declare -gA $nname
    declare -g  NODE=$nname
    local   -n  node=$nname
@@ -106,8 +99,8 @@ function mk_decl_variable {
 
 
 function mk_context_block {
-   (( _NODE_NUM++ ))
-   local   --  nname="NODE_${_NODE_NUM}"
+   (( NODE_NUM++ ))
+   local   --  nname="NODE_${NODE_NUM}"
    declare -ga $nname
    declare -g  NODE=$nname
 
@@ -119,8 +112,8 @@ function mk_context_block {
 
 
 function mk_context_test {
-   (( _NODE_NUM++ ))
-   local   -- nname="NODE_${_NODE_NUM}"
+   (( NODE_NUM++ ))
+   local   -- nname="NODE_${NODE_NUM}"
    declare -gA $nname
    declare -g  NODE=$nname
    local   -n  node=$nname
@@ -132,8 +125,8 @@ function mk_context_test {
 
 
 function mk_context_directive {
-   (( _NODE_NUM++ ))
-   local   -- nname="NODE_${_NODE_NUM}"
+   (( NODE_NUM++ ))
+   local   -- nname="NODE_${NODE_NUM}"
    declare -gA $nname
    declare -g  NODE=$nname
    local   -n  node=$nname
@@ -145,8 +138,8 @@ function mk_context_directive {
 
 
 function mk_array {
-   (( _NODE_NUM++ ))
-   local   --  nname="NODE_${_NODE_NUM}"
+   (( NODE_NUM++ ))
+   local   --  nname="NODE_${NODE_NUM}"
    declare -ga $nname
    declare -g  NODE=$nname
 
@@ -172,8 +165,8 @@ function mk_typedef {
    #>    )
    #> )
 
-   (( _NODE_NUM++ ))
-   local nname="NODE_${_NODE_NUM}"
+   (( NODE_NUM++ ))
+   local nname="NODE_${NODE_NUM}"
    declare -gA $nname
    declare -g  NODE=$nname
 
@@ -192,15 +185,15 @@ function mk_func_call {
    #>    params : array      = []
 
    # 1) create parent
-   (( _NODE_NUM++ ))
-   local   --  nname="NODE_${_NODE_NUM}"
+   (( NODE_NUM++ ))
+   local   --  nname="NODE_${NODE_NUM}"
    declare -gA $nname
    declare -g  NODE=$nname
    local   -n  node=$nname
 
    # 2) create list to hold the items within the section.
-   (( _NODE_NUM++ ))
-   local nname_params="NODE_${_NODE_NUM}"
+   (( NODE_NUM++ ))
+   local nname_params="NODE_${NODE_NUM}"
    declare -ga $nname_params
    local   -n  node_params=$nname_params
    node_params=()
@@ -214,24 +207,9 @@ function mk_func_call {
 }
 
 
-#function mk_binary {
-#   (( _NODE_NUM++ ))
-#   local   --  nname="NODE_${_NODE_NUM}"
-#   declare -ga $nname
-#   declare -g  NODE=$nname
-#   local   -n  node=$nname
-#
-#   node[op]=
-#   node[left]=
-#   node[right]=
-#
-#   TYPEOF[$nname]='binary'
-#}
-
-
 function mk_unary {
-   (( _NODE_NUM++ ))
-   local   --  nname="NODE_${_NODE_NUM}"
+   (( NODE_NUM++ ))
+   local   --  nname="NODE_${NODE_NUM}"
    declare -gA $nname
    declare -g  NODE=$nname
    local   -n  node=$nname
@@ -244,8 +222,8 @@ function mk_unary {
 
 
 function mk_boolean {
-   (( _NODE_NUM++ ))
-   local   -- nname="NODE_${_NODE_NUM}"
+   (( NODE_NUM++ ))
+   local   -- nname="NODE_${NODE_NUM}"
    declare -gA $nname
    declare -g  NODE=$nname
    local   -n  node=$nname
@@ -262,8 +240,8 @@ function mk_boolean {
 
 
 function mk_integer {
-   (( _NODE_NUM++ ))
-   local   --  nname="NODE_${_NODE_NUM}"
+   (( NODE_NUM++ ))
+   local   --  nname="NODE_${NODE_NUM}"
    declare -gA $nname
    declare -g  NODE=$nname
    local   -n  node=$nname
@@ -280,8 +258,8 @@ function mk_integer {
 
 
 function mk_string {
-   (( _NODE_NUM++ ))
-   local   --  nname="NODE_${_NODE_NUM}"
+   (( NODE_NUM++ ))
+   local   --  nname="NODE_${NODE_NUM}"
    declare -gA $nname
    declare -g  NODE=$nname
    local   -n  node=$nname
@@ -298,8 +276,8 @@ function mk_string {
 
 
 function mk_path {
-   (( _NODE_NUM++ ))
-   local   -- nname="NODE_${_NODE_NUM}"
+   (( NODE_NUM++ ))
+   local   -- nname="NODE_${NODE_NUM}"
    declare -gA $nname
    declare -g  NODE=$nname
    local   -n  node=$nname
@@ -316,8 +294,8 @@ function mk_path {
 
 
 function mk_identifier {
-   (( _NODE_NUM++ ))
-   local   -- nname="NODE_${_NODE_NUM}"
+   (( NODE_NUM++ ))
+   local   -- nname="NODE_${NODE_NUM}"
    declare -gA $nname
    declare -g  NODE=$nname
    local   -n  node=$nname
@@ -340,7 +318,7 @@ declare -g  CURRENT  CURRENT_NAME
 # e.g., `TOKEN_1', as well as declaring a nameref to the variable itself.
 
 
-function advance { 
+function p_advance { 
    while [[ $IDX -lt ${#TOKENS[@]} ]] ; do
       declare -g  CURRENT_NAME=${TOKENS[IDX]}
       declare -gn CURRENT=$CURRENT_NAME
@@ -356,14 +334,14 @@ function advance {
 }
 
 
-function check {
-   [[ "${CURRENT[type]}" == $1 ]]
+function p_check {
+   [[ "${CURRENT[type]}" == "$1" ]]
 }
 
 
-function match {
-   if check $1 ; then
-      advance
+function p_match {
+   if p_check $1 ; then
+      p_advance
       return 0
    fi
    
@@ -371,24 +349,24 @@ function match {
 }
 
 
-function munch {
+function p_munch {
    local -n t=$CURRENT_NAME
 
-   if ! check $1 ; then
+   if ! p_check $1 ; then
       raise parse_error "[${t[lineno]}:${t[colno]}] $1"
    fi
    
-   advance
+   p_advance
 }
 
 
 function parse {
-   advance
-   program
+   p_advance
+   p_program
 }
 
 #═════════════════════════════╡ GRAMMAR FUNCTIONS ╞═════════════════════════════
-function program {
+function p_program {
    # This is preeeeeeeeeeeeetty janky. I don't love it. Since this pseudo-
    # section doesn't actually exist in-code, it doesn't have any opening or
    # closing braces. So `section()` gets fucked up when trying to munch a
@@ -397,6 +375,7 @@ function program {
    # Creates a default top-level `section', allowing top-level key:value pairs,
    # wout requiring a dict (take that, JSON).
    mk_identifier
+
    local -- nname=$NODE
    local -n name=$nname
    name[value]='%inline'
@@ -406,50 +385,51 @@ function program {
    name[file]="${FILE_IDX}"
 
    mk_decl_section
+
    declare -g ROOT=$NODE
    local   -n node=$NODE
    local   -n items=${node[items]}
 
    node[name]=$nname
 
-   while ! check 'EOF' ; do
-      statement
+   while ! p_check 'EOF' ; do
+      p_statement
       items+=( $NODE )
    done
 
-   munch 'EOF'
+   p_munch 'EOF'
 }
 
 
-function statement {
-   if match 'PERCENT' ; then
-      parser_statement
+function p_statement {
+   if p_match 'PERCENT' ; then
+      p_parser_statement
    else
-      declaration
+      p_declaration
    fi
 }
 
 
-function parser_statement {
+function p_parser_statement {
    # Saved node referencing the parent Section.
-   if match 'INCLUDE' ; then
-      include
-   elif match 'CONSTRAIN' ; then
-      constrain
+   if p_match 'INCLUDE' ; then
+      p_include
+   elif p_match 'CONSTRAIN' ; then
+      p_constrain
    else
       raise parse_error "${CURRENT[value]} is not a parser statement."
    fi
 
-   munch 'SEMI' "expecting \`;' after parser statement."
+   p_munch 'SEMI' "expecting \`;' after parser statement."
 }
 
 
-function include {
+function p_include {
    mk_include
    local -n include=$INCLUDE
    
-   path
-   munch 'PATH' "expecting path after %include."
+   p_path
+   p_munch 'PATH' "expecting path after %include."
 
    local -n path=$NODE
    include[path]=${path[value]}
@@ -463,7 +443,7 @@ function include {
 }
 
 
-function constrain {
+function p_constrain {
    local -n section_ptr=$SECTION
    local -n name=${section_ptr[name]}
 
@@ -475,16 +455,16 @@ function constrain {
       raise parse_error "may not specify multiple constrain blocks." 
    fi
 
-   munch 'L_BRACKET' "expecting \`[' to begin array of paths."
-   while ! check 'R_BRACKET' ; do
-      path
-      munch 'PATH' "expecting an array of paths."
+   p_munch 'L_BRACKET' "expecting \`[' to begin array of paths."
+   while ! p_check 'R_BRACKET' ; do
+      p_path
+      p_munch 'PATH' "expecting an array of paths."
 
       local -n path=$NODE
       CONSTRAINTS+=( "${path[value]}" )
    done
 
-   munch 'R_BRACKET' "expecting \`]' after constrain block."
+   p_munch 'R_BRACKET' "expecting \`]' after constrain block."
    declare -g NODE=
    # Section declarations loop & append $NODEs to their .items. `include`/
    # `constrain` directives are technically children of a section, but they
@@ -493,19 +473,19 @@ function constrain {
 }
 
 
-function declaration {
-   identifier
-   munch 'IDENTIFIER' "expecting variable declaration."
+function p_declaration {
+   p_identifier
+   p_munch 'IDENTIFIER' "expecting variable declaration."
 
-   if match 'L_BRACE' ; then
-      decl_section
+   if p_match 'L_BRACE' ; then
+      p_decl_section
    else
-      decl_variable
+      p_decl_variable
    fi
 }
 
 
-function decl_section {
+function p_decl_section {
    local -- name=$NODE
 
    mk_decl_section
@@ -515,17 +495,17 @@ function decl_section {
 
    node[name]=$name
 
-   while ! check 'R_BRACE' ; do
-      statement
+   while ! p_check 'R_BRACE' ; do
+      p_statement
       items+=( $NODE )
    done
 
-   munch 'R_BRACE' "expecting \`}' after section."
+   p_munch 'R_BRACE' "expecting \`}' after section."
    declare -g NODE=$save
 }
 
 
-function decl_variable {
+function p_decl_variable {
    # Variable declaration must be preceded by an identifier.
    local -- name=$NODE
 
@@ -535,31 +515,31 @@ function decl_variable {
    node[name]=$name
 
    # Typedefs.
-   if check 'IDENTIFIER' ; then
-      typedef
+   if p_check 'IDENTIFIER' ; then
+      p_typedef
       node[type]=$NODE
    fi
 
    # Expressions.
-   if ! check 'L_BRACE' && ! check 'SEMI' ; then
-      expression
+   if ! p_check 'L_BRACE' && ! p_check 'SEMI' ; then
+      p_expression
       node[expr]=$NODE
    fi
 
    # Context blocks.
-   if match 'L_BRACE' ; then
-      context_block
+   if p_match 'L_BRACE' ; then
+      p_context_block
       node[context]=$NODE
    fi
 
-   munch 'SEMI' "expecting \`;' after declaration."
+   p_munch 'SEMI' "expecting \`;' after declaration."
    declare -g NODE=$save
 }
 
 
-function typedef {
-   identifier
-   munch 'IDENTIFIER' 'expecting identifier for typedef.'
+function p_typedef {
+   p_identifier
+   p_munch 'IDENTIFIER' 'expecting identifier for typedef.'
 
    local -- name=$NODE
 
@@ -569,8 +549,8 @@ function typedef {
 
    type_[kind]=$name
 
-   while match 'COLON' ; do
-      typedef
+   while p_match 'COLON' ; do
+      p_typedef
       type_[subtype]=$NODE
    done
 
@@ -581,28 +561,28 @@ function typedef {
 # THINKIES: I believe a context block can potentially be a postfix expression.
 # Though for now, as it only takes single directives and not expressions or
 # function calls, it lives here.
-function context_block {
+function p_context_block {
    mk_context_block
    local -- save=$NODE
    local -n node=$NODE
 
-   while ! check 'R_BRACE' ; do
-      context
+   while ! p_check 'R_BRACE' ; do
+      p_context
       node+=( $NODE )
    done
 
-   munch 'R_BRACE' "expecting \`}' after context block."
+   p_munch 'R_BRACE' "expecting \`}' after context block."
    declare -g NODE=$save
 }
 
 
-function context {
-   identifier
-   munch 'IDENTIFIER' 'expecting identifier in context block.'
+function p_context {
+   p_identifier
+   p_munch 'IDENTIFIER' 'expecting identifier in context block.'
 
    local -- ident=$NODE
 
-   if check 'QUESTION' ; then
+   if p_check 'QUESTION' ; then
       mk_context_test
    else
       mk_context_directive
@@ -613,24 +593,24 @@ function context {
 }
 
 
-function array {
-   munch 'L_BRACKET'
+function p_array {
+   p_munch 'L_BRACKET'
 
    mk_array
    local -- save=$NODE
    local -n node=$NODE
 
-   while ! check 'R_BRACKET' ; do
-      expression
+   while ! p_check 'R_BRACKET' ; do
+      p_expression
       node+=( $NODE )
    done
 
-   munch 'R_BRACKET' "expecting \`]' after array."
+   p_munch 'R_BRACKET' "expecting \`]' after array."
    declare -g NODE=$save
 }
 
 
-function identifier {
+function p_identifier {
    mk_identifier
    local -n node=$NODE
    node[value]=${CURRENT[value]}
@@ -641,7 +621,7 @@ function identifier {
 }
 
 
-function boolean {
+function p_boolean {
    mk_boolean
    local -n node=$NODE
    node[value]=${CURRENT[value]}
@@ -652,7 +632,7 @@ function boolean {
 }
 
 
-function integer {
+function p_integer {
    mk_integer
    local -n node=$NODE
    node[value]=${CURRENT[value]}
@@ -663,7 +643,7 @@ function integer {
 }
 
 
-function string {
+function p_string {
    mk_string
    local -n node=$NODE
    node[value]=${CURRENT[value]}
@@ -674,7 +654,7 @@ function string {
 }
 
 
-function path {
+function p_path {
    mk_path
    local -n node=$NODE
    node[value]=${CURRENT[value]}
@@ -696,17 +676,17 @@ declare -gA prefix_binding_power=(
    [MINUS]=10
 )
 declare -gA NUD=(
-   [NOT]='unary'
-   [BANG]='unary'
-   [MINUS]='unary'
-   [PATH]='path'
-   [TRUE]='boolean'
-   [FALSE]='boolean'
-   [STRING]='string'
-   [INTEGER]='integer'
-   [IDENTIFIER]='identifier'
-   [L_PAREN]='group'
-   [L_BRACKET]='array'
+   [NOT]='p_unary'
+   [BANG]='p_unary'
+   [MINUS]='p_unary'
+   [PATH]='p_path'
+   [TRUE]='p_boolean'
+   [FALSE]='p_boolean'
+   [STRING]='p_string'
+   [INTEGER]='p_integer'
+   [IDENTIFIER]='p_identifier'
+   [L_PAREN]='p_group'
+   [L_BRACKET]='p_array'
 )
 
 
@@ -726,19 +706,19 @@ declare -gA infix_binding_power=(
    [L_PAREN]=13
 )
 declare -gA LED=(
-   [OR]='compop'
-   [AND]='compop'
-   #[EQ]='binary'
-   #[NE]='binary'
-   #[LT]='binary'
-   #[LE]='binary'
-   #[GT]='binary'
-   #[GE]='binary'
-   #[PLUS]='binary'
-   #[MINUS]='binary'
-   #[STAR]='binary'
-   #[SLASH]='binary'
-   [L_PAREN]='func_call'
+   [OR]='p_compop'
+   [AND]='p_compop'
+   #[EQ]='p_binary'
+   #[NE]='p_binary'
+   #[LT]='p_binary'
+   #[LE]='p_binary'
+   #[GT]='p_binary'
+   #[GE]='p_binary'
+   #[PLUS]='p_binary'
+   #[MINUS]='p_binary'
+   #[STAR]='p_binary'
+   #[SLASH]='p_binary'
+   [L_PAREN]='p_func_call'
 )
 
 
@@ -752,7 +732,7 @@ declare -gA LED=(
 #)
 
 
-function expression {
+function p_expression {
    local -i min_bp=${1:-1}
 
    local -- lhs op
@@ -769,8 +749,8 @@ function expression {
    # THINKIES:
    # I feel like there has to be a more elegant way of handling a semicolon
    # ending expressions.
-   check 'SEMI' && return
-   advance
+   p_check 'SEMI' && return
+   p_advance
 
    while :; do
       op=$CURRENT ot=${CURRENT[type]}
@@ -786,7 +766,7 @@ function expression {
          break
       fi
 
-      advance
+      p_advance
 
       fn=${LED[${CURRENT[type]}]}
       if [[ -z $fn ]] ; then
@@ -801,19 +781,19 @@ function expression {
 }
 
 
-function group {
-   expression 
-   munch 'R_PAREN' "expecting \`)' after group."
+function p_group {
+   p_expression 
+   p_munch 'R_PAREN' "expecting \`)' after group."
 }
 
-function binary {
+function p_binary {
    local -- lhs="$1" op="$2" rbp="$3"
 
    mk_binary
    local -- save=$NODE
    local -n node=$NODE
 
-   expression "$rbp"
+   p_expression "$rbp"
 
    node[op]="$op"
    node[left]="$lhs"
@@ -823,38 +803,17 @@ function binary {
 }
 
 
-function unary {
+function p_unary {
    local -- op="$2" rbp="$3"
 
    mk_binary
    local -- save=$NODE
    local -n node=$NODE
 
-   expression "$rbp"
+   p_expression "$rbp"
 
    node[op]="$op"
    node[right]="$NODE"
 
    declare -g NODE=$save
 }
-
-
-#════════════════════════════════════╡ GO ╞═════════════════════════════════════
-parse
-
-# If we haven't thrown an exception, I've either catastrophically missed an
-# error, or we've completed the run successfully.
-PARSE_SUCCESS='yes'
-
-(
-   declare -p PARSE_SUCCESS
-   declare -p CONSTRAINTS
-   declare -p INCLUDES   ${!INCLUDE_*}
-   declare -p _NODE_NUM  _INCLUDE_NUM
-   declare -p TYPEOF     ROOT
-   [[ -n ${!NODE_*} ]] && declare -p ${!NODE_*}
-) | sort -V -k3 | sed -E 's;^declare -(-)?;declare -g;'
-# It is possible to not use `sed`, and instead read all the sourced declarations
-# into an array as strings, and parameter substitution them with something like:
-#> shopt -s extglob
-#> ${declarations[@]/declare -?(-)/declare -g}

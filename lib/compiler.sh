@@ -281,9 +281,9 @@ function merge_symtab {
    # there. The child symtab may contain *extra* keys that we need to merge in.
    # Every time we match a key from the parent->child, we can pop it from this
    # copy. Anything left is a duplicate that must be merged.
-   local -A child_keys=( "${!child_symtab[@]}" )
+   local -A child_keys=()
    for k in "${!child_symtab[@]}" ; do
-      child_keys[$k]=
+      child_keys["$k"]=
    done
    
    for p_key in "${!parent_symtab[@]}" ; do

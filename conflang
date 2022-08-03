@@ -166,60 +166,51 @@ function identify_constraint_file {
    fi
 }
 
+source "${LIBDIR}"/lexer.sh
+source "${LIBDIR}"/parser.sh
 
-function parse {
-   # TODO: rewrite
-   # 100% need to rethink this current implementation. I have enjoyed the
-   # niftiness of keeping all of the state isolated to its little scope, but
-   # it's honestly causing a lot of problems.
-   #  - Need to re-source the whole lexer/parser on every run
-   #  - Error handling becomes very tricky
-   #  - Testability goes out the fucking window
-   #
-   # Lexer & parser files should not have any executable code that changes
-   # state.
-   #
-   # When we only ran the lexer, parser, and compiler *once* each, it was a
-   # very cool approach. Less good now. Though this is going to result in us
-   # polluting the global namespace with variable/function name collisions.
-   # Hence my `source`ing nonsense below.
+function _parse {
+   #──────────────────────────────( scanner )───────────────────────────────────
+   # Reset global vars prior to each run.
+   (( FILE_IDX = ${#FILES[@]} - 1 ))
 
-   source <(
-      source <(
-         source "${LIBDIR}"/lexer.sh
-         # Exports:
-         #  TOKENS[]             # Array of token names
-         #  TOKEN_$n             # Sequence of all token objects
-         #  FILE_LINES[]         # INPUT_FILE.readlines()
-      )
+   # File & character information.
+   declare -ga  CHARRAY=()
+   #declare -ga  FILE_LINES=()
+   # TODO: error reporting
+   # Currently 
 
-      [[ $LEX_SUCCESS ]] || exit 1
+   # Token information.
+   declare -ga  TOKENS=()
+   declare -gi  TOKEN_NUM=0
 
-      # Since the lexer in run in a subshell (to isolate the name stomping)
-      # we need to global these out here.
-      declare -p LEX_SUCCESS  FILE_LINES  FILES |\
-         sed -E 's;^declare -(-)?;declare -g;' 
-
-      source "${LIBDIR}"/parser.sh
-      # Exports:
-      #  ROOT
-      #  TYPEOF{}
-      #  NODE_*
-
+   declare -gA  CURSOR=(
+      [offset]=-1
+      [lineno]=1
+      [colno]=0
    )
 
-   # TODO:
-   # This is a fine intermediate solution while I'm running into all sorts of
-   # errors in the lexer/parser, and don't have a good way of handling them...
-   # Needs a rewrite though.
-   [[ $LEX_SUCCESS && $PARSE_SUCCESS ]] || exit 1
+   scan
+   # Exports:
+   #  list  TOKENS[]
+
+
+   #───────────────────────────────( parser )───────────────────────────────────
+   parse
+   # Exports:
+   #  str   ROOT
+   #  dict  TYPEOF{}
+   #  dict  NODE_*
+
+   # I don't think there's anything that needs to be reset explicitly on every
+   # run for the parser.
 }
 
 
 #──────────────────────────────────( parser )───────────────────────────────────
 # Parse the top-level `base' file.
 add_file "$INPUT"
-parse ; parent_root=$ROOT
+_parse ; parent_root=$ROOT
 merge_includes
 # Merge all (potentially nested) `%include` statements from the parent file.
 
@@ -236,7 +227,7 @@ _f1=${#FILES[@]}
 # we added a file. Don't want to parse an additional time if it's not needed.
 if [[ "${_f0}" != "${_f1}" ]] ; then
    # Now parse all the sub-files we're imposing constraints upon.
-   parse ; child_root=$ROOT
+   _parse ; child_root=$ROOT
    merge_includes
    # Merge all (potentially nested) `%include` statements from the child file.
 fi
