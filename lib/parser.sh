@@ -55,12 +55,10 @@ function mk_decl_section {
    (( ++NODE_NUM ))
    local nname_items="NODE_${NODE_NUM}"
    declare -ga $nname_items
-   local   -n  node_items=$nname_items
-   node_items=()
 
    # 3) assign child node to parent.
-   node[name]=
-   node[items]=$nname_items
+   node['name']=
+   node['items']=$nname_items
 
    # 4) Meta information, for easier parsing.
    TYPEOF[$nname]='decl_section'
@@ -74,10 +72,10 @@ function mk_include {
    declare -g  INCLUDE=$iname
    local   -n  include=$iname
 
-   include[path]=
-   include[target]=
+   include['path']=
+   include['target']=
 
-   INCLUDES+=( $iname )
+   INCLUDES+=( "$iname" )
 }
 
 
@@ -88,11 +86,11 @@ function mk_decl_variable {
    declare -g  NODE=$nname
    local   -n  node=$nname
 
-   node[name]=       # identifier
-   node[type]=       # type
-   node[expr]=       # section, array, int, str, bool, path
-   node[context]=
-   
+   node['name']=       # identifier
+   node['type']=       # type
+   node['expr']=       # section, array, int, str, bool, path
+   node['context']=
+
    TYPEOF[$nname]='decl_variable'
 }
 
@@ -117,7 +115,7 @@ function mk_context_test {
    declare -g  NODE=$nname
    local   -n  node=$nname
 
-   node[name]=
+   node['name']=
 
    TYPEOF[$nname]='context_test'
 }
@@ -130,7 +128,7 @@ function mk_context_directive {
    declare -g  NODE=$nname
    local   -n  node=$nname
 
-   node[name]=
+   node['name']=
 
    TYPEOF[$nname]='context_directive'
 }
@@ -170,8 +168,8 @@ function mk_typedef {
    declare -g  NODE=$nname
 
    local -n node=$nname
-   node[kind]=          # Primitive type
-   node[subtype]=       # Sub `Type' node
+   node['kind']=          # Primitive type
+   node['subtype']=       # Sub `Type' node
 
    TYPEOF[$nname]='typedef'
 }
@@ -194,12 +192,10 @@ function mk_func_call {
    (( ++NODE_NUM ))
    local nname_params="NODE_${NODE_NUM}"
    declare -ga $nname_params
-   local   -n  node_params=$nname_params
-   node_params=()
 
    # 3) assign child node to parent.
-   node[name]=
-   node[params]=$nname_params
+   node['name']=
+   node['params']=$nname_params
 
    # 4) Meta information, for easier parsing.
    TYPEOF[$nname]='func_call'
@@ -213,8 +209,8 @@ function mk_unary {
    declare -g  NODE=$nname
    local   -n  node=$nname
 
-   node[op]=
-   node[right]=
+   node['op']=
+   node['right']=
 
    TYPEOF[$nname]='unary'
 }
@@ -228,11 +224,11 @@ function mk_boolean {
    local   -n  node=$nname
 
    # Copied over, so we can ditch the raw tokens after the parser.
-   node[value]=
-   node[offset]=
-   node[lineno]=
-   node[colno]=
-   node[file]=
+   node['value']=
+   node['offset']=
+   node['lineno']=
+   node['colno']=
+   node['file']=
 
    TYPEOF[$nname]='boolean'
 }
@@ -246,11 +242,11 @@ function mk_integer {
    local   -n  node=$nname
 
    # Copied over, so we can ditch the raw tokens after the parser.
-   node[value]=
-   node[offset]=
-   node[lineno]=
-   node[colno]=
-   node[file]=
+   node['value']=
+   node['offset']=
+   node['lineno']=
+   node['colno']=
+   node['file']=
 
    TYPEOF[$nname]='integer'
 }
@@ -264,11 +260,11 @@ function mk_string {
    local   -n  node=$nname
 
    # Copied over, so we can ditch the raw tokens after the parser.
-   node[value]=
-   node[offset]=
-   node[lineno]=
-   node[colno]=
-   node[file]=
+   node['value']=
+   node['offset']=
+   node['lineno']=
+   node['colno']=
+   node['file']=
 
    TYPEOF[$nname]='string'
 }
@@ -282,11 +278,11 @@ function mk_path {
    local   -n  node=$nname
 
    # Copied over, so we can ditch the raw tokens after the parser.
-   node[value]=
-   node[offset]=
-   node[lineno]=
-   node[colno]=
-   node[file]=
+   node['value']=
+   node['offset']=
+   node['lineno']=
+   node['colno']=
+   node['file']=
 
    TYPEOF[$nname]='path'
 }
@@ -300,12 +296,13 @@ function mk_identifier {
    local   -n  node=$nname
 
    # Copied over, so we can ditch the raw tokens after the parser.
-   node[value]=
-   node[offset]=
-   node[lineno]=
-   node[colno]=
-   node[file]=
+   node['value']=
+   node['offset']=
+   node['lineno']=
+   node['colno']=
+   node['file']=
 
+   # shellcheck disable=SC2034
    TYPEOF[$nname]='identifier'
 }
 
@@ -317,17 +314,10 @@ declare -g  CURRENT  CURRENT_NAME
 # e.g., `TOKEN_1', as well as declaring a nameref to the variable itself.
 
 
-function p_advance { 
+function p_advance {
    while [[ $IDX -lt ${#TOKENS[@]} ]] ; do
       declare -g  CURRENT_NAME=${TOKENS[$IDX]}
       declare -gn CURRENT=$CURRENT_NAME
-
-      if [[ ! $CURRENT ]] ; then
-         declare -p TOKENS
-         echo "idx($IDX)"
-         echo "${TOKENS[IDX]}"
-         declare -p ${TOKENS[IDX]}
-      fi
 
       if [[ ${CURRENT[type]} == 'ERROR' ]] ; then
          raise syntax_error "$CURRENT_NAME"
@@ -346,11 +336,11 @@ function p_check {
 
 
 function p_match {
-   if p_check $1 ; then
+   if p_check "$1" ; then
       p_advance
       return 0
    fi
-   
+
    return 1
 }
 
@@ -358,10 +348,10 @@ function p_match {
 function p_munch {
    local -n t=$CURRENT_NAME
 
-   if ! p_check $1 ; then
+   if ! p_check "$1" ; then
       raise parse_error "[${t[lineno]}:${t[colno]}] $1"
    fi
-   
+
    p_advance
 }
 
@@ -390,23 +380,24 @@ function p_program {
 
    local -- nname=$NODE
    local -n name=$nname
-   name[value]='%inline'
-   name[offset]=0
-   name[lineno]=0
-   name[colno]=0
-   name[file]="${FILE_IDX}"
+   name['value']='%inline'
+   name['offset']=0
+   name['lineno']=0
+   name['colno']=0
+   name['file']="${FILE_IDX}"
 
    mk_decl_section
 
+   # shellcheck disable=SC2034
    declare -g ROOT=$NODE
    local   -n node=$NODE
-   local   -n items=${node[items]}
+   local   -n items=${node['items']}
 
-   node[name]=$nname
+   node['name']=$nname
 
    while ! p_check 'EOF' ; do
       p_statement
-      items+=( $NODE )
+      items+=( "$NODE" )
    done
 
    p_munch 'EOF'
@@ -439,13 +430,16 @@ function p_parser_statement {
 function p_include {
    mk_include
    local -n include=$INCLUDE
-   
+
    p_path
    p_munch 'PATH' "expecting path after %include."
 
    local -n path=$NODE
-   include[path]=${path[value]}
-   include[target]=$SECTION
+   include['path']=${path[value]}
+   # shellcheck disable=SC2034 
+   # Ignore "appears unused", `shellcheck` doesn't know it's used in a different
+   # file.
+   include['target']=$SECTION
 
    declare -g NODE=
    # Section declarations loop & append $NODEs to their .items. `include`/
@@ -460,11 +454,11 @@ function p_constrain {
    local -n name=${section_ptr[name]}
 
    if [[ ${name[value]} != '%inline' ]] ; then
-      raise parse_error "constrain blocks may only occur in the top level." 
+      raise parse_error "constrain blocks may only occur in the top level."
    fi
 
    if [[ "${#CONSTRAINTS[@]}" -gt 0 ]] ; then
-      raise parse_error "may not specify multiple constrain blocks." 
+      raise parse_error "may not specify multiple constrain blocks."
    fi
 
    p_munch 'L_BRACKET' "expecting \`[' to begin array of paths."
@@ -503,13 +497,15 @@ function p_decl_section {
    mk_decl_section
    local -- save=$NODE
    local -n node=$NODE
-   local -n items=${node[items]}
+   local -n items=${node['items']}
 
-   node[name]=$name
+   # shellcheck disable=SC2128 
+   # Incorrectly identified error by `shellcheck`.
+   node['name']="$name"
 
    while ! p_check 'R_BRACE' ; do
       p_statement
-      items+=( $NODE )
+      items+=( "$NODE" )
    done
 
    p_munch 'R_BRACE' "expecting \`}' after section."
@@ -524,24 +520,27 @@ function p_decl_variable {
    mk_decl_variable
    local -- save=$NODE
    local -n node=$NODE
-   node[name]=$name
+
+   # shellcheck disable=SC2128
+   # Incorrectly identified error by `shellcheck`.
+   node['name']=$name
 
    # Typedefs.
    if p_check 'IDENTIFIER' ; then
       p_typedef
-      node[type]=$NODE
+      node['type']=$NODE
    fi
 
    # Expressions.
    if ! p_check 'L_BRACE' && ! p_check 'SEMI' ; then
       p_expression
-      node[expr]=$NODE
+      node['expr']=$NODE
    fi
 
    # Context blocks.
    if p_match 'L_BRACE' ; then
       p_context_block
-      node[context]=$NODE
+      node['context']=$NODE
    fi
 
    p_munch 'SEMI' "expecting \`;' after declaration."
@@ -559,11 +558,14 @@ function p_typedef {
    local -- save=$NODE
    local -n type_=$save
 
-   type_[kind]=$name
+   # shellcheck disable=SC2128
+   # Incorrectly identified error by `shellcheck`.
+   type_['kind']=$name
 
    while p_match 'COLON' ; do
       p_typedef
-      type_[subtype]=$NODE
+      # shellcheck disable=SC2034
+      type_['subtype']=$NODE
    done
 
    declare -g NODE=$save
@@ -580,7 +582,7 @@ function p_context_block {
 
    while ! p_check 'R_BRACE' ; do
       p_context
-      node+=( $NODE )
+      node+=( "$NODE" )
    done
 
    p_munch 'R_BRACE' "expecting \`}' after context block."
@@ -601,7 +603,7 @@ function p_context {
    fi
 
    local -n node=$NODE
-   node[name]=$ident
+   node['name']=$ident
 }
 
 
@@ -614,7 +616,7 @@ function p_array {
 
    while ! p_check 'R_BRACKET' ; do
       p_expression
-      node+=( $NODE )
+      node+=( "$NODE" )
    done
 
    p_munch 'R_BRACKET' "expecting \`]' after array."
@@ -625,55 +627,55 @@ function p_array {
 function p_identifier {
    mk_identifier
    local -n node=$NODE
-   node[value]=${CURRENT[value]}
-   node[offset]=${CURRENT[offset]}
-   node[lineno]=${CURRENT[lineno]}
-   node[colno]=${CURRENT[colno]}
-   node[file]=${CURRENT[file]}
+   node['value']=${CURRENT[value]}
+   node['offset']=${CURRENT[offset]}
+   node['lineno']=${CURRENT[lineno]}
+   node['colno']=${CURRENT[colno]}
+   node['file']=${CURRENT[file]}
 }
 
 
 function p_boolean {
    mk_boolean
    local -n node=$NODE
-   node[value]=${CURRENT[value]}
-   node[offset]=${CURRENT[offset]}
-   node[lineno]=${CURRENT[lineno]}
-   node[colno]=${CURRENT[colno]}
-   node[file]=${CURRENT[file]}
+   node['value']=${CURRENT[value]}
+   node['offset']=${CURRENT[offset]}
+   node['lineno']=${CURRENT[lineno]}
+   node['colno']=${CURRENT[colno]}
+   node['file']=${CURRENT[file]}
 }
 
 
 function p_integer {
    mk_integer
    local -n node=$NODE
-   node[value]=${CURRENT[value]}
-   node[offset]=${CURRENT[offset]}
-   node[lineno]=${CURRENT[lineno]}
-   node[colno]=${CURRENT[colno]}
-   node[file]=${CURRENT[file]}
+   node['value']=${CURRENT[value]}
+   node['offset']=${CURRENT[offset]}
+   node['lineno']=${CURRENT[lineno]}
+   node['colno']=${CURRENT[colno]}
+   node['file']=${CURRENT[file]}
 }
 
 
 function p_string {
    mk_string
    local -n node=$NODE
-   node[value]=${CURRENT[value]}
-   node[offset]=${CURRENT[offset]}
-   node[lineno]=${CURRENT[lineno]}
-   node[colno]=${CURRENT[colno]}
-   node[file]=${CURRENT[file]}
+   node['value']=${CURRENT[value]}
+   node['offset']=${CURRENT[offset]}
+   node['lineno']=${CURRENT[lineno]}
+   node['colno']=${CURRENT[colno]}
+   node['file']=${CURRENT[file]}
 }
 
 
 function p_path {
    mk_path
    local -n node=$NODE
-   node[value]=${CURRENT[value]}
-   node[offset]=${CURRENT[offset]}
-   node[lineno]=${CURRENT[lineno]}
-   node[colno]=${CURRENT[colno]}
-   node[file]=${CURRENT[file]}
+   node['value']=${CURRENT[value]}
+   node['offset']=${CURRENT[offset]}
+   node['lineno']=${CURRENT[lineno]}
+   node['colno']=${CURRENT[colno]}
+   node['file']=${CURRENT[file]}
 }
 
 #───────────────────────────────( expressions )─────────────────────────────────
@@ -682,11 +684,11 @@ function p_path {
 # Had to do a little bit of tomfoolery with the binding powers. Shifted
 # everything up by 1bp (+2), so the lowest is lbp=3 rbp=4.
 
-declare -gA prefix_binding_power=(
-   [NOT]=10
-   [BANG]=10
-   [MINUS]=10
-)
+#declare -gA prefix_binding_power=(
+#   [NOT]=10
+#   [BANG]=10
+#   [MINUS]=10
+#)
 declare -gA NUD=(
    [NOT]='p_unary'
    [BANG]='p_unary'
@@ -794,7 +796,7 @@ function p_expression {
 
 
 function p_group {
-   p_expression 
+   p_expression
    p_munch 'R_PAREN' "expecting \`)' after group."
 }
 
@@ -807,9 +809,9 @@ function p_binary {
 
    p_expression "$rbp"
 
-   node[op]="$op"
-   node[left]="$lhs"
-   node[right]="$NODE"
+   node['op']="$op"
+   node['left']="$lhs"
+   node['right']="$NODE"
 
    declare -g NODE=$save
 }
@@ -824,8 +826,8 @@ function p_unary {
 
    p_expression "$rbp"
 
-   node[op]="$op"
-   node[right]="$NODE"
+   node['op']="$op"
+   node['right']="$NODE"
 
    declare -g NODE=$save
 }

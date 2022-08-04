@@ -1,0 +1,4 @@
+disable=SC2178 
+# "variable was used as ... but is now ..."
+# When using namerefs, this will occur all the time. The same name is used in
+# different functions to reference different data types.
