@@ -4,9 +4,9 @@
 function setup {
    load '/usr/lib/bats-assert/load.bash'
    load '/usr/lib/bats-support/load.bash'
+   source "${BATS_TEST_DIRNAME}"/../lib/errors.sh
 
    export lib_lexer="${BATS_TEST_DIRNAME}"/../lib/lexer.sh
-   export lib_errors="${BATS_TEST_DIRNAME}"/../lib/errors.sh
 }
 
 
@@ -16,7 +16,6 @@ function setup {
 
 
 @test "fails with no input" {
-   source "$lib_errors"
    source "$lib_lexer"
 
    run init_scanner
@@ -30,7 +29,7 @@ function setup {
    : 'Given an empty input file, should successfully lex, generating only the
       final EOF token when closing the file.'
 
-   declare -a FILES=( "${BATS_TEST_DIRNAME}"/lexer/empty.conf )
+   declare -a FILES=( "${BATS_TEST_DIRNAME}"/share/empty.conf )
    source "$lib_lexer"
 
    init_scanner
@@ -40,12 +39,12 @@ function setup {
    assert [ ${#TOKENS[@]} -eq 1 ]
 
    local -n t="${TOKENS[0]}" 
-   assert [ "${t[type]}" == 'EOF' ]
+   assert_equal "${t[type]}"  'EOF'
 }
 
 
 @test "identify valid symbols" {
-   declare -a FILES=( "${BATS_TEST_DIRNAME}"/lexer/symbols.conf )
+   declare -a FILES=( "${BATS_TEST_DIRNAME}"/share/symbols.conf )
    source "$lib_lexer"
 
    init_scanner
@@ -71,14 +70,14 @@ function setup {
       local -- expected="EXP_$idx"
       local -n etoken="$expected"
 
-      assert [ "${token[type]}"  == "${etoken[type]}"  ]
-      assert [ "${token[value]}" == "${etoken[value]}" ]
+      assert_equal "${token[type]}"   "${etoken[type]}"
+      assert_equal "${token[value]}"  "${etoken[value]}"
    done
 }
 
 
 @test "identify valid literals" {
-   declare -a FILES=( "${BATS_TEST_DIRNAME}"/lexer/literals.conf )
+   declare -a FILES=( "${BATS_TEST_DIRNAME}"/share/literals.conf )
    source "$lib_lexer"
 
    init_scanner
@@ -111,8 +110,8 @@ function setup {
       local -- expected="EXP_${idx}"
       local -n etoken="$expected"
 
-      assert [ "${token[type]}"  == "${etoken[type]}"  ]
-      assert [ "${token[value]}" == "${etoken[value]}" ]
+      assert_equal "${token[type]}"   "${etoken[type]}"
+      assert_equal "${token[value]}"  "${etoken[value]}"
    done
 }
 
@@ -121,7 +120,7 @@ function setup {
    : 'While not testing every invalid token, a selection of invalid characters
       should all produce an `ERROR` token, with their value preserved.'
 
-   declare -a FILES=( "${BATS_TEST_DIRNAME}"/lexer/invalid.conf )
+   declare -a FILES=( "${BATS_TEST_DIRNAME}"/share/invalid.conf )
    source "$lib_lexer"
 
    init_scanner
@@ -139,8 +138,8 @@ function setup {
       local -- expected="EXP_${idx}"
       local -n etoken="$expected"
 
-      assert [ "${token[type]}"  == "${etoken[type]}"  ]
-      assert [ "${token[value]}" == "${etoken[value]}" ]
+      assert_equal "${token[type]}"   "${etoken[type]}"
+      assert_equal "${token[value]}"  "${etoken[value]}"
    done
 }
 
@@ -182,14 +181,13 @@ function setup {
       fi
    done
 
-   [[ "${#missing_prefix[@]}" -eq 0 ]]
+   assert_equal "${#missing_prefix[@]}"  0
 }
 
 
 @test "function calls have intended \`l_\` prefix" {
    : "Can be easy to forget to add the l_ prefix when calling simple functions
-      like advance() or munch(). Awk the full text to ensure we are not
-      missing anything"
+      like advance() or munch(). Awk the full text to check."
 
    # Awk regex pattern for identifying function names in the `declare -f`
    # output.
@@ -224,7 +222,7 @@ function setup {
 
    _pattern=''
    for f in "${lexer_fns[@]}" ; do
-      _pattern+="${_pattern:+|}${f/l_/}"
+      _pattern+="${_pattern:+|}${f#l_}"
    done
    pattern="($_pattern)"
 
