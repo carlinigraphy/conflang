@@ -21,6 +21,7 @@
 # decrementing each time until we find a unique value. We cannot end up with
 # non-unique values, as we'll throw a parse error.
 
+# shellcheck disable=SC2155,SC2164
 declare -g PROGDIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" ; pwd )
 declare -g LIBDIR="${PROGDIR}/lib"
 source "${LIBDIR}"/errors.sh
@@ -224,7 +225,7 @@ source "${LIBDIR}"/compiler.sh
 # Each section assumes there's a symtab above it. There is a "hidden" top-
 # level section `%inline'. Need to create a parent symtab above to hold it.
 mk_symtab ; parent_symtab=$SYMTAB
-walk_symtab $parent_root
+walk_symtab "$parent_root"
 
 if [[ "$child_root" ]] ; then
    mk_symtab ; child_symtab=$SYMTAB

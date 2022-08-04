@@ -34,8 +34,8 @@ function init_scanner {
 
 
 function Token {
-   : 'Effectively a `class`. Creates instances of Token with information for
-      the position in the file, as well as the character type/value.'
+   : "Effectively a Class. Creates instances of Token with information for
+      the position in the file, as well as the character type/value."
 
    local type=$1  value=$2
 
@@ -49,14 +49,14 @@ function Token {
    declare -n t="$tname"
 
    # Token data.
-   t[type]="$type"
-   t[value]="$value"
+   t['type']="$type"
+   t['value']="$value"
 
    # Cursor information (position in file & line).
-   t[offset]=${FREEZE[offset]}
-   t[lineno]=${FREEZE[lineno]}
-   t[colno]=${FREEZE[colno]}
-   t[file]="${FILE_IDX}"
+   t['offset']=${FREEZE[offset]}
+   t['lineno']=${FREEZE[lineno]}
+   t['colno']=${FREEZE[colno]}
+   t['file']="${FILE_IDX}"
 
    TOKENS+=( "$tname" )
    (( TOKEN_NUM++ )) ||:
@@ -65,13 +65,13 @@ function Token {
                                      
 #══════════════════════════════════╡ SCANNER ╞══════════════════════════════════
 declare -A KEYWORD=(
-   [true]=true
-   [false]=true
-   [and]=true
-   [or]=true
-   [not]=true
-   [include]=true
-   [constrain]=true
+   ['true']=true
+   ['false']=true
+   ['and']=true
+   ['or']=true
+   ['not']=true
+   ['include']=true
+   ['constrain']=true
 )
 
 
@@ -88,16 +88,16 @@ function l_advance {
    #> (( 2 )) ; echo $?    #  0
    #> (( 0 )) ; echo $?    #  1
    # So the stupid way around this... add an `or true`. This is the short form:
-   (( ++CURSOR[offset] )) ||:
-   (( ++CURSOR[colno]  ))
+   (( ++CURSOR['offset'] )) ||:
+   (( ++CURSOR['colno']  ))
 
    # This is a real dumb use of bash's confusing array indexing.
-   CURRENT=${CHARRAY[CURSOR[offset]]}
-   PEEK=${CHARRAY[CURSOR[offset]+1]}
+   CURRENT=${CHARRAY[CURSOR['offset']]}
+   PEEK=${CHARRAY[CURSOR['offset']+1]}
 
    if [[ $CURRENT == $'\n' ]] ; then
-      ((CURSOR[lineno]++))
-      CURSOR[colno]=0
+      ((CURSOR['lineno']++))
+      CURSOR['colno']=0
    fi
 }
 
@@ -122,9 +122,9 @@ function scan {
       l_advance ; [[ -z "$CURRENT" ]] && break
 
       # Save current cursor information.
-      FREEZE[offset]=${CURSOR[offset]}
-      FREEZE[lineno]=${CURSOR[lineno]}
-      FREEZE[colno]=${CURSOR[colno]}
+      FREEZE['offset']=${CURSOR['offset']}
+      FREEZE['lineno']=${CURSOR['lineno']}
+      FREEZE['colno']=${CURSOR['colno']}
 
       # Skip comments.
       if [[ $CURRENT == '#' ]] ; then
@@ -217,7 +217,10 @@ function l_string {
 
    while [[ -n $CURRENT ]] ; do
       if [[ $PEEK == '"' ]] ; then
+         # shellcheck disable=SC1003
+         # Misidentified error.
          if [[ $CURRENT == '\' ]] ; then
+            # shellcheck disable=SC2184
             unset buffer[-1]
          else
             break
@@ -244,7 +247,10 @@ function l_path {
 
    while [[ -n $CURRENT ]] ; do
       if [[ $PEEK == "'" ]] ; then
+         # shellcheck disable=SC1003
+         # Misidentified error.
          if [[ $CURRENT == '\' ]] ; then
+            # shellcheck disable=SC2184
             unset buffer[-1]
          else
             break
