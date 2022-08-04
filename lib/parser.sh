@@ -1,9 +1,8 @@
 #!/bin/bash
 #
-# from ./lexer.sh import {
+# Requires from ENV:
 #  TOKENS[]             # Array of token names
 #  TOKEN_$n             # Sequence of all token objects
-#  FILE_LINES[]         # INPUT_FILE.readlines()
 #  FILES[]              # Array of imported files
 # }
 
@@ -42,7 +41,7 @@ declare -g SECTION
 
 function mk_decl_section {
    # 1) create parent
-   (( NODE_NUM++ ))
+   (( ++NODE_NUM ))
    local   --  nname="NODE_${NODE_NUM}"
    declare -gA $nname
    declare -g  NODE=$nname
@@ -53,7 +52,7 @@ function mk_decl_section {
    declare -g  SECTION=$nname
 
    # 2) create list to hold the items within the section.
-   (( NODE_NUM++ ))
+   (( ++NODE_NUM ))
    local nname_items="NODE_${NODE_NUM}"
    declare -ga $nname_items
    local   -n  node_items=$nname_items
@@ -83,7 +82,7 @@ function mk_include {
 
 
 function mk_decl_variable {
-   (( NODE_NUM++ ))
+   (( ++NODE_NUM ))
    local   --  nname="NODE_${NODE_NUM}"
    declare -gA $nname
    declare -g  NODE=$nname
@@ -99,7 +98,7 @@ function mk_decl_variable {
 
 
 function mk_context_block {
-   (( NODE_NUM++ ))
+   (( ++NODE_NUM ))
    local   --  nname="NODE_${NODE_NUM}"
    declare -ga $nname
    declare -g  NODE=$nname
@@ -112,7 +111,7 @@ function mk_context_block {
 
 
 function mk_context_test {
-   (( NODE_NUM++ ))
+   (( ++NODE_NUM ))
    local   -- nname="NODE_${NODE_NUM}"
    declare -gA $nname
    declare -g  NODE=$nname
@@ -125,7 +124,7 @@ function mk_context_test {
 
 
 function mk_context_directive {
-   (( NODE_NUM++ ))
+   (( ++NODE_NUM ))
    local   -- nname="NODE_${NODE_NUM}"
    declare -gA $nname
    declare -g  NODE=$nname
@@ -138,7 +137,7 @@ function mk_context_directive {
 
 
 function mk_array {
-   (( NODE_NUM++ ))
+   (( ++NODE_NUM ))
    local   --  nname="NODE_${NODE_NUM}"
    declare -ga $nname
    declare -g  NODE=$nname
@@ -165,7 +164,7 @@ function mk_typedef {
    #>    )
    #> )
 
-   (( NODE_NUM++ ))
+   (( ++NODE_NUM ))
    local nname="NODE_${NODE_NUM}"
    declare -gA $nname
    declare -g  NODE=$nname
@@ -185,14 +184,14 @@ function mk_func_call {
    #>    params : array      = []
 
    # 1) create parent
-   (( NODE_NUM++ ))
+   (( ++NODE_NUM ))
    local   --  nname="NODE_${NODE_NUM}"
    declare -gA $nname
    declare -g  NODE=$nname
    local   -n  node=$nname
 
    # 2) create list to hold the items within the section.
-   (( NODE_NUM++ ))
+   (( ++NODE_NUM ))
    local nname_params="NODE_${NODE_NUM}"
    declare -ga $nname_params
    local   -n  node_params=$nname_params
@@ -208,7 +207,7 @@ function mk_func_call {
 
 
 function mk_unary {
-   (( NODE_NUM++ ))
+   (( ++NODE_NUM ))
    local   --  nname="NODE_${NODE_NUM}"
    declare -gA $nname
    declare -g  NODE=$nname
@@ -222,7 +221,7 @@ function mk_unary {
 
 
 function mk_boolean {
-   (( NODE_NUM++ ))
+   (( ++NODE_NUM ))
    local   -- nname="NODE_${NODE_NUM}"
    declare -gA $nname
    declare -g  NODE=$nname
@@ -240,7 +239,7 @@ function mk_boolean {
 
 
 function mk_integer {
-   (( NODE_NUM++ ))
+   (( ++NODE_NUM ))
    local   --  nname="NODE_${NODE_NUM}"
    declare -gA $nname
    declare -g  NODE=$nname
@@ -258,7 +257,7 @@ function mk_integer {
 
 
 function mk_string {
-   (( NODE_NUM++ ))
+   (( ++NODE_NUM ))
    local   --  nname="NODE_${NODE_NUM}"
    declare -gA $nname
    declare -g  NODE=$nname
@@ -276,7 +275,7 @@ function mk_string {
 
 
 function mk_path {
-   (( NODE_NUM++ ))
+   (( ++NODE_NUM ))
    local   -- nname="NODE_${NODE_NUM}"
    declare -gA $nname
    declare -g  NODE=$nname
@@ -294,7 +293,7 @@ function mk_path {
 
 
 function mk_identifier {
-   (( NODE_NUM++ ))
+   (( ++NODE_NUM ))
    local   -- nname="NODE_${NODE_NUM}"
    declare -gA $nname
    declare -g  NODE=$nname
@@ -320,8 +319,15 @@ declare -g  CURRENT  CURRENT_NAME
 
 function p_advance { 
    while [[ $IDX -lt ${#TOKENS[@]} ]] ; do
-      declare -g  CURRENT_NAME=${TOKENS[IDX]}
+      declare -g  CURRENT_NAME=${TOKENS[$IDX]}
       declare -gn CURRENT=$CURRENT_NAME
+
+      if [[ ! $CURRENT ]] ; then
+         declare -p TOKENS
+         echo "idx($IDX)"
+         echo "${TOKENS[IDX]}"
+         declare -p ${TOKENS[IDX]}
+      fi
 
       if [[ ${CURRENT[type]} == 'ERROR' ]] ; then
          raise syntax_error "$CURRENT_NAME"
@@ -361,6 +367,12 @@ function p_munch {
 
 
 function parse {
+   # Realistically this should not happen, outside running the lexer & parser
+   # independently. Though it's a prerequisite for all that follows.
+   if [[ "${#TOKENS[0]}" -eq 0 ]] ; then
+      raise parse_error "didn't receive tokens from lexer."
+   fi
+
    p_advance
    p_program
 }

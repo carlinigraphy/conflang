@@ -75,8 +75,8 @@ declare -A KEYWORD=(
 )
 
 
-declare -- CURRENT PEEK
-declare -a CHARRAY=()      # Array of each character in the file.
+declare -g  CURRENT PEEK
+declare -ga CHARRAY=()      # Array of each character in the file.
 
 function l_advance {
    # Advance cursor position, pointing to each sequential character. Also incr.
