@@ -5,19 +5,152 @@ function setup {
    load '/usr/lib/bats-assert/load.bash'
    load '/usr/lib/bats-support/load.bash'
 
-   export lexer=$( realpath "${BATS_TEST_DIRNAME}"/../lib/lexer.sh )
+   export lib_lexer="${BATS_TEST_DIRNAME}"/../lib/lexer.sh
+   export lib_errors="${BATS_TEST_DIRNAME}"/../lib/errors.sh
 }
 
-#@test "fails with no input" { skip; }
-#@test "runs with empty file" { skip; }
-#
-#@test "correctly identifies integers" { skip; }
-#@test "correctly identifies keywords" {
-#   run $lexer
-#   echo "$output" 1>&3
-#}
+
+@test "successful source" {
+   source "$lib_lexer"
+}
+
+
+@test "fails with no input" {
+   source "$lib_errors"
+   source "$lib_lexer"
+
+   run init_scanner
+
+   assert [ "$status" -eq "${EXIT_STATUS[no_input]}" ]
+   assert_output 'File Error: missing input file.'
+}
+
+
+@test "runs with empty file" {
+   : 'Given an empty input file, should successfully lex, generating only the
+      final EOF token when closing the file.'
+
+   declare -a FILES=( "${BATS_TEST_DIRNAME}"/lexer/empty.conf )
+   source "$lib_lexer"
+
+   init_scanner
+   scan
+
+   # Should have only an EOF token.
+   assert [ ${#TOKENS[@]} -eq 1 ]
+
+   local -n t="${TOKENS[0]}" 
+   assert [ "${t[type]}" == 'EOF' ]
+}
+
+
+@test "identify valid symbols" {
+   declare -a FILES=( "${BATS_TEST_DIRNAME}"/lexer/symbols.conf )
+   source "$lib_lexer"
+
+   init_scanner
+   scan
+
+   declare -A EXP_0=(  [type]="COLON"     [value]=":" )
+   declare -A EXP_1=(  [type]="SEMI"      [value]=";" )
+   declare -A EXP_2=(  [type]="MINUS"     [value]="-" )
+   declare -A EXP_3=(  [type]="PERCENT"   [value]="%" )
+   declare -A EXP_4=(  [type]="QUESTION"  [value]="?" )
+   declare -A EXP_5=(  [type]="L_PAREN"   [value]="(" )
+   declare -A EXP_6=(  [type]="R_PAREN"   [value]=")" )
+   declare -A EXP_7=(  [type]="L_BRACKET" [value]="[" )
+   declare -A EXP_8=(  [type]="R_BRACKET" [value]="]" )
+   declare -A EXP_9=(  [type]="L_BRACE"   [value]="{" )
+   declare -A EXP_10=( [type]="R_BRACE"   [value]="}" )
+   declare -A EXP_11=( [type]="EOF"       [value]=""  )
+
+   for idx in "${!TOKENS[@]}" ; do
+      local -- tname="${TOKENS[$idx]}"
+      local -n token="$tname"
+
+      local -- expected="EXP_$idx"
+      local -n etoken="$expected"
+
+      assert [ "${token[type]}"  == "${etoken[type]}"  ]
+      assert [ "${token[value]}" == "${etoken[value]}" ]
+   done
+}
+
+
+@test "identify valid literals" {
+   declare -a FILES=( "${BATS_TEST_DIRNAME}"/lexer/literals.conf )
+   source "$lib_lexer"
+
+   init_scanner
+   scan
+
+   # Keywords.
+   declare -A EXP_0=(  [type]="INCLUDE"   [value]="include"     )
+   declare -A EXP_1=(  [type]="CONSTRAIN" [value]="constrain"   )
+   declare -A EXP_2=(  [type]="TRUE"      [value]="true"        )
+   declare -A EXP_3=(  [type]="FALSE"     [value]="false"       )
+
+   # Integers.
+   declare -A EXP_4=(  [type]="INTEGER"    [value]="1"          )
+   declare -A EXP_5=(  [type]="INTEGER"    [value]="100"        )
+   declare -A EXP_6=(  [type]="INTEGER"    [value]="1234567890" )
+
+   # Literals.
+   declare -A EXP_7=(  [type]="IDENTIFIER" [value]="ident"      )
+   declare -A EXP_8=(  [type]="STRING"     [value]="string"     )
+   declare -A EXP_9=(  [type]="PATH"       [value]="path"       )
+
+   # EOF.
+   declare -A EXP_10=( [type]="EOF"        [value]=""           )
+
+
+   for idx in "${!TOKENS[@]}" ; do
+      local -- tname="${TOKENS[$idx]}"
+      local -n token="$tname"
+
+      local -- expected="EXP_${idx}"
+      local -n etoken="$expected"
+
+      assert [ "${token[type]}"  == "${etoken[type]}"  ]
+      assert [ "${token[value]}" == "${etoken[value]}" ]
+   done
+}
+
+
+@test "identify invalid tokens" {
+   : 'While not testing every invalid token, a selection of invalid characters
+      should all produce an `ERROR` token, with their value preserved.'
+
+   declare -a FILES=( "${BATS_TEST_DIRNAME}"/lexer/invalid.conf )
+   source "$lib_lexer"
+
+   init_scanner
+   scan
+
+   declare -A EXP_0=( [type]="ERROR"  [value]="&" )
+   declare -A EXP_1=( [type]="ERROR"  [value]="^" )
+   declare -A EXP_2=( [type]="ERROR"  [value]="*" )
+   declare -A EXP_3=( [type]="EOF"    [value]=""  )
+
+   for idx in "${!TOKENS[@]}" ; do
+      local -- tname="${TOKENS[$idx]}"
+      local -n token="$tname"
+
+      local -- expected="EXP_${idx}"
+      local -n etoken="$expected"
+
+      assert [ "${token[type]}"  == "${etoken[type]}"  ]
+      assert [ "${token[value]}" == "${etoken[value]}" ]
+   done
+}
+
 
 @test "function declarations all have \`l_\` prefix" {
+   : 'The lib/lexer.sh and lib/parser.sh files have many common functions and
+      variables, whose names could stomp eachothers. For example: advance(), match(), $CURRENT, $PEEK.
+      To avoid name stomping, lexer functions are prefixed by `l_`. Ensure that
+      for every intended function, it contains the `l_` prefix.'
+
    # Awk regex pattern.
    pattern='/^[[:alpha:]_][[:alnum:]_]* \(\)/'
 
@@ -39,7 +172,7 @@ function setup {
    # Source in the lexer, compile list of function names. Iterating this,
    # and filtering out anything defined previously, should give us only those
    # created within the lexer.
-   source "$lexer"
+   source "$lib_lexer"
    readarray -td $'\n' fns < <(declare -f | awk "${pattern} {print \$1}")
 
    local -a missing_prefix=()
@@ -79,7 +212,7 @@ function setup {
    # Source in the lexer, compile list of function names. Iterating this,
    # and filtering out anything defined previously, should give us only those
    # created within the lexer.
-   source "$lexer"
+   source "$lib_lexer"
    readarray -td $'\n' fns < <(declare -f | awk "${pattern} {print \$1}")
 
    local -a lexer_fns=()

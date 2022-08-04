@@ -8,7 +8,12 @@ function init_scanner {
       information that should not be carried from file to file.'
 
    # Reset global vars prior to each run.
-   (( FILE_IDX = ${#FILES[@]} - 1 ))
+   (( FILE_IDX = ${#FILES[@]} - 1 )) ||:
+
+   # Fail if no file.
+   if [[ "${#FILES[@]}" -eq 0 ]] ; then
+      raise no_input
+   fi
 
    # File & character information.
    declare -ga  CHARRAY=()
@@ -53,7 +58,8 @@ function Token {
    t[colno]=${FREEZE[colno]}
    t[file]="${FILE_IDX}"
 
-   TOKENS+=( "$tname" ) ; (( TOKEN_NUM++ ))
+   TOKENS+=( "$tname" )
+   (( TOKEN_NUM++ )) ||:
 }
 
                                      
@@ -134,7 +140,6 @@ function scan {
       case $CURRENT in
          ';')  Token       'SEMI' "$CURRENT"  ; continue ;;
          ':')  Token      'COLON' "$CURRENT"  ; continue ;;
-         ',')  Token      'COMMA' "$CURRENT"  ; continue ;;
          '-')  Token      'MINUS' "$CURRENT"  ; continue ;;
          '%')  Token    'PERCENT' "$CURRENT"  ; continue ;;
          '?')  Token   'QUESTION' "$CURRENT"  ; continue ;;
@@ -142,32 +147,12 @@ function scan {
          '(')  Token    'L_PAREN' "$CURRENT"  ; continue ;;
          ')')  Token    'R_PAREN' "$CURRENT"  ; continue ;;
 
-         '{')  Token    'L_BRACE' "$CURRENT"  ; continue ;;
-         '}')  Token    'R_BRACE' "$CURRENT"  ; continue ;;
-
          '[')  Token  'L_BRACKET' "$CURRENT"  ; continue ;;
          ']')  Token  'R_BRACKET' "$CURRENT"  ; continue ;;
+
+         '{')  Token    'L_BRACE' "$CURRENT"  ; continue ;;
+         '}')  Token    'R_BRACE' "$CURRENT"  ; continue ;;
       esac
-
-      if [[ $CURRENT == '<' ]] ; then
-         if [[ $PEEK == '=' ]] ; then
-            l_advance ; Token 'LE_EQ' '<='
-            continue
-         else
-            Token 'LT' '<'
-            continue
-         fi
-      fi
-
-      if [[ $CURRENT == '>' ]] ; then
-         if [[ $PEEK == '=' ]] ; then
-            l_advance ; Token 'GT_EQ' '>='
-            continue
-         else
-            Token 'GT' '>'
-            continue
-         fi
-      fi
 
       # Identifiers.
       if [[ $CURRENT =~ [[:alpha:]_] ]] ; then
@@ -282,7 +267,7 @@ function l_path {
 
 
 function l_number {
-   local number=''
+   local number="${CURRENT}"
 
    while [[ $PEEK =~ [[:digit:]] ]] ; do
       l_advance ; number+="$CURRENT"
