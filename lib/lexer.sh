@@ -56,6 +56,9 @@ function Token {
    t['offset']=${FREEZE[offset]}
    t['lineno']=${FREEZE[lineno]}
    t['colno']=${FREEZE[colno]}
+
+   # shellcheck disable=SC2034
+   # ^-- doesn't know this is used later.
    t['file']="${FILE_IDX}"
 
    TOKENS+=( "$tname" )

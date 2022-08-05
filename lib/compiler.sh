@@ -51,8 +51,8 @@ function mk_type {
    declare -g  TYPE=$tname
    local   --  type=$tname
 
-   type[kind]=
-   type[subtype]=
+   type['kind']=
+   type['subtype']=
 }
 
 
@@ -66,10 +66,10 @@ function mk_symbol {
    declare -g  SYMBOL=$sname
    local   --  symbol=$sname
 
-   symbol[type]=
-   symbol[node]=
-   symbol[symtab]=
-   symbol[required]=
+   symbol['type']=
+   symbol['node']=
+   symbol['symtab']=
+   symbol['required']=
    # Variable declaration symbols are `required' if its NODE has no expression.
    # A Section is considered to be `required' if *any* of its children are
    # required. This is only needed when enforcing constraints upon a child file.
@@ -78,7 +78,7 @@ function mk_symbol {
 
 function walk_symtab {
    declare -g NODE="$1"
-   symtab_${TYPEOF[$NODE]}
+   symtab_"${TYPEOF[$NODE]}"
 }
 
 
@@ -119,16 +119,16 @@ function symtab_decl_section {
    local -- type_name=$TYPE
    local -n type=$TYPE
    type[kind]='SECTION'
-   symbol[type]=$type_name
+   symbol['type']=$type_name
 
    # Create new symtab for children of this section. Populate parent's symtab
    # with a reference to this one.
    mk_symtab
-   symbol[symtab]=$SYMTAB
+   symbol['symtab']=$SYMTAB
 
    local -n items="${node[items]}" 
    for nname in "${items[@]}"; do
-      walk_symtab $nname
+      walk_symtab "$nname"
    done
 
    # Check if this section is `required'. If any of its children are required,
@@ -137,7 +137,7 @@ function symtab_decl_section {
    for c_sym_name in "${child_symtab[@]}" ; do
       local -n c_sym=$c_sym_name
       if [[ "${c_sym[required]}" ]] ; then
-         symbol[required]='yes'
+         symbol['required']='yes'
          break
       fi
    done
@@ -179,21 +179,21 @@ function symtab_decl_variable {
       symtab[$name]=$symbol_name
    fi
 
-   if [[ ${node[type]} ]] ; then
-      walk_symtab ${node[type]}
-      symbol[type]=$TYPE
+   if [[ ${node['type']} ]] ; then
+      walk_symtab "${node['type']}"
+      symbol['type']=$TYPE
    else
       # If user does not specify a type declaration, it gets an implicit ANY
       # type that matches anything.
       mk_type
       local -n type=$TYPE
-      type[kind]='ANY'
-      symbol[type]=$TYPE
+      type['kind']='ANY'
+      symbol['type']=$TYPE
    fi
 
    # Variables are `required' when they do not contain an expression. A child
    # must fill in the value.
-   if [[ ! ${node[expr]} ]] ; then
+   if [[ ! ${node['expr']} ]] ; then
       symbol[required]='yes'
    fi
 
@@ -205,12 +205,12 @@ function symtab_typedef {
    local -- save=$NODE
    local -n node=$save
 
-   walk_symtab ${node[kind]}
+   walk_symtab "${node[kind]}"
    local -- tname=$TYPE
 
-   if [[ ${node[subtype]} ]] ; then
-      walk_symtab ${node[subtype]}
-      type[subtype]=$TYPE
+   if [[ ${node['subtype']} ]] ; then
+      walk_symtab "${node[subtype]}"
+      type['subtype']=$TYPE
    fi
 
    declare -g TYPE=$tname
@@ -271,10 +271,7 @@ declare -a TYPE_REDECLARE=()
 
 
 function merge_symtab {
-   local -- parent_symtab_root=$1
    local -n parent_symtab=$1
-
-   local -- child_symtab_root=$2
    local -n child_symtab=$2
 
    # We iterate over the parent symtab. So we're guaranteed to hit every key
@@ -309,10 +306,11 @@ function merge_symtab {
       # Child Symbol.
       local -- c_sym_name="${child_symtab[$p_key]}"
       
+      # shellcheck disable=SC2184
+      unset child_keys["$p_key"]
       # Pop reference to child symbol from the `child_keys[]` copy. Will allow
       # us to check at the end if there are leftover keys that are defined in
       # the child, but not in the parent.
-      unset child_keys[$p_key]
 
       if [[ "${p_type[kind]}" == 'SECTION' ]] ; then
          merge_section  "$p_sym_name" "$c_sym_name"
@@ -426,7 +424,9 @@ function merge_variable {
    local -n p_node="${p_sym[node]}" 
    local -n c_node="${c_sym[node]}" 
    if [[ "${c_node[expr]}" ]] ; then
-      p_node[expr]="${c_node[expr]}" 
+      # shellcheck disable=SC2034
+      # ^-- does not understand namerefs
+      p_node['expr']="${c_node[expr]}" 
    fi
 
    # TODO: feature
@@ -446,8 +446,8 @@ function merge_type {
    # If there's a defined parent type, but no child.
    [[ $1 && ! $2 ]] && return 0
 
-   local -- t1_name="$1" t2_name="$2"
-   local -n t1="$1"      t2="$2"
+   local -n t1="$1"
+   local -n t2="$2"
 
    # case 2.
    # Doesn't matter what the parent's type was. The child is not declaring it,
@@ -456,12 +456,12 @@ function merge_type {
 
    # case 1.
    # Parent and child's types match exactly.
-   if [[ ${t1[kind]} == ${t2[kind]} ]] ; then
+   if [[ ${t1['kind']} == "${t2[kind]}" ]] ; then
       return 0
    fi
 
    # Same as above, but for any subtypes.
-   if [[ ${t1[subtype]} ]] ; then
+   if [[ ${t1['subtype']} ]] ; then
       merge_type "${t1[subtype]}" "${t2[subtype]}"
       return $?
    fi
@@ -472,6 +472,8 @@ function merge_type {
 
 #────────────────────────────────( build data )─────────────────────────────────
 # TODO: documentation
+# shellcheck disable=SC1007
+# ^-- thinks I'm trying to assign a var, rather than declare empty variables.
 declare -- KEY= DATA=
 declare -i DATA_NUM=${TYPE_NUM:-0}
 
@@ -497,7 +499,7 @@ function mk_data_array {
 
 function walk_data {
    declare -g NODE="$1"
-   data_${TYPEOF[$NODE]}
+   data_"${TYPEOF[$NODE]}"
 }
 
 
@@ -511,12 +513,12 @@ function data_decl_section {
    local -- dname=$DATA
    local -n data=$DATA
 
-   walk_data ${node[name]}
+   walk_data "${node[name]}"
    local -- key="$DATA"
 
    local -n items="${node[items]}" 
    for nname in "${items[@]}"; do
-      walk_data $nname
+      walk_data "$nname"
       data[$KEY]="$DATA"
    done
 
@@ -530,11 +532,11 @@ function data_decl_variable {
    local -- save=$NODE
    local -n node=$save
 
-   walk_data ${node[name]}
+   walk_data "${node[name]}"
    local -- key="$DATA"
 
    if [[ -n ${node[expr]} ]] ; then
-      walk_data ${node[expr]}
+      walk_data "${node[expr]}"
    else
       declare -g DATA=''
    fi
@@ -549,10 +551,10 @@ function data_unary {
    local -n node=$save
 
    # The only unary expression right now is negation.
-   walk_data ${node[rhs]}
+   walk_data "${node[rhs]}"
    local -i rhs=$DATA
 
-   declare -g DATA=$(( -1 * $rhs ))
+   (( DATA = -1 * rhs ))
    declare -g NODE=$save
 }
 
@@ -566,7 +568,7 @@ function data_array {
    local -n data=$DATA
 
    for nname in "${node[@]}"; do
-      walk_data $nname
+      walk_data "$nname"
       data+=( "$DATA" )
    done
 
@@ -814,7 +816,7 @@ declare -i INDENTATION=0
 
 function walk_pprint {
    declare -g NODE="$1"
-   pprint_${TYPEOF[$NODE]}
+   pprint_"${TYPEOF[$NODE]}"
 }
 
 
@@ -823,14 +825,14 @@ function pprint_decl_section {
    local -- save=$NODE
    local -n node=$save
 
-   walk_pprint ${node[name]}
+   walk_pprint "${node[name]}"
    printf ' {\n'
 
    (( INDENTATION++ ))
 
    local -n items="${node[items]}" 
    for nname in "${items[@]}"; do
-      walk_pprint $nname
+      walk_pprint "$nname"
    done
 
    (( INDENTATION-- ))
@@ -845,7 +847,7 @@ function pprint_decl_variable {
    local -n node=$save
 
    printf "%$(( INDENTATION * INDENT_FACTOR ))s" ''
-   walk_pprint ${node[name]}
+   walk_pprint "${node[name]}"
 
    if [[ ${node[type]} ]] ; then
       printf ' ('
@@ -855,7 +857,7 @@ function pprint_decl_variable {
 
    if [[ ${node[expr]} ]] ; then
       printf ' '
-      walk_pprint ${node[expr]}
+      walk_pprint "${node[expr]}"
       printf ';\n'
    fi
 
@@ -887,7 +889,7 @@ function pprint_array {
 
    for nname in "${node[@]}"; do
       printf "\n%$(( INDENTATION * INDENT_FACTOR ))s" ''
-      walk_pprint $nname
+      walk_pprint "$nname"
    done
 
    (( INDENTATION-- ))

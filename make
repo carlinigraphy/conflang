@@ -26,7 +26,7 @@ case "$1" in
                   "${PROGDIR}"/lib/*.sh
                )
             fi
-            exec shellcheck -x "${args[@]}"
+            exec shellcheck -s bash -x "${args[@]}"
             ;;
 
    'run')   shift

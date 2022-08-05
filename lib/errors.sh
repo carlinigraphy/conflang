@@ -14,7 +14,7 @@ declare -gA EXIT_STATUS=(
 
 function raise {
    local type="$1" ; shift
-   print_${type} "$@" 1>&2
+   print_"${type}" "$@" 1>&2
 
    exit "${EXIT_STATUS[$type]}"
 }

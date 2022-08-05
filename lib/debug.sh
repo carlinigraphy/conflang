@@ -19,7 +19,7 @@ function pprint_symtab {
 
       if [[ "$key" == '%inline' ]] ; then
          local -n name="${node[name]}"
-         printf "${FILES[${name[file]}]##*/}"
+         printf '%s' "${FILES[${name[file]}]##*/}"
       else
          printf "%$(( INDENTATION * INDENT_FACTOR ))s%s" '' "$key"
       fi
@@ -42,7 +42,7 @@ function pprint_symtab {
 
 function walk_pprint {
    declare -g NODE="$1"
-   pprint_${TYPEOF[$NODE]}
+   pprint_"${TYPEOF[$NODE]}"
 }
 
 
@@ -51,14 +51,14 @@ function pprint_decl_section {
    local -- save=$NODE
    local -n node=$save
 
-   walk_pprint ${node[name]}
+   walk_pprint "${node[name]}"
    printf ' {\n'
 
    (( INDENTATION++ ))
 
    local -n items="${node[items]}" 
    for nname in "${items[@]}"; do
-      walk_pprint $nname
+      walk_pprint "$nname"
    done
 
    (( INDENTATION-- ))
@@ -73,7 +73,7 @@ function pprint_decl_variable {
    local -n node=$save
 
    printf "%$(( INDENTATION * INDENT_FACTOR ))s" ''
-   walk_pprint ${node[name]}
+   walk_pprint "${node[name]}"
 
    if [[ ${node[type]} ]] ; then
       printf ' ('
@@ -83,7 +83,7 @@ function pprint_decl_variable {
 
    if [[ ${node[expr]} ]] ; then
       printf ' '
-      walk_pprint ${node[expr]}
+      walk_pprint "${node[expr]}"
       printf ';\n'
    fi
 
@@ -115,7 +115,7 @@ function pprint_array {
 
    for nname in "${node[@]}"; do
       printf "\n%$(( INDENTATION * INDENT_FACTOR ))s" ''
-      walk_pprint $nname
+      walk_pprint "$nname"
    done
 
    (( INDENTATION-- ))
@@ -169,11 +169,12 @@ function dump_everything {
       -e 's,\[([[:alpha:]%]+)\]=,\1: ,g'     # [file]="value"     ->  file: "value"
    )
 
-   (
+   (  # shellcheck disable=SC2154
+      # ^-- doesn't know these are defined in ./conflang
       declare -p parent_symtab child_symtab
-      declare -p ${!NODE_*}
-      declare -p ${!SYMTAB*}
-      declare -p ${!SYMBOL_*}
-      declare -p ${!TYPE_*}
+
+      # shellcheck disable=SC2086
+      # ^-- thinks we don't want globbing here. We do.
+      declare -p ${!NODE_*} ${!SYMTAB*} ${!SYMBOL_*} ${!TYPE_*}
    ) | sort -V -k3 | sed "${sed_params[@]}"
 }

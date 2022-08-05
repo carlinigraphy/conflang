@@ -24,6 +24,8 @@
 # shellcheck disable=SC2155,SC2164
 declare -g PROGDIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" ; pwd )
 declare -g LIBDIR="${PROGDIR}/lib"
+
+# shellcheck source=./lib/errors.sh
 source "${LIBDIR}"/errors.sh
 
 declare -g INPUT="$1"
@@ -167,7 +169,10 @@ function identify_constraint_file {
    fi
 }
 
+# shellcheck source=./lib/lexer.sh
 source "${LIBDIR}"/lexer.sh
+
+# shellcheck source=./lib/parser.sh
 source "${LIBDIR}"/parser.sh
 
 function _parse {
@@ -217,6 +222,7 @@ ROOT=$parent_root
 
 
 #─────────────────────────────────( compiler )──────────────────────────────────
+# shellcheck source=./lib/compiler.sh
 source "${LIBDIR}"/compiler.sh
 # Exports (USER ACCESSIBLE):
 #  _DATA_ROOT
@@ -231,11 +237,20 @@ if [[ "$child_root" ]] ; then
    mk_symtab ; child_symtab=$SYMTAB
    walk_symtab "$child_root"
 
+   # shellcheck disable=SC2128
+   # It thinks the parent_symtab is an array itself, rather than the name of an
+   # array.
    merge_symtab "$parent_symtab" "$child_symtab"
 fi
 
 #walk_pprint "$parent_root"
+
+# shellcheck source=./lib/debug.sh
 source "${LIBDIR}"/debug.sh
+
+# shellcheck disable=SC2128
+# It thinks the parent_symtab is an array itself, rather than the name of an
+# array.
 pprint_symtab "${parent_symtab}"
 
 exit 0

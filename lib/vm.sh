@@ -62,183 +62,183 @@
 # reduce complexity, and likely increase speed. Fractionally. The majority
 # is likely eaten up by tests inside the while loop.
 
-: '
-   TYPE           CODE        ARG1        ARG2        META
-   ----------------------------------------------------------------
-   general        POP
-                  JUMP        offset
-                  STORE       value
-
-   dir/file       TOUCH       path                    cursor
-                  MKDIR       path                    cursor
-                  IS_DIR      path                    cursor
-                  IS_FILE     path                    cursor
-                  CAN_READ    path        user        cursor
-                  CAN_WRITE   path        user        cursor
-
-   comparison     GT          rhs                     cursor
-                  LT          rhs                     cursor
-                  EQ          rhs                     cursor
-
-   logical        NOT
-                  TRUE
-                  FALSE
-                  NEGATE      rhs                     cursor
-
-   functions      CALL        name        arg_num     cursor
-'
-
-
-declare -A OP_1=(  [code]='IS_DIR'  [dir]='./bin'     )    # dir stuff
-declare -A OP_2=(  [code]='MKDIR'   [dir]='./tmpdir'  )
-declare -A OP_3=(  [code]='STORE'   [value]='VAL_0'   )    # store stuff
-declare -A OP_4=(  [code]='LT'      [rhs]='VAL_1'     )    # compare stuff
-
-declare -A VAL_0=( [type]='INTEGER' [value]=4         )
-declare -A VAL_1=( [type]='INTEGER' [value]=5         )
-
-declare -a OP_CODES=(
-   OP_1
-   OP_2
-   OP_3
-   OP_4
-)
-
-declare -gi IP=0
-declare -ga STACK=()
-
-declare -g  VAL
-declare -gi VAL_NUM=1
-
-function make_value {
-   (( ++VAL_NUM ))
-   local   --  vname="VAL_${VAL_NUM}"
-   declare -gA $vname
-   declare -g  VAL=$vname
-}
-
-
-# If something external has a non-0 exit status, record the cursor information,
-# as well as anything to stdout, and the exit status in an error object.
-declare -ga  ERRORS=()
-
-
-declare -i NUM_OPS="${#OP_CODES[@]}"
-while [[ $IP -lt $NUM_OPS ]] ; do
-   declare -n op=${OP_CODES[IP]}
-
-   case "${op[code]}" in
-      ## STATEMENTS.
-      ## (It does not have an impact on the stack.)
-      # Prior to running a `mkdir`, we should've pushed a CAN_WRITE (or
-      # equivalent).
-      'MKDIR')    mkdir -p "${op[dir]}"
-                  ;;
-
-      'TOUCH')    touch "${op[dir]}"
-                  ;;
-
-      ## EXPRESSIONS
-      ## (It does have an impact on the stack.)
-      'POP')      STACK=( "${STACK[@]:0:${#STACK[@]}-1}" )
-                  ;;
-
-      # I believe this will be faster than a 'POP', however it unsets the VAL_n
-      # itself, in addition to popping it from the array.
-      'DEL')      unset STACK[-1]
-                  ;;
-
-      'STORE')    STACK+=( "${op[value]}" )
-                  ;;
-
-      'IS_DIR')   make_value
-                  declare -n v=$VAL
-                  v[type]='BOOLEAN'
-                  v[value]='FALSE'
-
-                  if [[ -d "${op[dir]}" ]] ; then
-                     v[value]='TRUE'
-                  fi
-
-                  STACK+=( $VAL )
-                  ;;
-
-      'TRUE' | 'FALSE')
-                  make_value
-                  declare -n v=$VAL
-                  v[type]='BOOLEAN'
-                  v[value]="${op[value]}"
-                  STACK+=( "$VAL" )
-                  ;;
-
-      'LT')       make_value
-                  declare -n v=$VAL
-                  v[type]='BOOLEAN'
-
-                  declare -n rhs="${op[rhs]}"
-                  declare -n lhs="${STACK[-1]}"
-                  STACK=( "${STACK[@]:0:${#STACK[@]}-1}" )
-
-                  if [[ "${lhs[type]}" != "INTEGER" || "${rhs[type]}" != "INTEGER" ]] ; then
-                     echo "Requires lhs & rhs integers." 1>&2 ; exit -1
-                  fi
-
-                  v[value]='FALSE'
-                  if [[ "${lhs[value]}" < "${rhs[value]}" ]] ; then
-                     v[value]='TRUE'
-                  fi
-
-                  STACK+=( "$VAL" )
-                  ;;
-
-      'GT')       make_value
-                  declare -n v=$VAL
-                  v[type]='BOOLEAN'
-
-                  declare -n rhs="${op[rhs]}"
-                  declare -n lhs="${STACK[-1]}"
-                  STACK=( "${STACK[@]:0:${#STACK[@]}-1}" )
-
-                  if [[ "${lhs[type]}" != "INTEGER" || "${rhs[type]}" != "INTEGER" ]] ; then
-                     echo "Requires lhs & rhs integers." 1>&2 ; exit -1
-                  fi
-
-                  v[value]='FALSE'
-                  if [[ "${lhs[value]}" > "${rhs[value]}" ]] ; then
-                     v[value]='TRUE'
-                  fi
-
-                  STACK+=( "$VAL" )
-                  ;;
-
-      'EQ')       make_value
-                  declare -n v=$VAL
-                  v[type]='BOOLEAN'
-
-                  declare -n rhs="${op[rhs]}"
-                  declare -n lhs="${STACK[-1]}"
-                  STACK=( "${STACK[@]:0:${#STACK[@]}-1}" )
-
-                  if [[ "${lhs[type]}" != "${rhs[type]}" ]] ; then
-                     echo "Requires matching types." 1>&2 ; exit -1
-                  fi
-
-                  v[value]='FALSE'
-                  if [[ "${lhs[value]}" == "${rhs[value]}" ]] ; then
-                     v[value]='TRUE'
-                  fi
-
-                  STACK+=( "$VAL" )
-                  ;;
-
-      *) echo "OP[${op[code]}] is invalid." 1>&2
-         exit -1 ;;
-   esac
-
-   (( ++IP ))
-done
-
-(
-   declare -p STACK
-   declare -p ${!VAL_*}
-) | sort -V -k3
+#: '
+#   TYPE           CODE        ARG1        ARG2        META
+#   ----------------------------------------------------------------
+#   general        POP
+#                  JUMP        offset
+#                  STORE       value
+#
+#   dir/file       TOUCH       path                    cursor
+#                  MKDIR       path                    cursor
+#                  IS_DIR      path                    cursor
+#                  IS_FILE     path                    cursor
+#                  CAN_READ    path        user        cursor
+#                  CAN_WRITE   path        user        cursor
+#
+#   comparison     GT          rhs                     cursor
+#                  LT          rhs                     cursor
+#                  EQ          rhs                     cursor
+#
+#   logical        NOT
+#                  TRUE
+#                  FALSE
+#                  NEGATE      rhs                     cursor
+#
+#   functions      CALL        name        arg_num     cursor
+#'
+#
+#
+#declare -A OP_1=(  [code]='IS_DIR'  [dir]='./bin'     )    # dir stuff
+#declare -A OP_2=(  [code]='MKDIR'   [dir]='./tmpdir'  )
+#declare -A OP_3=(  [code]='STORE'   [value]='VAL_0'   )    # store stuff
+#declare -A OP_4=(  [code]='LT'      [rhs]='VAL_1'     )    # compare stuff
+#
+#declare -A VAL_0=( [type]='INTEGER' [value]=4         )
+#declare -A VAL_1=( [type]='INTEGER' [value]=5         )
+#
+#declare -a OP_CODES=(
+#   OP_1
+#   OP_2
+#   OP_3
+#   OP_4
+#)
+#
+#declare -gi IP=0
+#declare -ga STACK=()
+#
+#declare -g  VAL
+#declare -gi VAL_NUM=1
+#
+#function make_value {
+#   (( ++VAL_NUM ))
+#   local   --  vname="VAL_${VAL_NUM}"
+#   declare -gA $vname
+#   declare -g  VAL=$vname
+#}
+#
+#
+## If something external has a non-0 exit status, record the cursor information,
+## as well as anything to stdout, and the exit status in an error object.
+#declare -ga  ERRORS=()
+#
+#
+#declare -i NUM_OPS="${#OP_CODES[@]}"
+#while [[ $IP -lt $NUM_OPS ]] ; do
+#   declare -n op=${OP_CODES[IP]}
+#
+#   case "${op[code]}" in
+#      ## STATEMENTS.
+#      ## (It does not have an impact on the stack.)
+#      # Prior to running a `mkdir`, we should've pushed a CAN_WRITE (or
+#      # equivalent).
+#      'MKDIR')    mkdir -p "${op[dir]}"
+#                  ;;
+#
+#      'TOUCH')    touch "${op[dir]}"
+#                  ;;
+#
+#      ## EXPRESSIONS
+#      ## (It does have an impact on the stack.)
+#      'POP')      STACK=( "${STACK[@]:0:${#STACK[@]}-1}" )
+#                  ;;
+#
+#      # I believe this will be faster than a 'POP', however it unsets the VAL_n
+#      # itself, in addition to popping it from the array.
+#      'DEL')      unset STACK[-1]
+#                  ;;
+#
+#      'STORE')    STACK+=( "${op[value]}" )
+#                  ;;
+#
+#      'IS_DIR')   make_value
+#                  declare -n v=$VAL
+#                  v[type]='BOOLEAN'
+#                  v[value]='FALSE'
+#
+#                  if [[ -d "${op[dir]}" ]] ; then
+#                     v[value]='TRUE'
+#                  fi
+#
+#                  STACK+=( $VAL )
+#                  ;;
+#
+#      'TRUE' | 'FALSE')
+#                  make_value
+#                  declare -n v=$VAL
+#                  v[type]='BOOLEAN'
+#                  v[value]="${op[value]}"
+#                  STACK+=( "$VAL" )
+#                  ;;
+#
+#      'LT')       make_value
+#                  declare -n v=$VAL
+#                  v[type]='BOOLEAN'
+#
+#                  declare -n rhs="${op[rhs]}"
+#                  declare -n lhs="${STACK[-1]}"
+#                  STACK=( "${STACK[@]:0:${#STACK[@]}-1}" )
+#
+#                  if [[ "${lhs[type]}" != "INTEGER" || "${rhs[type]}" != "INTEGER" ]] ; then
+#                     echo "Requires lhs & rhs integers." 1>&2 ; exit -1
+#                  fi
+#
+#                  v[value]='FALSE'
+#                  if [[ "${lhs[value]}" < "${rhs[value]}" ]] ; then
+#                     v[value]='TRUE'
+#                  fi
+#
+#                  STACK+=( "$VAL" )
+#                  ;;
+#
+#      'GT')       make_value
+#                  declare -n v=$VAL
+#                  v[type]='BOOLEAN'
+#
+#                  declare -n rhs="${op[rhs]}"
+#                  declare -n lhs="${STACK[-1]}"
+#                  STACK=( "${STACK[@]:0:${#STACK[@]}-1}" )
+#
+#                  if [[ "${lhs[type]}" != "INTEGER" || "${rhs[type]}" != "INTEGER" ]] ; then
+#                     echo "Requires lhs & rhs integers." 1>&2 ; exit -1
+#                  fi
+#
+#                  v[value]='FALSE'
+#                  if [[ "${lhs[value]}" > "${rhs[value]}" ]] ; then
+#                     v[value]='TRUE'
+#                  fi
+#
+#                  STACK+=( "$VAL" )
+#                  ;;
+#
+#      'EQ')       make_value
+#                  declare -n v=$VAL
+#                  v[type]='BOOLEAN'
+#
+#                  declare -n rhs="${op[rhs]}"
+#                  declare -n lhs="${STACK[-1]}"
+#                  STACK=( "${STACK[@]:0:${#STACK[@]}-1}" )
+#
+#                  if [[ "${lhs[type]}" != "${rhs[type]}" ]] ; then
+#                     echo "Requires matching types." 1>&2 ; exit -1
+#                  fi
+#
+#                  v[value]='FALSE'
+#                  if [[ "${lhs[value]}" == "${rhs[value]}" ]] ; then
+#                     v[value]='TRUE'
+#                  fi
+#
+#                  STACK+=( "$VAL" )
+#                  ;;
+#
+#      *) echo "OP[${op[code]}] is invalid." 1>&2
+#         exit -1 ;;
+#   esac
+#
+#   (( ++IP ))
+#done
+#
+#(
+#   declare -p STACK
+#   declare -p ${!VAL_*}
+#) | sort -V -k3

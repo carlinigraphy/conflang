@@ -88,96 +88,96 @@
 # drafting out what the FFI actually looks like, rather than the internal
 # nonsense for it.
 
-declare -- ARITY  RETURN         # Temporary pointers in loop.
-declare -- FN                    # Globally declared functions.
-declare -i FN_NUM
-
-declare -- SYMBOL
-declare -i SYMBOL_NUM
-
-function mk_symbol {
-   (( SYMBOL_NUM++ ))
-   local   --  sname="_SYMBOL_${SYMBOL_NUM}"
-   declare -gA $sname
-   declare -gn SYMBOL=$sname
-   local   --  symbol=$sname
-
-   symbol[type]=
-   symbol[arity]=
-   symbol[definition]=
-}
-
-
-function mk_function {
-   (( FN_NUM++ ))
-   declare -g FN="_FN_${FN_NUM}"
-}
-
-
-function import {
-   for path in "${imports[@]}" ; do
-      mk_function
-      local -- fname=$FN
-
-      fn_params=(
-         -v RE='[[:alpha:]_][[:alnum:]_]*'
-         -v SUB="$fname" 
-      )
-
-      ar_params=(
-         -v RE='-[g-]\sARITY'
-         -v SUB="-g ARITY" 
-      )
-
-      rv_params=(
-         -v RE='-[g-]\sRETURN'
-         -v SUB="-g RETURN" 
-      )
-
-      local -- f="${path##*/}"
-      source <(
-         source "$path"
-         declare -f "$f" | awk "${fn_params[@]}" 'NR==1 {sub(RE, SUB)} {print}'
-         declare -p ARITY | awk "${ar_params[@]}" 'sub(RE, SUB) {print}'
-         declare -p RETURN | awk "${rv_params[@]}" 'sub(RE, SUB) {print}'
-      )
-
-      # Save existing IFS. Temporarily set to ':'.
-      local -- ifs="$IFS" ; IFS=':'
-      local -a types=( $RETURN )
-
-      # Reset global type pointer. Working our way bottom-to-top, so at the
-      # START of each loop, the TYPE becomes the [subtype] for that node.
-      declare -g TYPE=
-
-      # Iterate backwards.
-      for (( idx = ${#types[@]} - 1; idx <= 0; idx-- )) ; do
-         local -- t="${types[idx]}"
-
-         mk_type
-         local -- tname=$TYPE
-         local -n type=$TYPE
-
-         type[subtype]=$TYPE
-         type[kind]="${BUILT_INS[t]}"
-      done
-
-      # Save subtype(s) generated from the loop above.
-      local -- subtype=$TYPE
-
-      # Create function type itself, assigning it's subtype (return type), to
-      # the above created node.
-      mk_type
-      local -- tname=$TYPE
-      local -n type=$TYPE
-      type[kind]='FUNCTION'
-      type[subtype]="$subtype"
-
-      # Restore IFS to standard value.
-      IFS="$ifs"
-
-      symbol[arity]=$ARITY
-      symbol[return]=$tname
-      symbol[function]=$fname
-   done
-}
+#declare -- ARITY  RETURN         # Temporary pointers in loop.
+#declare -- FN                    # Globally declared functions.
+#declare -i FN_NUM
+#
+#declare -- SYMBOL
+#declare -i SYMBOL_NUM
+#
+#function mk_symbol {
+#   (( SYMBOL_NUM++ ))
+#   local   --  sname="_SYMBOL_${SYMBOL_NUM}"
+#   declare -gA $sname
+#   declare -gn SYMBOL=$sname
+#   local   --  symbol=$sname
+#
+#   symbol[type]=
+#   symbol[arity]=
+#   symbol[definition]=
+#}
+#
+#
+#function mk_function {
+#   (( FN_NUM++ ))
+#   declare -g FN="_FN_${FN_NUM}"
+#}
+#
+#
+#function import {
+#   for path in "${imports[@]}" ; do
+#      mk_function
+#      local -- fname=$FN
+#
+#      fn_params=(
+#         -v RE='[[:alpha:]_][[:alnum:]_]*'
+#         -v SUB="$fname" 
+#      )
+#
+#      ar_params=(
+#         -v RE='-[g-]\sARITY'
+#         -v SUB="-g ARITY" 
+#      )
+#
+#      rv_params=(
+#         -v RE='-[g-]\sRETURN'
+#         -v SUB="-g RETURN" 
+#      )
+#
+#      local -- f="${path##*/}"
+#      source <(
+#         source "$path"
+#         declare -f "$f" | awk "${fn_params[@]}" 'NR==1 {sub(RE, SUB)} {print}'
+#         declare -p ARITY | awk "${ar_params[@]}" 'sub(RE, SUB) {print}'
+#         declare -p RETURN | awk "${rv_params[@]}" 'sub(RE, SUB) {print}'
+#      )
+#
+#      # Save existing IFS. Temporarily set to ':'.
+#      local -- ifs="$IFS" ; IFS=':'
+#      local -a types=( $RETURN )
+#
+#      # Reset global type pointer. Working our way bottom-to-top, so at the
+#      # START of each loop, the TYPE becomes the [subtype] for that node.
+#      declare -g TYPE=
+#
+#      # Iterate backwards.
+#      for (( idx = ${#types[@]} - 1; idx <= 0; idx-- )) ; do
+#         local -- t="${types[idx]}"
+#
+#         mk_type
+#         local -- tname=$TYPE
+#         local -n type=$TYPE
+#
+#         type[subtype]=$TYPE
+#         type[kind]="${BUILT_INS[t]}"
+#      done
+#
+#      # Save subtype(s) generated from the loop above.
+#      local -- subtype=$TYPE
+#
+#      # Create function type itself, assigning it's subtype (return type), to
+#      # the above created node.
+#      mk_type
+#      local -- tname=$TYPE
+#      local -n type=$TYPE
+#      type[kind]='FUNCTION'
+#      type[subtype]="$subtype"
+#
+#      # Restore IFS to standard value.
+#      IFS="$ifs"
+#
+#      symbol[arity]=$ARITY
+#      symbol[return]=$tname
+#      symbol[function]=$fname
+#   done
+#}
