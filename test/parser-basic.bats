@@ -51,6 +51,7 @@ function setup {
 @test "lexer -> parser with simple data" {
    : 'Must check the lexer successfully hands off everything to the parser.
       and no additional global vars/functions are unspecified'
+
    source "$lib_lexer"
    source "$lib_parser"
 
