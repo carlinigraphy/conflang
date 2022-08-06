@@ -144,6 +144,7 @@ function scan {
          ';')  Token       'SEMI' "$CURRENT"  ; continue ;;
          ':')  Token      'COLON' "$CURRENT"  ; continue ;;
          '-')  Token      'MINUS' "$CURRENT"  ; continue ;;
+         '$')  Token     'DOLLAR' "$CURRENT"  ; continue ;;
          '%')  Token    'PERCENT' "$CURRENT"  ; continue ;;
          '?')  Token   'QUESTION' "$CURRENT"  ; continue ;;
 
