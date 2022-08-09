@@ -87,6 +87,7 @@ function setup {
       [mk_decl_section]='yes'
       [mk_decl_variable]='yes'
       [mk_func_call]='yes'
+      [mk_variable]='yes'
       [mk_identifier]='yes'
       [mk_include]='yes'
       [mk_integer]='yes'
@@ -140,6 +141,7 @@ function setup {
       [mk_decl_section]='yes'
       [mk_decl_variable]='yes'
       [mk_func_call]='yes'
+      [mk_variable]='yes'
       [mk_identifier]='yes'
       [mk_include]='yes'
       [mk_integer]='yes'
@@ -196,4 +198,44 @@ function setup {
          fi
       fi
    done< <( declare -f "${parser_fns[@]}" )
+}
+
+
+@test "No function overlap between lexer and parser" {
+   # Awk regex pattern for identifying function names in the `declare -f`
+   # output.
+   pattern='/^[[:alpha:]_][[:alnum:]_]* \(\)/'
+
+   # Get initial list of functions from the environment. Don't want these
+   # polluting the results from the lexer function names. Filter them out.
+   readarray -td $'\n' filter < <(declare -f | awk "${pattern} {print \$1}" | sort)
+
+   # Only lexer functions.
+   source "$lib_lexer"
+   readarray -td $'\n' _lex_fns < <(declare -f | awk "${pattern} {print \$1}" | sort)
+   readarray -td $'\n'  lex_fns < <(
+         comm -13 \
+         <(printf '%s\n' "${filter[@]}") \
+         <(printf '%s\n' "${_lex_fns[@]}")
+   )
+   unset "${lex_fns[@]}" 
+
+   # Only parser functions.
+   source "$lib_parser"
+   readarray -td $'\n' _parse_fns < <(declare -f | awk "${pattern} {print \$1}" | sort)
+   readarray -td $'\n'  parse_fns < <(
+         comm -13 \
+         <(printf '%s\n' "${filter[@]}") \
+         <(printf '%s\n' "${_parse_fns[@]}")
+   )
+   unset "${parse_fns[@]}" 
+
+   # Intersection of lexer & parser. Ideally 0.
+   readarray -td $'\n' intersection < <(
+         comm -13
+         <(printf '%s\n' "${lex_fns[@]}") \
+         <(printf '%s\n' "${parse_fns[@]}")
+   )
+
+   assert_equal "${#intersection[@]}"  0
 }

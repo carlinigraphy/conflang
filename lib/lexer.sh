@@ -177,7 +177,7 @@ function scan {
       if [[ $CURRENT =~ [[:digit:]] ]] ; then
          # Bash only natively handles integers. It's not able to do floats
          # without bringing `bc` or something. For now, that's all we'll also
-         # support. Maybe later I'll add a float type, just so I can write some
+        # support. Maybe later I'll add a float type, just so I can write some
          # external functions that support float comparisons.
          l_number ; continue
       fi

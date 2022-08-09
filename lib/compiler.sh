@@ -49,7 +49,7 @@ function mk_type {
    local   --  tname="TYPE_${TYPE_NUM}"
    declare -gA $tname
    declare -g  TYPE=$tname
-   local   --  type=$tname
+   local   -n  type=$tname
 
    type['kind']=
    type['subtype']=
@@ -64,7 +64,7 @@ function mk_symbol {
    local   --  sname="SYMBOL_${SYMBOL_NUM}"
    declare -gA $sname
    declare -g  SYMBOL=$sname
-   local   --  symbol=$sname
+   local   -n  symbol=$sname
 
    symbol['type']=
    symbol['node']=

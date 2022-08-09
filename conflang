@@ -33,6 +33,24 @@ if [[ -z "$INPUT" ]] ; then
    raise no_input
 fi
 
+# shellcheck source=./lib/debug.sh
+source "${LIBDIR}"/debug.sh
+
+# shellcheck source=./lib/lexer.sh
+source "${LIBDIR}"/lexer.sh
+
+# shellcheck source=./lib/parser.sh
+source "${LIBDIR}"/parser.sh
+# Exports:
+#  TOKENS[]
+#  TOKEN_$n
+
+# shellcheck source=./lib/compiler.sh
+source "${LIBDIR}"/compiler.sh
+# Exports (USER ACCESSIBLE):
+#  _DATA_ROOT
+#  _DATA_*
+
 # Shouldn't code file names/paths into the generated output. If the user has the
 # same file *data*, but it's in a different place, we shouldn't have to
 # re-compile the output.
@@ -169,11 +187,6 @@ function identify_constraint_file {
    fi
 }
 
-# shellcheck source=./lib/lexer.sh
-source "${LIBDIR}"/lexer.sh
-
-# shellcheck source=./lib/parser.sh
-source "${LIBDIR}"/parser.sh
 
 function _parse {
    # Some elements of the scanner need to be reset before every run. Vars that
@@ -220,14 +233,7 @@ fi
 # Restore top-level root node.
 ROOT=$parent_root
 
-
 #─────────────────────────────────( compiler )──────────────────────────────────
-# shellcheck source=./lib/compiler.sh
-source "${LIBDIR}"/compiler.sh
-# Exports (USER ACCESSIBLE):
-#  _DATA_ROOT
-#  _DATA_*
-
 # Each section assumes there's a symtab above it. There is a "hidden" top-
 # level section `%inline'. Need to create a parent symtab above to hold it.
 mk_symtab ; parent_symtab=$SYMTAB
@@ -244,9 +250,6 @@ if [[ "$child_root" ]] ; then
 fi
 
 #walk_pprint "$parent_root"
-
-# shellcheck source=./lib/debug.sh
-source "${LIBDIR}"/debug.sh
 
 # shellcheck disable=SC2128
 # It thinks the parent_symtab is an array itself, rather than the name of an

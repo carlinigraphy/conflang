@@ -307,6 +307,25 @@ function mk_identifier {
 }
 
 
+function mk_variable {
+   (( ++NODE_NUM ))
+   local   -- nname="NODE_${NODE_NUM}"
+   declare -gA $nname
+   declare -g  NODE=$nname
+   local   -n  node=$nname
+
+   # Copied over, so we can ditch the raw tokens after the parser.
+   node['value']=
+   node['offset']=
+   node['lineno']=
+   node['colno']=
+   node['file']=
+
+   # shellcheck disable=SC2034
+   TYPEOF[$nname]='variable'
+}
+
+
 #═══════════════════════════════════╡ utils ╞═══════════════════════════════════
 declare -gi IDX=0
 declare -g  CURRENT  CURRENT_NAME
@@ -624,6 +643,27 @@ function p_array {
 }
 
 
+function p_variable {
+   p_munch 'DOLLAR'
+
+   if p_match 'L_BRACE' ; then
+      local surround='yes'
+   fi
+
+   mk_variable
+   local -n node=$NODE
+   node['value']=${CURRENT[value]}
+   node['offset']=${CURRENT[offset]}
+   node['lineno']=${CURRENT[lineno]}
+   node['colno']=${CURRENT[colno]}
+   node['file']=${CURRENT[file]}
+
+   if [[ $surround ]] ; then
+      p_munch 'R_BRACE' "expecting \`}' after variable identifier."
+   fi
+}
+
+
 function p_identifier {
    mk_identifier
    local -n node=$NODE
@@ -699,6 +739,7 @@ declare -gA NUD=(
    [STRING]='p_string'
    [INTEGER]='p_integer'
    [IDENTIFIER]='p_identifier'
+   [DOLLAR]='p_variable'
    [L_PAREN]='p_group'
    [L_BRACKET]='p_array'
 )
