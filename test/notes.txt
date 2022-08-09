@@ -1,0 +1,16 @@
+Still needs:
+
+parser
+   exceptions
+   error tokens
+   error recovery
+   include / constrain statements
+
+conflang
+   (add an `if __name__ == '__main__'` so can source without executing)
+   merge includes
+   constraints
+      only read the lowest existing file
+      required keys if no default
+      can overwrite value
+      can't overwrite type

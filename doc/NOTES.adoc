@@ -7,12 +7,11 @@
 
 Collections of my thinkies, musings, and stuff to refer back to while working on this.
 
-== Bash tomfoolery
 
+== Bash tomfoolery
 Naturally, any project of mine must contain a fair amount of bash tomfoolery.
 
 === Set, but empty
-
 There are built-in tests for variables that are empty _or_ unset (`test -z`).
 However none for declared _and_ empty.
 Did some testing to verify how all the parameter expansion for unset/empty vars works:
@@ -62,7 +61,6 @@ declare -- ne='set'
 
 
 == Properties vs. asserts
-
 I think I've been low-key struggling to justify the "`assert`" piece of the syntax.
 I know I wanted something to say "`this value should have some required information`".
 Perhaps that was mistakenly ``assert``s, rather than '`properties`'.
@@ -128,13 +126,11 @@ Ooh, maybe they can become tests if they end with a `?`, else they're a directiv
 
 
 == Casting
-
 There is currently no casting.
 This is a problem if we want to type a directory as a string, to avoid escaping spaces with backslash.
 
 
 == Subtypes
-
 Would be nice to have subtypes for paths.
 `path:file`, `path:directory`, etc.
 
@@ -143,7 +139,6 @@ But the runtime validation will check if the file itself actually is a directory
 
 
 == Failing in subshells
-
 If something exits with a non-zero status from a subshell, gotta make sure the rest of the execution does not continue.
 Can set a `EXIT=0` before the subshell.
 Within the sourced `.sh` file, the final line is `SUCCESS=true ; declare -p SUCCESS`.
@@ -151,7 +146,6 @@ The parent shell does a `test $SUCCESS == 'true' || exit 1`.
 
 
 == Basic grammar
-
 ----
 program        -> statement EOF
 
@@ -176,7 +170,6 @@ array          -> '[' expression* ']'
 
 
 == Basic syntax
-
 [source]
 ----
 untyped {
@@ -208,7 +201,6 @@ context {
 
 
 == Rethink nested ``source``ing structure
-
 Sourcing from a process substitution is really neat, and has clear benefits.
 Can re-use common names across multiple files (`advance`, `peek`, etc.).
 
@@ -255,8 +247,106 @@ However in the end, it's certainly more important to be testable and well writte
 This, unlikely many of the other `hre-utils`, I want to be *good*, rather than just *neat*.
 
 
-== What do I work on now?
+== Variables
+=== Bash variables
+How should bash variables work?
 
+.Options
+. Only allow for basic variables: `$VAR`
+  .. Additionally allow `${VAR}` style
+. Include support for basic array indexing: `${VAR[0]}`
+. Include support for complex array operations (slices?): `${VAR[0:-2]}`
+
+There's a slight deviation from traditional bash syntax in these arrays.
+At that point, I may as well just use a better syntax, raerpb Bash's kinda convoluted approach.
+I do need a syntax to separate environment variables from internal variables.
+I can make these function calls tbh.
+
+.idea #1, function calls
+[source,conf]
+----
+global {
+   path  env("PATH");
+   name  self("user", "name");
+}
+
+user {
+   name "Marcus";
+   age  30;
+}
+----
+
+The functions are variatic, and effective take a series of indices.
+They would work in the same way the `api.conf()` function does.
+Cannot do static typechecking, would need to be runtime in the compiler.
+Though can use the type information in nifty ways.
+
+_AS IT TURNS OUT... I FORGOT SOMETHING IMPORTANT._
+
+I don't need to worry about indexes at all.
+Bash does not support exporting an array into the environment.
+It's a known bash bug that I've run into once or twice in the past.
+Makes it way easier to pull in vars from the environment when they can only be simple key:value pairs.
+Though still need a way to pull '`internal`' vars.
+Saves repetition.
+
+.idea #2, simple vars
+[source,conf]
+----
+global {
+   path  $PATH;
+}
+----
+
+
+=== Internal variables
+First idea is to just use a different prefix to designate internal variables.
+This has the approach of being distinct from environment variables.
+Though could lead one to mistakenly use `$` over `%`.
+
+.idea #1, different prefix
+[source,conf]
+----
+global {
+   people [
+      %user1.name
+      %user2.name
+   ];
+}
+
+user1 {
+   name "Marcus";
+}
+
+user2 {
+   name "Ginny";
+}
+----
+
+
+=== String interpolation
+Should string interpolation be able to handle arbitrary expressions?
+Currently I think not.
+There really aren't any expressions in the language.
+It would really just be '`internal`' or environment variables.
+
+[source,conf]
+----
+global {
+   full  "%{user1.name} Aurelius";
+   repo  "${HOME}/hg";
+}
+
+user1 {
+   name  "Marcus";
+}
+----
+
+I think the above examples definitely demonstrate the difficulty in distinguishing between `$`/`%`.
+Other symbols I can use?
+
+
+== What do I work on now?
 For when I get stuck, what are things I can work on...
 
 .Core features that *do not* yet work
