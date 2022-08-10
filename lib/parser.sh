@@ -659,7 +659,7 @@ function p_variable {
    node['file']=${CURRENT[file]}
 
    if [[ $surround ]] ; then
-      p_munch 'R_BRACE' "expecting \`}' after variable identifier."
+      p_munch 'R_BRACE' "expecting \`}' after variable."
    fi
 }
 

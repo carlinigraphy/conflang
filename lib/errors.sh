@@ -10,6 +10,7 @@ declare -gA EXIT_STATUS=(
    [name_error]=7
    [invalid_type_error]=8
    [missing_file]=9
+   [missing_env_var]=10
 )
 
 function raise {
@@ -52,4 +53,8 @@ function print_name_error {
 
 function print_invalid_type_error {
    echo "Type Error: ${1@Q} not defined."
+}
+
+function print_missing_env_var {
+   echo "Name Error: ${1@Q} is not defined."
 }

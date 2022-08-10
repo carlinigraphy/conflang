@@ -256,8 +256,7 @@ fi
 # array.
 pprint_symtab "${parent_symtab}"
 
-exit 0
-walk_data "$ROOT"
+walk_compiler "$parent_root"
 
 #───────────────────────────────────( api )─────────────────────────────────────
 ## DISABLED API WHILE WORKING ON MERGING TREES AND WHATNOT.

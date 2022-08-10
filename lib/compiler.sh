@@ -477,7 +477,7 @@ function merge_type {
 declare -- KEY= DATA=
 declare -i DATA_NUM=${TYPE_NUM:-0}
 
-function mk_data_dict {
+function mk_compile_dict {
    (( DATA_NUM++ ))
    local   --  dname="_DATA_${DATA_NUM}"
    declare -gA $dname
@@ -487,7 +487,7 @@ function mk_data_dict {
 }
 
 
-function mk_data_array {
+function mk_compile_array {
    (( DATA_NUM++ ))
    local   --  dname="_DATA_${DATA_NUM}"
    declare -ga $dname
@@ -497,28 +497,28 @@ function mk_data_array {
 }
 
 
-function walk_data {
+function walk_compiler {
    declare -g NODE="$1"
-   data_"${TYPEOF[$NODE]}"
+   compile_"${TYPEOF[$NODE]}"
 }
 
 
-function data_decl_section {
+function compile_decl_section {
    # Save reference to current NODE. Restored at the end.
    local -- save=$NODE
    local -n node=$save
 
    # Create data dictionary object.
-   mk_data_dict
+   mk_compile_dict
    local -- dname=$DATA
    local -n data=$DATA
 
-   walk_data "${node[name]}"
+   walk_compiler "${node[name]}"
    local -- key="$DATA"
 
    local -n items="${node[items]}" 
    for nname in "${items[@]}"; do
-      walk_data "$nname"
+      walk_compiler "$nname"
       data[$KEY]="$DATA"
    done
 
@@ -528,15 +528,15 @@ function data_decl_section {
 }
 
 
-function data_decl_variable {
+function compile_decl_variable {
    local -- save=$NODE
    local -n node=$save
 
-   walk_data "${node[name]}"
+   walk_compiler "${node[name]}"
    local -- key="$DATA"
 
    if [[ -n ${node[expr]} ]] ; then
-      walk_data "${node[expr]}"
+      walk_compiler "${node[expr]}"
    else
       declare -g DATA=''
    fi
@@ -546,12 +546,12 @@ function data_decl_variable {
 }
 
 
-function data_unary {
+function compile_unary {
    local -- save=$NODE
    local -n node=$save
 
    # The only unary expression right now is negation.
-   walk_data "${node[rhs]}"
+   walk_compiler "${node[rhs]}"
    local -i rhs=$DATA
 
    (( DATA = -1 * rhs ))
@@ -559,16 +559,16 @@ function data_unary {
 }
 
 
-function data_array {
+function compile_array {
    local -- save=$NODE
    local -n node=$save
 
-   mk_data_array
+   mk_compile_array
    local -- dname=$DATA
    local -n data=$DATA
 
    for nname in "${node[@]}"; do
-      walk_data "$nname"
+      walk_compiler "$nname"
       data+=( "$DATA" )
    done
 
@@ -577,35 +577,56 @@ function data_array {
 }
 
 
-function data_boolean {
+function compile_boolean {
    local -n node=$NODE
    declare -g DATA="${node[value]}"
 }
 
 
-function data_integer {
+function compile_integer {
    local -n node=$NODE
    declare -g DATA="${node[value]}"
 }
 
 
-function data_string {
+function compile_string {
    local -n node=$NODE
    declare -g DATA="${node[value]}"
 }
 
 
-function data_path {
+function compile_path {
    local -n node=$NODE
    declare -g DATA="${node[value]}"
 }
 
 
-function data_identifier {
+function compile_identifier {
    local -n node=$NODE
    declare -g DATA="${node[value]}"
 }
 
+
+function compile_variable {
+   : "There's a chance we may have stomped on an environment variable from the
+      user."
+
+   # TODO: error reporting
+   # I don't know of a good way of checking if I've stomped on an environment
+   # variable within this script. I certainly need a way of checking, as this
+   # can be disastrous to the user if we substitute a script var for an expected
+   # value from the environment.
+
+   local -n node=$NODE
+   local -- val_name="${node[value]}" 
+
+   if [[ ! -v "$val_name" ]] ; then
+      raise missing_env_var "$val_name"
+   fi
+
+   local -n val="$val_name"
+   declare -g DATA="$val"
+}
 
 ##─────────────────────────────( semantic analysis )─────────────────────────────
 ## Easy way of doing semantic analysis is actually similar to how we did the node
