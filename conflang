@@ -21,6 +21,14 @@
 # decrementing each time until we find a unique value. We cannot end up with
 # non-unique values, as we'll throw a parse error.
 
+# Dump of all the declared variables. By diffing with the later dump of
+# variables, we can determine which were defined here, and what was pre-
+# existing from the environment. If the user tries to reference an environment
+# variable that we've stomped on, we can accurately report that here.
+readarray -td $'\n' ENV_START < <(
+   declare -p | awk '/^declare -/ { sub(/=.*/, "") ; print $3}' | sort
+)
+
 # shellcheck disable=SC2155,SC2164
 declare -g PROGDIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" ; pwd )
 declare -g LIBDIR="${PROGDIR}/lib"
@@ -255,6 +263,31 @@ fi
 # It thinks the parent_symtab is an array itself, rather than the name of an
 # array.
 pprint_symtab "${parent_symtab}"
+
+# Second dump of all the declared variables. By diffing with the last dump of
+# variables, we can determine which were defined here, and what was pre-
+# existing from the environment. If the user tries to reference an environment
+# variable that we've stomped on, we can accurately report that here.
+readarray -td $'\n' ENV_END < <(
+   declare -p | awk '/^declare -/ { sub(/=.*/, "") ; print $3}' | sort
+)
+
+readarray -td $'\n' _ENV_DIFF < <(
+   comm -13 <(printf '%s\n' "${ENV_START[@]}") <(printf '%s\n' "${ENV_END[@]}")
+)
+
+declare -gA ENV_DIFF=(
+   [ENV_DIFF]='yes'
+   # The `ENV_DIFF` variable itself would not have been included in the dump
+   # above. Manually add.
+)
+
+# Throw variables from indexed array into associative array. Allows us to more
+# easily see if the user attempts to reference an environment variable, but
+# we've stomped on it. Oopsies.
+for d in "${_ENV_DIFF[@]}" ; do
+   ENV_DIFF[$d]='yes'
+done
 
 walk_compiler "$parent_root"
 
