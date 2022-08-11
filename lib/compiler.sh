@@ -470,164 +470,6 @@ function merge_type {
 }
 
 
-#────────────────────────────────( build data )─────────────────────────────────
-# TODO: documentation
-# shellcheck disable=SC1007
-# ^-- thinks I'm trying to assign a var, rather than declare empty variables.
-declare -- KEY= DATA=
-declare -i DATA_NUM=${TYPE_NUM:-0}
-
-function mk_compile_dict {
-   (( DATA_NUM++ ))
-   local   --  dname="_DATA_${DATA_NUM}"
-   declare -gA $dname
-   declare -g  DATA=$dname
-   local   -n  data=$dname
-   data=()
-}
-
-
-function mk_compile_array {
-   (( DATA_NUM++ ))
-   local   --  dname="_DATA_${DATA_NUM}"
-   declare -ga $dname
-   declare -g  DATA=$dname
-   local   -n  data=$dname
-   data=()
-}
-
-
-function walk_compiler {
-   declare -g NODE="$1"
-   compile_"${TYPEOF[$NODE]}"
-}
-
-
-function compile_decl_section {
-   # Save reference to current NODE. Restored at the end.
-   local -- save=$NODE
-   local -n node=$save
-
-   # Create data dictionary object.
-   mk_compile_dict
-   local -- dname=$DATA
-   local -n data=$DATA
-
-   walk_compiler "${node[name]}"
-   local -- key="$DATA"
-
-   local -n items="${node[items]}" 
-   for nname in "${items[@]}"; do
-      walk_compiler "$nname"
-      data[$KEY]="$DATA"
-   done
-
-   declare -g KEY="$key"
-   declare -g DATA="$dname"
-   declare -g NODE="$save"
-}
-
-
-function compile_decl_variable {
-   local -- save=$NODE
-   local -n node=$save
-
-   walk_compiler "${node[name]}"
-   local -- key="$DATA"
-
-   if [[ -n ${node[expr]} ]] ; then
-      walk_compiler "${node[expr]}"
-   else
-      declare -g DATA=''
-   fi
-
-   declare -g KEY="$key"
-   declare -g NODE=$save
-}
-
-
-function compile_unary {
-   local -- save=$NODE
-   local -n node=$save
-
-   # The only unary expression right now is negation.
-   walk_compiler "${node[rhs]}"
-   local -i rhs=$DATA
-
-   (( DATA = -1 * rhs ))
-   declare -g NODE=$save
-}
-
-
-function compile_array {
-   local -- save=$NODE
-   local -n node=$save
-
-   mk_compile_array
-   local -- dname=$DATA
-   local -n data=$DATA
-
-   for nname in "${node[@]}"; do
-      walk_compiler "$nname"
-      data+=( "$DATA" )
-   done
-
-   declare -g DATA=$dname
-   declare -g NODE=$save
-}
-
-
-function compile_boolean {
-   local -n node=$NODE
-   declare -g DATA="${node[value]}"
-}
-
-
-function compile_integer {
-   local -n node=$NODE
-   declare -g DATA="${node[value]}"
-}
-
-
-function compile_string {
-   local -n node=$NODE
-   declare -g DATA="${node[value]}"
-}
-
-
-function compile_path {
-   local -n node=$NODE
-   declare -g DATA="${node[value]}"
-}
-
-
-function compile_identifier {
-   local -n node=$NODE
-   declare -g DATA="${node[value]}"
-}
-
-
-function compile_variable {
-   : "There's a chance we may have stomped on an environment variable from the
-      user."
-
-   # TODO: error reporting
-   # I don't know of a good way of checking if I've stomped on an environment
-   # variable within this script. I certainly need a way of checking, as this
-   # can be disastrous to the user if we substitute a script var for an expected
-   # value from the environment.
-
-   local -n node=$NODE
-   local -- val_name="${node[value]}" 
-
-   if [[ ! -v "$val_name" ]] ; then
-      raise missing_env_var "$val_name"
-   fi
-
-   local -n val="$val_name"
-   declare -g DATA="$val"
-}
-
 ##─────────────────────────────( semantic analysis )─────────────────────────────
 ## Easy way of doing semantic analysis is actually similar to how we did the node
 ## traversal in the `conf()` function. Globally point to a Type() node.
@@ -826,125 +668,158 @@ function compile_variable {
 ## elements, or function calls.
 
 
-#───────────────────────────────( pretty print )────────────────────────────────
-# For debugging, having a pretty printer is super useful. Also supes good down
-# the line when we want to make a function for script-writers to dump a base
-# skeleton config for users.
+#─────────────────────────────────( compiler )──────────────────────────────────
+# TODO: documentation
+# shellcheck disable=SC1007
+# ^-- thinks I'm trying to assign a var, rather than declare empty variables.
+declare -- KEY= DATA=
+declare -i DATA_NUM=${TYPE_NUM:-0}
 
-declare -i INDENT_FACTOR=2
-declare -i INDENTATION=0
-
-
-function walk_pprint {
-   declare -g NODE="$1"
-   pprint_"${TYPEOF[$NODE]}"
+function mk_compile_dict {
+   (( DATA_NUM++ ))
+   local   --  dname="_DATA_${DATA_NUM}"
+   declare -gA $dname
+   declare -g  DATA=$dname
+   local   -n  data=$dname
+   data=()
 }
 
 
-function pprint_decl_section {
+function mk_compile_array {
+   (( DATA_NUM++ ))
+   local   --  dname="_DATA_${DATA_NUM}"
+   declare -ga $dname
+   declare -g  DATA=$dname
+   local   -n  data=$dname
+   data=()
+}
+
+
+function walk_compiler {
+   declare -g NODE="$1"
+   compile_"${TYPEOF[$NODE]}"
+}
+
+
+function compile_decl_section {
    # Save reference to current NODE. Restored at the end.
    local -- save=$NODE
    local -n node=$save
 
-   walk_pprint "${node[name]}"
-   printf ' {\n'
+   # Create data dictionary object.
+   mk_compile_dict
+   local -- dname=$DATA
+   local -n data=$DATA
 
-   (( INDENTATION++ ))
+   walk_compiler "${node[name]}"
+   local -- key="$DATA"
 
    local -n items="${node[items]}" 
    for nname in "${items[@]}"; do
-      walk_pprint "$nname"
+      walk_compiler "$nname"
+      data[$KEY]="$DATA"
    done
 
-   (( INDENTATION-- ))
-   printf "%$(( INDENTATION * INDENT_FACTOR ))s}\n" ''
-
+   declare -g KEY="$key"
+   declare -g DATA="$dname"
    declare -g NODE="$save"
 }
 
 
-function pprint_decl_variable {
+function compile_decl_variable {
    local -- save=$NODE
    local -n node=$save
 
-   printf "%$(( INDENTATION * INDENT_FACTOR ))s" ''
-   walk_pprint "${node[name]}"
+   walk_compiler "${node[name]}"
+   local -- key="$DATA"
 
-   if [[ ${node[type]} ]] ; then
-      printf ' ('
-      walk_pprint "${node[type]}"
-      printf ')'
+   if [[ -n ${node[expr]} ]] ; then
+      walk_compiler "${node[expr]}"
+   else
+      declare -g DATA=''
    fi
 
-   if [[ ${node[expr]} ]] ; then
-      printf ' '
-      walk_pprint "${node[expr]}"
-      printf ';\n'
-   fi
-
+   declare -g KEY="$key"
    declare -g NODE=$save
 }
 
 
-function pprint_typedef {
+function compile_unary {
    local -- save=$NODE
    local -n node=$save
 
-   walk_pprint "${node[kind]}"
+   # The only unary expression right now is negation.
+   walk_compiler "${node[rhs]}"
+   local -i rhs=$DATA
 
-   if [[ "${node[subtype]}" ]] ; then
-      printf ':'
-      walk_pprint "${node[subtype]}"
-   fi
-
+   (( DATA = -1 * rhs ))
    declare -g NODE=$save
 }
 
 
-function pprint_array {
+function compile_array {
    local -- save=$NODE
    local -n node=$save
 
-   (( INDENTATION++ ))
-   printf '['
+   mk_compile_array
+   local -- dname=$DATA
+   local -n data=$DATA
 
    for nname in "${node[@]}"; do
-      printf "\n%$(( INDENTATION * INDENT_FACTOR ))s" ''
-      walk_pprint "$nname"
+      walk_compiler "$nname"
+      data+=( "$DATA" )
    done
 
-   (( INDENTATION-- ))
-   printf "\n%$(( INDENTATION * INDENT_FACTOR ))s]" ''
-
+   declare -g DATA=$dname
    declare -g NODE=$save
 }
 
 
-function pprint_boolean {
+function compile_boolean {
    local -n node=$NODE
-   printf '%s' "${node[value]}"
+   declare -g DATA="${node[value]}"
 }
 
 
-function pprint_integer {
+function compile_integer {
    local -n node=$NODE
-   printf '%s' "${node[value]}"
+   declare -g DATA="${node[value]}"
 }
 
 
-function pprint_string {
+function compile_string {
    local -n node=$NODE
-   printf '"%s"' "${node[value]}"
+   declare -g DATA="${node[value]}"
 }
 
 
-function pprint_path {
+function compile_path {
    local -n node=$NODE
-   printf "'%s'" "${node[value]}"
+   declare -g DATA="${node[value]}"
 }
 
 
-function pprint_identifier {
+function compile_identifier {
    local -n node=$NODE
-   printf '%s' "${node[value]}"
+   declare -g DATA="${node[value]}"
+}
+
+
+function compile_variable {
+   : "There's a chance we may have stomped on an environment variable from the
+      user."
+
+   local -n node=$NODE
+   local -- var_name="${node[value]}" 
+
+   if [[ "${ENV_DIFF[$var_name]}" ]] ; then
+      raise stomped_env_var "$var_name"
+   fi
+
+   if [[ ! -v "$var_name" ]] ; then
+      raise missing_env_var "$var_name"
+   fi
+
+   local -n var="$var_name"
+   declare -g DATA="$var"
 }

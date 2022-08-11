@@ -271,11 +271,9 @@ pprint_symtab "${parent_symtab}"
 readarray -td $'\n' ENV_END < <(
    declare -p | awk '/^declare -/ { sub(/=.*/, "") ; print $3}' | sort
 )
-
 readarray -td $'\n' _ENV_DIFF < <(
    comm -13 <(printf '%s\n' "${ENV_START[@]}") <(printf '%s\n' "${ENV_END[@]}")
 )
-
 declare -gA ENV_DIFF=(
    [ENV_DIFF]='yes'
    # The `ENV_DIFF` variable itself would not have been included in the dump

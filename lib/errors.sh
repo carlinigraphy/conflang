@@ -11,6 +11,7 @@ declare -gA EXIT_STATUS=(
    [invalid_type_error]=8
    [missing_file]=9
    [missing_env_var]=10
+   [stomped_env_var]=11
 )
 
 function raise {
@@ -56,5 +57,9 @@ function print_invalid_type_error {
 }
 
 function print_missing_env_var {
-   echo "Name Error: ${1@Q} is not defined."
+   echo "Name Error: env variable ${1@Q} is not defined."
+}
+
+function print_stomped_env_var {
+   echo "Name Error: env variable ${1@Q} stomped by program variable."
 }
