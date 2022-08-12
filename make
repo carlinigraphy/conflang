@@ -19,6 +19,26 @@ case "$1" in
             exec bats "${args[@]}"
             ;;
 
+
+   'cov')   shift ; args=( "$@" )
+            if [[ ! "$args" ]] ; then
+               args=( "${PROGDIR}"/test )
+            fi
+            kargs=(
+               --bash-dont-parse-binary-dir
+               --include-path="${PROGDIR}"
+               "${PROGDIR}"/.coverage
+               bats --pretty
+            )
+            exec kcov "${kargs[@]}" "${args[@]}" 2>/dev/null
+            ;;
+
+
+   'res')   shift
+            exec xdg-open "${PROGDIR}"/.coverage/index.html
+            ;;
+
+
    'check') shift ; args=( "$@" )
             if [[ ! "$args" ]] ; then
                args=(
@@ -28,6 +48,7 @@ case "$1" in
             fi
             exec shellcheck -s bash -x "${args[@]}"
             ;;
+
 
    'run')   shift
             exec "${PROGDIR}"/conflang "$@"
