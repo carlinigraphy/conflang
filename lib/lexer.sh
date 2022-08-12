@@ -177,7 +177,7 @@ function scan {
       if [[ $CURRENT =~ [[:digit:]] ]] ; then
          # Bash only natively handles integers. It's not able to do floats
          # without bringing `bc` or something. For now, that's all we'll also
-        # support. Maybe later I'll add a float type, just so I can write some
+         # support. Maybe later I'll add a float type, just so I can write some
          # external functions that support float comparisons.
          l_number ; continue
       fi
@@ -230,7 +230,30 @@ function l_string {
             break
          fi
       fi
-      l_advance ; buffer+=( "$CURRENT" )
+
+      if [[ $CURRENT == '{' ]] && [[ "${buffer[-1]}" != '\' ]] ; then
+         unset buffer[-1]
+
+         # If starting a string interpolation block, make everything before this
+         # a string of its own.
+         local join=''
+         for c in "${buffer[@]}" ; do
+            join+="$c"
+         done
+         buffer=()
+
+         Token 'STRING'  "$join"
+         Token 'STR_CAT' ''
+
+         l_interpolation
+         l_advance # past the closing `}'
+
+         Token 'STR_CAT' ''
+         continue
+      fi
+
+      l_advance
+      buffer+=( "$CURRENT" )
    done
 
    local join=''
@@ -243,6 +266,43 @@ function l_string {
 
    # Skip final closing `'`.
    l_advance
+}
+
+
+function l_interpolation {
+   while [[ ${CURSOR[offset]} -lt ${#CHARRAY[@]} ]] ; do
+      # String interpolation ends upon a closing R_BRACE token, or if there's
+      # no current character.
+      if [[ ! $CURRENT ]] || [[ $PEEK == '}' ]] ; then
+         break
+      fi
+
+      l_advance
+
+      # Skip whitespace.
+      if [[ $CURRENT =~ [[:space:]] ]] ; then
+         continue
+      fi
+
+      # Save current cursor information.
+      FREEZE['offset']=${CURSOR['offset']}
+      FREEZE['lineno']=${CURSOR['lineno']}
+      FREEZE['colno']=${CURSOR['colno']}
+
+      # Symbols.
+      case $CURRENT in
+         '$')  Token  'DOLLAR' "$CURRENT"  ; continue ;;
+         #'%') Token 'PERCENT' "$CURRENT"  ; continue ;;
+         # Does not yet support internal variables.
+      esac
+
+      # Identifiers.
+      if [[ $CURRENT =~ [[:alpha:]_] ]] ; then
+         l_identifier ; continue
+      fi
+
+      raise invalid_interpolation_char "$CURRENT"
+   done
 }
 
 

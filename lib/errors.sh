@@ -12,6 +12,7 @@ declare -gA EXIT_STATUS=(
    [missing_file]=9
    [missing_env_var]=10
    [stomped_env_var]=11
+   [invalid_interpolation_char]=12
 )
 
 function raise {
@@ -32,6 +33,10 @@ function print_missing_file {
 function print_syntax_error {
    local -n node="$1"
    echo "Syntax Error: [${node[lineno]}:${node[colno]}] ${node[value]@Q}."
+}
+
+function print_invalid_interpolation_char {
+   echo "Syntax Error: ${1@Q} not valid in string interpolation."
 }
 
 function print_parse_error {

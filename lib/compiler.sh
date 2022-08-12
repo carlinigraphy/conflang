@@ -7,7 +7,7 @@
 #  SECTION
 #  ^-- Name of the section we're currently in. After we've iterated through a
 #    pair of symtabs, any keys remaining in the child should be copied over to
-#    the parent. We must both copy the key:value from the symtab (for semantic
+#   the parent. We must both copy the key:value from the symtab (for semantic
 #    analysis in the next phase), but also need to append the nodes themselves
 #    to the parent section's .items array.
 
