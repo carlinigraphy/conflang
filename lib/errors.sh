@@ -19,6 +19,15 @@ function raise {
    local type="$1" ; shift
    print_"${type}" "$@" 1>&2
 
+   printf 'Traceback:\n'
+   for (( i=${#FUNCNAME[@]}-1; i>=2 ; --i )) ; do
+      printf '%5sln.%4d in %-25s%s\n' \
+         ''                          \
+         "${BASH_LINENO[i-1]}"       \
+         "${FUNCNAME[i]}"            \
+         "${BASH_SOURCE[i]}"
+   done
+
    exit "${EXIT_STATUS[$type]}"
 }
 
@@ -40,7 +49,16 @@ function print_invalid_interpolation_char {
 }
 
 function print_parse_error {
-   echo "Parse Error: ${1}"
+   local -- expect="$1"
+   local -n got="$2"
+   local -- msg="$3"
+
+   printf 'Parse Error: [%s:%s] expected %s, received %s. %s\n' \
+      "${got[lineno]}"  \
+      "${got[colno]}"   \
+      "${1,,}"          \
+      "${got[type],,}"  \
+      "${msg^}"
 }
 
 function print_type_error { :; }
