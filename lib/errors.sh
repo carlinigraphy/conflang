@@ -20,14 +20,6 @@ function raise {
    local type="$1" ; shift
    print_"${type}" "$@" 1>&2
 
-   #ifs="$IFS" ; IFS=$'\n'
-   #for i in "${BASH_SOURCE[@]}" ; do
-   #   local -a "FPARTS_${i}"=(
-   #      $()
-   #   )
-   #done
-   #IFS="$ifs"
-
    printf 'Traceback:\n'
    for (( i=${#FUNCNAME[@]}-1; i>=2 ; --i )) ; do
       printf '%5sln.%4d in %-25s%s\n' \
