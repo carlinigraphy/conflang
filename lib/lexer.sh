@@ -236,7 +236,7 @@ function l_string {
       if [[ $CURRENT == '"' ]] ; then
          # shellcheck disable=SC1003
          # Misidentified error.
-         if [[ $CURRENT == '\' ]] ; then
+         if [[ $buffer && ${buffer[-1]} == '\' ]] ; then
             # shellcheck disable=SC2184
             unset buffer[-1]
          else
@@ -266,7 +266,7 @@ function l_path {
       if [[ $CURRENT == "'" ]] ; then
          # shellcheck disable=SC1003
          # Misidentified error.
-         if [[ $CURRENT == '\' ]] ; then
+         if [[ $buffer && ${buffer[-1]} == '\' ]] ; then
             # shellcheck disable=SC2184
             unset buffer[-1]
          else
@@ -344,7 +344,7 @@ function l_fstring {
       if [[ $CURRENT == '"' ]] ; then
          # shellcheck disable=SC1003
          # ^-- mistakenly thinks I'm trying to escape a single quote 1j.
-         if [[ ${buffer[-1]} == '\' ]] ; then
+         if [[ $buffer && ${buffer[-1]} == '\' ]] ; then
             # shellcheck disable=SC2184
             unset buffer[-1]
          else
@@ -411,7 +411,7 @@ function l_fpath {
       if [[ $CURRENT == "'" ]] ; then
          # shellcheck disable=SC1003
          # ^-- mistakenly thinks I'm trying to escape a single quote 1j.
-         if [[ $CURRENT == '\' ]] ; then
+         if [[ $buffer && ${buffer[-1]} == '\' ]] ; then
             # shellcheck disable=SC2184
             unset buffer[-1]
          else

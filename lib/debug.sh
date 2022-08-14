@@ -139,13 +139,29 @@ function pprint_integer {
 
 function pprint_string {
    local -n node=$NODE
-   printf '"%s"' "${node[value]}"
+   local -- string="${node[value]}"
+
+   while [[ "${node[next]}" ]] ; do
+      walk_compiler "${node[next]}"
+      string+="$DATA"
+      local -n node="${node[next]}"
+   done
+
+   printf '"%s"' "$string"
 }
 
 
 function pprint_path {
    local -n node=$NODE
-   printf "'%s'" "${node[value]}"
+   local -- path="${node[value]}"
+
+   while [[ "${node[next]}" ]] ; do
+      walk_compiler "${node[next]}"
+      path+="$DATA"
+      local -n node="${node[next]}"
+   done
+
+   printf "'%s'" "$path"
 }
 
 

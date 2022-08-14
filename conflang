@@ -257,12 +257,10 @@ if [[ "$child_root" ]] ; then
    merge_symtab "$parent_symtab" "$child_symtab"
 fi
 
-#walk_pprint "$parent_root"
-
 # shellcheck disable=SC2128
 # It thinks the parent_symtab is an array itself, rather than the name of an
 # array.
-pprint_symtab "${parent_symtab}"
+#pprint_symtab "${parent_symtab}"
 
 # Second dump of all the declared variables. By diffing with the last dump of
 # variables, we can determine which were defined here, and what was pre-
@@ -288,6 +286,7 @@ for d in "${_ENV_DIFF[@]}" ; do
 done
 
 walk_compiler "$parent_root"
+walk_pprint   "$parent_root"
 
 #───────────────────────────────────( api )─────────────────────────────────────
 ## DISABLED API WHILE WORKING ON MERGING TREES AND WHATNOT.

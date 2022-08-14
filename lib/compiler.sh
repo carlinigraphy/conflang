@@ -789,13 +789,29 @@ function compile_integer {
 
 function compile_string {
    local -n node=$NODE
-   declare -g DATA="${node[value]}"
+   local -- string="${node[value]}"
+
+   while [[ "${node[next]}" ]] ; do
+      walk_compiler "${node[next]}"
+      string+="$DATA"
+      local -n node="${node[next]}"
+   done
+
+   declare -g DATA="$string"
 }
 
 
 function compile_path {
    local -n node=$NODE
-   declare -g DATA="${node[value]}"
+   local -- path="${node[value]}"
+
+   while [[ "${node[next]}" ]] ; do
+      walk_compiler "${node[next]}"
+      path+="$DATA"
+      local -n node="${node[next]}"
+   done
+
+   declare -g DATA="$path"
 }
 
 
@@ -805,7 +821,7 @@ function compile_identifier {
 }
 
 
-function compile_variable {
+function compile_env_var {
    : "There's a chance we may have stomped on an environment variable from the
       user."
 
