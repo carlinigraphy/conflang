@@ -307,7 +307,7 @@ function mk_identifier {
 }
 
 
-function mk_variable {
+function mk_env_var {
    (( ++NODE_NUM ))
    local   -- nname="NODE_${NODE_NUM}"
    declare -gA $nname
@@ -322,7 +322,7 @@ function mk_variable {
    node['file']=
 
    # shellcheck disable=SC2034
-   TYPEOF[$nname]='variable'
+   TYPEOF[$nname]='env_var'
 }
 
 
@@ -365,10 +365,8 @@ function p_match {
 
 
 function p_munch {
-   local -n t=$CURRENT_NAME
-
    if ! p_check "$1" ; then
-      raise parse_error "[${t[lineno]}:${t[colno]}] $1"
+      raise munch_error  "$1"  "$CURRENT_NAME"  "$2"
    fi
 
    p_advance
@@ -473,17 +471,17 @@ function p_constrain {
    local -n name=${section_ptr[name]}
 
    if [[ ${name[value]} != '%inline' ]] ; then
-      raise parse_error "constrain blocks may only occur in the top level."
+      raise parse_error 'constrain blocks may only occur in the top level.'
    fi
 
    if [[ "${#CONSTRAINTS[@]}" -gt 0 ]] ; then
-      raise parse_error "may not specify multiple constrain blocks."
+      raise parse_error 'may not specify multiple constrain blocks.'
    fi
 
    p_munch 'L_BRACKET' "expecting \`[' to begin array of paths."
    while ! p_check 'R_BRACKET' ; do
       p_path
-      p_munch 'PATH' "expecting an array of paths."
+      p_munch 'PATH' 'expecting an array of paths.'
 
       local -n path=$NODE
       CONSTRAINTS+=( "${path[value]}" )
@@ -643,14 +641,14 @@ function p_array {
 }
 
 
-function p_variable {
+function p_env_var {
    p_munch 'DOLLAR'
 
    if p_match 'L_BRACE' ; then
       local surround='yes'
    fi
 
-   mk_variable
+   mk_env_var
    local -n node=$NODE
    node['value']=${CURRENT[value]}
    node['offset']=${CURRENT[offset]}
@@ -705,6 +703,8 @@ function p_string {
    node['lineno']=${CURRENT[lineno]}
    node['colno']=${CURRENT[colno]}
    node['file']=${CURRENT[file]}
+   node['next']=''
+   # ^-- for string interpolation, concatenate with the subsequent node.
 }
 
 
@@ -739,7 +739,7 @@ declare -gA NUD=(
    [STRING]='p_string'
    [INTEGER]='p_integer'
    [IDENTIFIER]='p_identifier'
-   [DOLLAR]='p_variable'
+   [DOLLAR]='p_env_var'
    [L_PAREN]='p_group'
    [L_BRACKET]='p_array'
 )
@@ -777,21 +777,23 @@ declare -gA LED=(
 )
 
 
-#declare -gA postfix_binding_power=(
-#   [L_BRACE]=3
-#   [QUESTION]=15
-#)
-#declare -gA RID=(
-#   [L_BRACE]='context_block'
-#   [QUESTION]='context_test'
-#)
+declare -gA postfix_binding_power=(
+   #[L_BRACE]=3
+   #[QUESTION]=15
+   [STR_CAT]=15
+)
+declare -gA RID=(
+   #[L_BRACE]='context_block'
+   #[QUESTION]='context_test'
+   [STR_CAT]='p_str_cat'
+)
 
 
 function p_expression {
    local -i min_bp=${1:-1}
 
    local -- lhs op
-   local -i lbp rbp
+   local -i lbp=0 rbp=0
 
    local -- fn=${NUD[${CURRENT[type]}]}
 
@@ -810,11 +812,26 @@ function p_expression {
    while :; do
       op=$CURRENT ot=${CURRENT[type]}
 
+      #───────────────────────────( postfix )───────────────────────────────────
+      lbp=${postfix_binding_power[$ot]:-0}
+
+      if [[ $lbp -ge $min_bp ]] ; then
+         fn="${RID[${CURRENT[type]}]}"
+
+         if [[ ! $fn ]] ; then
+            raise parse_error "not a postfix expression: ${CURRENT[type]}."
+         fi
+
+         $fn "$lhs"
+         continue
+      fi
+
+      #────────────────────────────( infix )────────────────────────────────────
       # If not unset, or explicitly set to 0, `rbp` remains set through each
       # pass of the loop. They are local to the function, but while loops do not
       # have lexical scope. I should've known this. Have done an entire previous
       # project on the premise of lexical scoping in bash.
-      rbp=0 ; lbp=${infix_binding_power[ot]:-0}
+      lbp=${infix_binding_power[ot]:-0}
       (( rbp = (lbp == 0 ? 0 : lbp+1) ))
 
       if [[ $rbp -lt $min_bp ]] ; then
@@ -824,7 +841,7 @@ function p_expression {
       p_advance
 
       fn=${LED[${CURRENT[type]}]}
-      if [[ -z $fn ]] ; then
+      if [[ ! $fn ]] ; then
          raise parse_error "not an infix expression: ${CURRENT[type]}."
       fi
       $fn  "$lhs"  "$op"  "$rbp"
@@ -840,6 +857,7 @@ function p_group {
    p_expression
    p_munch 'R_PAREN' "expecting \`)' after group."
 }
+
 
 function p_binary {
    local -- lhs="$1" op="$2" rbp="$3"
@@ -871,4 +889,15 @@ function p_unary {
    node['right']="$NODE"
 
    declare -g NODE=$save
+}
+
+
+function p_str_cat {
+   local -- lname="$1"
+   local -n last="$lname"
+
+   p_advance # past the 'STR_CAT' token
+
+   p_expression
+   last['next']=$NODE
 }

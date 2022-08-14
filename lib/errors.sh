@@ -13,42 +13,61 @@ declare -gA EXIT_STATUS=(
    [missing_env_var]=10
    [stomped_env_var]=11
    [invalid_interpolation_char]=12
+   [munch_error]=13
 )
 
 function raise {
    local type="$1" ; shift
    print_"${type}" "$@" 1>&2
 
+   #ifs="$IFS" ; IFS=$'\n'
+   #for i in "${BASH_SOURCE[@]}" ; do
+   #   local -a "FPARTS_${i}"=(
+   #      $()
+   #   )
+   #done
+   #IFS="$ifs"
+
    printf 'Traceback:\n'
    for (( i=${#FUNCNAME[@]}-1; i>=2 ; --i )) ; do
       printf '%5sln.%4d in %-25s%s\n' \
-         ''                          \
-         "${BASH_LINENO[i-1]}"       \
-         "${FUNCNAME[i]}"            \
+         ''                           \
+         "${BASH_LINENO[i-1]}"        \
+         "${FUNCNAME[i]}"             \
          "${BASH_SOURCE[i]}"
    done
 
    exit "${EXIT_STATUS[$type]}"
 }
 
+#───────────────────────────────( I/O errors )──────────────────────────────────
 function print_no_input {
-   echo "File Error: missing input file."
+   printf 'File Error: missing input file.'
 }
 
 function print_missing_file {
-   echo "File Error: missing source file ${1@Q}."
+   printf 'File Error: missing source file %s.'  "$1"
 }
 
+function print_circular_import {
+   printf 'Import Error: cannot source %q, circular import.'  "$1"
+}
+
+#──────────────────────────────( syntax errors )────────────────────────────────
 function print_syntax_error {
    local -n node="$1"
-   echo "Syntax Error: [${node[lineno]}:${node[colno]}] ${node[value]@Q}."
+   printf 'Syntax Error: [%d:%d] %q.' \
+      "${node[lineno]}" \
+      "${node[colno]}"  \
+      "${node[value]}"
 }
 
 function print_invalid_interpolation_char {
-   echo "Syntax Error: ${1@Q} not valid in string interpolation."
+   printf 'Syntax Error: %q not valid in string interpolation.'  "$1"
 }
 
-function print_parse_error {
+#───────────────────────────────( parse errors )────────────────────────────────
+function print_munch_error {
    local -- expect="$1"
    local -n got="$2"
    local -- msg="$3"
@@ -61,28 +80,29 @@ function print_parse_error {
       "${msg^}"
 }
 
-function print_type_error { :; }
-
-function print_index_error {
-   echo "Index Error: ${1@Q} not found."
-}
-
-function print_circular_import {
-   echo "Import Error: cannot source ${1@Q}, circular import." 
-}
-
-function print_name_error {
-   echo "Name Error: ${1@Q} already defined in this scope."
+function print_parse_error {
+   printf 'Parse Error: %s\n'  "$1"
 }
 
 function print_invalid_type_error {
-   echo "Type Error: ${1@Q} not defined."
+   printf 'Type Error: %q not defined.'  "$1"
+}
+
+function print_type_error { :; }
+
+#────────────────────────────────( key errors )─────────────────────────────────
+function print_index_error {
+   printf 'Index Error: %q not found.'  "$1"
+}
+
+function print_name_error {
+   printf 'Name Error: %q already defined in this scope.'  "$1"
 }
 
 function print_missing_env_var {
-   echo "Name Error: env variable ${1@Q} is not defined."
+   printf 'Name Error: env variable %q is not defined.'  "$1"
 }
 
 function print_stomped_env_var {
-   echo "Name Error: env variable ${1@Q} stomped by program variable."
+   printf 'Name Error: env variable %q stomped by program variable.'  "$1"
 }
