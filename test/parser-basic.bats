@@ -95,6 +95,7 @@ function setup {
       [mk_string]='yes'
       [mk_typedef]='yes'
       [mk_unary]='yes'
+      [mk_env_var]='yes' 
       [parse]='yes'
    )
 
@@ -149,6 +150,7 @@ function setup {
       [mk_string]='yes'
       [mk_typedef]='yes'
       [mk_unary]='yes'
+      [mk_env_var]='yes' 
       [parse]='yes'
    )
    for f in "${_fns[@]}" ; do

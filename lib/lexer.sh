@@ -254,9 +254,6 @@ function l_string {
 
    # Create token.
    Token 'STRING' "$join"
-
-   # Skip final closing `"`.
-   l_advance
 }
 
 
@@ -287,9 +284,6 @@ function l_path {
 
    # Create token.
    Token 'PATH' "$join"
-
-   # Skip final closing `'`.
-   l_advance
 }
 
 
@@ -405,9 +399,6 @@ function l_fstring {
 
    # Create token.
    Token 'STRING' "$join"
-
-   # Skip final closing `"`.
-   l_advance
 }
 
 
@@ -475,7 +466,4 @@ function l_fpath {
 
    # Create token.
    Token 'PATH' "$join"
-
-   # Skip final closing `"`.
-   l_advance
 }

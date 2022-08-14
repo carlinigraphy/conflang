@@ -785,7 +785,7 @@ declare -gA postfix_binding_power=(
 declare -gA RID=(
    #[L_BRACE]='context_block'
    #[QUESTION]='context_test'
-   [CONCAT]='p_str_cat'
+   [CONCAT]='p_concat'
 )
 
 
@@ -827,10 +827,6 @@ function p_expression {
       fi
 
       #────────────────────────────( infix )────────────────────────────────────
-      # If not unset, or explicitly set to 0, `rbp` remains set through each
-      # pass of the loop. They are local to the function, but while loops do not
-      # have lexical scope. I should've known this. Have done an entire previous
-      # project on the premise of lexical scoping in bash.
       lbp=${infix_binding_power[ot]:-0}
       (( rbp = (lbp == 0 ? 0 : lbp+1) ))
 
@@ -892,7 +888,7 @@ function p_unary {
 }
 
 
-function p_str_cat {
+function p_concat {
    local -- lname="$1"
    local -n last="$lname"
 
