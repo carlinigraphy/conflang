@@ -161,10 +161,10 @@ function scan {
       # f-{strings,paths}
       if [[ $CURRENT == 'f' ]] ; then
          if   [[ $PEEK == '"' ]] ; then
-            l_advance ; l_fpath
+            l_advance ; l_fstring
             continue
          elif [[ $PEEK == "'" ]] ; then
-            l_advance ; l_fstring
+            l_advance ; l_fpath
             continue
          fi
       fi
@@ -230,8 +230,10 @@ function l_identifier {
 function l_string {
    local -a buffer=()
 
-   while [[ -n $CURRENT ]] ; do
-      if [[ $PEEK == '"' ]] ; then
+   while [[ $PEEK ]] ; do
+      l_advance
+
+      if [[ $CURRENT == '"' ]] ; then
          # shellcheck disable=SC1003
          # Misidentified error.
          if [[ $CURRENT == '\' ]] ; then
@@ -242,7 +244,6 @@ function l_string {
          fi
       fi
 
-      l_advance
       buffer+=( "$CURRENT" )
    done
 
@@ -262,8 +263,10 @@ function l_string {
 function l_path {
    local -a buffer=()
 
-   while [[ -n $CURRENT ]] ; do
-      if [[ $PEEK == "'" ]] ; then
+   while [[ $PEEK ]] ; do
+      l_advance
+
+      if [[ $CURRENT == "'" ]] ; then
          # shellcheck disable=SC1003
          # Misidentified error.
          if [[ $CURRENT == '\' ]] ; then
@@ -273,7 +276,8 @@ function l_path {
             break
          fi
       fi
-      l_advance ; buffer+=( "$CURRENT" )
+
+      buffer+=( "$CURRENT" )
    done
 
    local join=''
@@ -340,11 +344,13 @@ function l_interpolation {
 function l_fstring {
    local -a buffer=()
 
-   while [[ -n $CURRENT ]] ; do
-      if [[ $PEEK == '"' ]] ; then
+   while [[ $PEEK ]] ; do
+      l_advance
+
+      if [[ $CURRENT == '"' ]] ; then
          # shellcheck disable=SC1003
          # ^-- mistakenly thinks I'm trying to escape a single quote 1j.
-         if [[ $CURRENT == '\' ]] ; then
+         if [[ ${buffer[-1]} == '\' ]] ; then
             # shellcheck disable=SC2184
             unset buffer[-1]
          else
@@ -380,16 +386,15 @@ function l_fstring {
          buffer=()
 
          Token 'STRING'  "$join"
-         Token 'STR_CAT' ''
+         Token 'CONCAT'  ''
 
          l_interpolation
          l_advance # past the closing `}'
 
-         Token 'STR_CAT' ''
+         Token 'CONCAT'  ''
          continue
       fi
 
-      l_advance
       buffer+=( "$CURRENT" )
    done
 
@@ -409,8 +414,10 @@ function l_fstring {
 function l_fpath {
    local -a buffer=()
 
-   while [[ -n $CURRENT ]] ; do
-      if [[ $PEEK == "'" ]] ; then
+   while [[ $PEEK ]] ; do
+      l_advance
+
+      if [[ $CURRENT == "'" ]] ; then
          # shellcheck disable=SC1003
          # ^-- mistakenly thinks I'm trying to escape a single quote 1j.
          if [[ $CURRENT == '\' ]] ; then
@@ -448,17 +455,16 @@ function l_fpath {
          done
          buffer=()
 
-         Token 'PATH'  "$join"
-         Token 'STR_CAT' ''
+         Token 'PATH'    "$join"
+         Token 'CONCAT'  ''
 
          l_interpolation
          l_advance # past the closing `}'
 
-         Token 'STR_CAT' ''
+         Token 'CONCAT'  ''
          continue
       fi
 
-      l_advance
       buffer+=( "$CURRENT" )
    done
 

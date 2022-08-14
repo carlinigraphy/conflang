@@ -23,29 +23,29 @@ function raise {
    local type="$1" ; shift
    print_"${type}" "$@" 1>&2
 
-   printf 'Traceback:\n'
-   for (( i=${#FUNCNAME[@]}-1; i>=2 ; --i )) ; do
-      printf '%5sln.%4d in %-25s%s\n' \
-         ''                           \
-         "${BASH_LINENO[i-1]}"        \
-         "${FUNCNAME[i]}"             \
-         "${BASH_SOURCE[i]}"
-   done
+   #printf 'Traceback:\n'
+   #for (( i=${#FUNCNAME[@]}-1; i>=2 ; --i )) ; do
+   #   printf '%5sln.%4d in %-25s%s\n' \
+   #      ''                           \
+   #      "${BASH_LINENO[i-1]}"        \
+   #      "${FUNCNAME[i]}"             \
+   #      "${BASH_SOURCE[i]}"
+   #done
 
    exit "${EXIT_STATUS[$type]}"
 }
 
 #───────────────────────────────( I/O errors )──────────────────────────────────
 function print_no_input {
-   printf 'File Error: missing input file.'
+   printf 'File Error: missing input file.\n'
 }
 
 function print_missing_file {
-   printf 'File Error: missing source file %s.'  "$1"
+   printf 'File Error: missing source file %s.\n'  "$1"
 }
 
 function print_circular_import {
-   printf 'Import Error: cannot source %q, circular import.'  "$1"
+   printf 'Import Error: cannot source %q, circular import.\n'  "$1"
 }
 
 #──────────────────────────────( syntax errors )────────────────────────────────
@@ -53,18 +53,18 @@ function print_syntax_error {
    local -n node="$1"
    local -- msg="$2"
 
-   printf 'Syntax Error: [%d:%d] %q' \
+   printf 'Syntax Error: [%d:%d] %q\n' \
       "${node[lineno]}" \
       "${node[colno]}"  \
       "${node[value]}"
 }
 
 function print_invalid_interpolation_char {
-   printf 'Syntax Error: %q not valid in string interpolation.'  "$1"
+   printf 'Syntax Error: %q not valid in string interpolation.\n'  "$1"
 }
 
 function print_unescaped_interpolation_brace {
-   printf "Syntax Error: single \`}' not allowed in f-string."
+   printf "Syntax Error: single \`}' not allowed in f-string.\n"
 }
 
 #───────────────────────────────( parse errors )────────────────────────────────
@@ -86,24 +86,24 @@ function print_parse_error {
 }
 
 function print_invalid_type_error {
-   printf 'Type Error: %q not defined.'  "$1"
+   printf 'Type Error: %q not defined.\n'  "$1"
 }
 
 function print_type_error { :; }
 
 #────────────────────────────────( key errors )─────────────────────────────────
 function print_index_error {
-   printf 'Index Error: %q not found.'  "$1"
+   printf 'Index Error: %q not found.\n'  "$1"
 }
 
 function print_name_error {
-   printf 'Name Error: %q already defined in this scope.'  "$1"
+   printf 'Name Error: %q already defined in this scope.\n'  "$1"
 }
 
 function print_missing_env_var {
-   printf 'Name Error: env variable %q is not defined.'  "$1"
+   printf 'Name Error: env variable %q is not defined.\n'  "$1"
 }
 
 function print_stomped_env_var {
-   printf 'Name Error: env variable %q stomped by program variable.'  "$1"
+   printf 'Name Error: env variable %q stomped by program variable.\n'  "$1"
 }
