@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# TODO:
+# Exit statuses should be unique. BATS test to `sort | uniq` keys, compare len.
 declare -gA EXIT_STATUS=(
    [no_input]=1
    [syntax_error]=2
@@ -13,7 +15,8 @@ declare -gA EXIT_STATUS=(
    [missing_env_var]=10
    [stomped_env_var]=11
    [invalid_interpolation_char]=12
-   [munch_error]=13
+   [unescaped_interpolation_brace]=13
+   [munch_error]=14
 )
 
 function raise {
@@ -48,7 +51,9 @@ function print_circular_import {
 #──────────────────────────────( syntax errors )────────────────────────────────
 function print_syntax_error {
    local -n node="$1"
-   printf 'Syntax Error: [%d:%d] %q.' \
+   local -- msg="$2"
+
+   printf 'Syntax Error: [%d:%d] %q' \
       "${node[lineno]}" \
       "${node[colno]}"  \
       "${node[value]}"
@@ -56,6 +61,10 @@ function print_syntax_error {
 
 function print_invalid_interpolation_char {
    printf 'Syntax Error: %q not valid in string interpolation.'  "$1"
+}
+
+function print_unescaped_interpolation_brace {
+   printf "Syntax Error: single \`}' not allowed in f-string."
 }
 
 #───────────────────────────────( parse errors )────────────────────────────────

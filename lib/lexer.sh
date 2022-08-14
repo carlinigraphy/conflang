@@ -158,6 +158,17 @@ function scan {
          '}')  Token    'R_BRACE' "$CURRENT"  ; continue ;;
       esac
 
+      # f-{strings,paths}
+      if [[ $CURRENT == 'f' ]] ; then
+         if   [[ $PEEK == '"' ]] ; then
+            l_advance ; l_fpath
+            continue
+         elif [[ $PEEK == "'" ]] ; then
+            l_advance ; l_fstring
+            continue
+         fi
+      fi
+
       # Identifiers.
       if [[ $CURRENT =~ [[:alpha:]_] ]] ; then
          l_identifier ; continue
@@ -231,27 +242,6 @@ function l_string {
          fi
       fi
 
-      if [[ $CURRENT == '{' ]] && [[ "${buffer[-1]}" != '\' ]] ; then
-         unset buffer[-1]
-
-         # If starting a string interpolation block, make everything before this
-         # a string of its own.
-         local join=''
-         for c in "${buffer[@]}" ; do
-            join+="$c"
-         done
-         buffer=()
-
-         Token 'STRING'  "$join"
-         Token 'STR_CAT' ''
-
-         l_interpolation
-         l_advance # past the closing `}'
-
-         Token 'STR_CAT' ''
-         continue
-      fi
-
       l_advance
       buffer+=( "$CURRENT" )
    done
@@ -264,45 +254,8 @@ function l_string {
    # Create token.
    Token 'STRING' "$join"
 
-   # Skip final closing `'`.
+   # Skip final closing `"`.
    l_advance
-}
-
-
-function l_interpolation {
-   while [[ ${CURSOR[offset]} -lt ${#CHARRAY[@]} ]] ; do
-      # String interpolation ends upon a closing R_BRACE token, or if there's
-      # no current character.
-      if [[ ! $CURRENT ]] || [[ $PEEK == '}' ]] ; then
-         break
-      fi
-
-      l_advance
-
-      # Skip whitespace.
-      if [[ $CURRENT =~ [[:space:]] ]] ; then
-         continue
-      fi
-
-      # Save current cursor information.
-      FREEZE['offset']=${CURSOR['offset']}
-      FREEZE['lineno']=${CURSOR['lineno']}
-      FREEZE['colno']=${CURSOR['colno']}
-
-      # Symbols.
-      case $CURRENT in
-         '$')  Token  'DOLLAR' "$CURRENT"  ; continue ;;
-         #'%') Token 'PERCENT' "$CURRENT"  ; continue ;;
-         # Does not yet support internal variables.
-      esac
-
-      # Identifiers.
-      if [[ $CURRENT =~ [[:alpha:]_] ]] ; then
-         l_identifier ; continue
-      fi
-
-      raise invalid_interpolation_char "$CURRENT"
-   done
 }
 
 
@@ -344,4 +297,179 @@ function l_number {
    done
 
    Token 'INTEGER' "$number"
+}
+
+
+function l_interpolation {
+   while [[ ${CURSOR[offset]} -lt ${#CHARRAY[@]} ]] ; do
+      # String interpolation ends upon a closing R_BRACE token, or if there's
+      # no current character.
+      if [[ ! $CURRENT ]] || [[ $PEEK == '}' ]] ; then
+         break
+      fi
+
+      l_advance
+
+      # Skip whitespace.
+      if [[ $CURRENT =~ [[:space:]] ]] ; then
+         continue
+      fi
+
+      # Save current cursor information.
+      FREEZE['offset']=${CURSOR['offset']}
+      FREEZE['lineno']=${CURSOR['lineno']}
+      FREEZE['colno']=${CURSOR['colno']}
+
+      # Symbols.
+      case $CURRENT in
+         '$')  Token  'DOLLAR' "$CURRENT"  ; continue ;;
+         #'%') Token 'PERCENT' "$CURRENT"  ; continue ;;
+         # Does not yet support internal variables.
+      esac
+
+      # Identifiers.
+      if [[ $CURRENT =~ [[:alpha:]_] ]] ; then
+         l_identifier ; continue
+      fi
+
+      raise invalid_interpolation_char "$CURRENT"
+   done
+}
+
+
+function l_fstring {
+   local -a buffer=()
+
+   while [[ -n $CURRENT ]] ; do
+      if [[ $PEEK == '"' ]] ; then
+         # shellcheck disable=SC1003
+         # ^-- mistakenly thinks I'm trying to escape a single quote 1j.
+         if [[ $CURRENT == '\' ]] ; then
+            # shellcheck disable=SC2184
+            unset buffer[-1]
+         else
+            break
+         fi
+      fi
+
+      # When used outside an expression, closing braces must be escaped.
+      if [[ $CURRENT == '}' ]] ; then
+         if [[ "${buffer[-1]}" == '\' ]] ; then
+            unset buffer[-1]
+            buffer+=( "$CURRENT" )
+            continue
+         else
+            raise unescaped_interpolation_brace
+         fi
+      fi
+
+      # Start of f-string.
+      if [[ $CURRENT == '{' ]] ; then
+         if [[ "${buffer[-1]}" == '\' ]] ; then
+            unset buffer[-1]
+            buffer+=( "$CURRENT" )
+            continue
+         fi
+
+         # When beginning f-expressions, create a STRING token for all the text
+         # found prior and reset the string buffer.
+         local join=''
+         for c in "${buffer[@]}" ; do
+            join+="$c"
+         done
+         buffer=()
+
+         Token 'STRING'  "$join"
+         Token 'STR_CAT' ''
+
+         l_interpolation
+         l_advance # past the closing `}'
+
+         Token 'STR_CAT' ''
+         continue
+      fi
+
+      l_advance
+      buffer+=( "$CURRENT" )
+   done
+
+   local join=''
+   for c in "${buffer[@]}" ; do
+      join+="$c"
+   done
+
+   # Create token.
+   Token 'STRING' "$join"
+
+   # Skip final closing `"`.
+   l_advance
+}
+
+
+function l_fpath {
+   local -a buffer=()
+
+   while [[ -n $CURRENT ]] ; do
+      if [[ $PEEK == "'" ]] ; then
+         # shellcheck disable=SC1003
+         # ^-- mistakenly thinks I'm trying to escape a single quote 1j.
+         if [[ $CURRENT == '\' ]] ; then
+            # shellcheck disable=SC2184
+            unset buffer[-1]
+         else
+            break
+         fi
+      fi
+
+      # When used outside an expression, closing braces must be escaped.
+      if [[ $CURRENT == '}' ]] ; then
+         if [[ "${buffer[-1]}" == '\' ]] ; then
+            unset buffer[-1]
+            buffer+=( "$CURRENT" )
+            continue
+         else
+            raise unescaped_interpolation_brace
+         fi
+      fi
+
+      # Start of f-path.
+      if [[ $CURRENT == '{' ]] ; then
+         if [[ "${buffer[-1]}" == '\' ]] ; then
+            unset buffer[-1]
+            buffer+=( "$CURRENT" )
+            continue
+         fi
+
+         # When beginning f-expressions, create a PATH token for all the text
+         # found prior and reset the string buffer.
+         local join=''
+         for c in "${buffer[@]}" ; do
+            join+="$c"
+         done
+         buffer=()
+
+         Token 'PATH'  "$join"
+         Token 'STR_CAT' ''
+
+         l_interpolation
+         l_advance # past the closing `}'
+
+         Token 'STR_CAT' ''
+         continue
+      fi
+
+      l_advance
+      buffer+=( "$CURRENT" )
+   done
+
+   local join=''
+   for c in "${buffer[@]}" ; do
+      join+="$c"
+   done
+
+   # Create token.
+   Token 'PATH' "$join"
+
+   # Skip final closing `"`.
+   l_advance
 }

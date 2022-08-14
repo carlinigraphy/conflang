@@ -780,12 +780,12 @@ declare -gA LED=(
 declare -gA postfix_binding_power=(
    #[L_BRACE]=3
    #[QUESTION]=15
-   [STR_CAT]=15
+   [CONCAT]=15
 )
 declare -gA RID=(
    #[L_BRACE]='context_block'
    #[QUESTION]='context_test'
-   [STR_CAT]='p_str_cat'
+   [CONCAT]='p_str_cat'
 )
 
 
@@ -896,7 +896,7 @@ function p_str_cat {
    local -- lname="$1"
    local -n last="$lname"
 
-   p_advance # past the 'STR_CAT' token
+   p_advance # past the 'CONCAT' token
 
    p_expression
    last['next']=$NODE
