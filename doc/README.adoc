@@ -8,20 +8,39 @@
 Declarative config file "`language`" with built-in validation.
 
 
-== Syntax
+== Why it do
+
+Another stepping stone in my path to write a programming language.
+
+Many projects in the last few years have been geared towards incrementally writing a programming language.
+I consistently find myself hitting sticking points.
+Stemming from both the gaps in my non-existent CS education, as well as difficulties approaching design problems.
+Smaller scale projects, like this one, help me to work through specific conceptual slices.
+
+This is the spiritual successor to `mkconf`, `conf`, and `shql`.
+Each better than the last.
+
+I do not intend for anyone to actually use `conflang`, just as I didn't write `shql` to be used.
+The project is in the designing/writing itself.
+
+
+== How it look
 
 First thing anyone wants to see is some example syntax.
 
 .config.cfg
 ----
+# Basic key:value pairs.
 name  "Marcus";
 age   30;
 
+# Arrays.
 projects [
    "shql"
    "conf"
 ];
 
+# Sections.
 globals {
    scope  "outer";
 
@@ -30,11 +49,12 @@ globals {
    }
 }
 
+# Import other files.
 %include './sub-file.conf';
 ----
 
 
-== Theory
+== What it about
 
 Writing small shell files that take configuration parameters can be tricky and tiresome.
 Do you trust the user's input, or validate everything?
@@ -52,6 +72,6 @@ I hope to resolve some of those problems with:
 . Good error reporting for everyone
 
 
-== Use
+== How you use
 === Developers
 === End users
