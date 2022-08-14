@@ -50,6 +50,10 @@ case "$1" in
             ;;
 
 
+   'wc')    exec wc -l "${PROGDIR}"/conflang "${PROGDIR}"/lib/*
+            ;;
+
+
    'run')   shift
             exec "${PROGDIR}"/conflang "$@"
             ;;
