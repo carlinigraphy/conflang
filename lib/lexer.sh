@@ -141,6 +141,7 @@ function scan {
 
       # Symbols.
       case $CURRENT in
+         '.')  Token        'DOT' "$CURRENT"  ; continue ;;
          ';')  Token       'SEMI' "$CURRENT"  ; continue ;;
          ':')  Token      'COLON' "$CURRENT"  ; continue ;;
          '-')  Token      'MINUS' "$CURRENT"  ; continue ;;
@@ -321,8 +322,7 @@ function l_interpolation {
       # Symbols.
       case $CURRENT in
          '$')  Token  'DOLLAR' "$CURRENT"  ; continue ;;
-         #'%') Token 'PERCENT' "$CURRENT"  ; continue ;;
-         # Does not yet support internal variables.
+         '%')  Token 'PERCENT' "$CURRENT"  ; continue ;;
       esac
 
       # Identifiers.

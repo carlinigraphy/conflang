@@ -778,13 +778,11 @@ declare -gA LED=(
 
 
 declare -gA postfix_binding_power=(
-   #[L_BRACE]=3
-   #[QUESTION]=15
+   [L_BRACKET]=3
    [CONCAT]=15
 )
 declare -gA RID=(
-   #[L_BRACE]='context_block'
-   #[QUESTION]='context_test'
+   [L_BRACKET]='p_index'
    [CONCAT]='p_concat'
 )
 
@@ -896,4 +894,12 @@ function p_concat {
 
    p_expression
    last['next']=$NODE
+}
+
+
+function p_index {
+   local -- lname="$1"
+   local -n last="$lname"
+
+
 }
