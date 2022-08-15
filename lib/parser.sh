@@ -175,30 +175,15 @@ function mk_typedef {
 }
 
 
-function mk_func_call {
-   ## psdudo.
-   #> class Function:
-   #>    name   : identifier = None
-   #>    params : array      = []
-
-   # 1) create parent
+function mk_index {
    (( ++NODE_NUM ))
    local   --  nname="NODE_${NODE_NUM}"
    declare -gA $nname
    declare -g  NODE=$nname
    local   -n  node=$nname
 
-   # 2) create list to hold the items within the section.
-   (( ++NODE_NUM ))
-   local nname_params="NODE_${NODE_NUM}"
-   declare -ga $nname_params
-
-   # 3) assign child node to parent.
-   node['name']=
-   node['params']=$nname_params
-
-   # 4) Meta information, for easier parsing.
-   TYPEOF[$nname]='func_call'
+   node['value']=
+   node['next']=
 }
 
 
@@ -901,5 +886,24 @@ function p_index {
    local -- lname="$1"
    local -n last="$lname"
 
+   mk_index
+   local -- save=$NODE
+   local -n node=$NODE
 
+   p_advance # past the 'DOT'
+   p_expression
+
+   local -- ename="$NODE"
+   local -n expr="$ename"
+
+   if [[ ${TYPEOF[$ename]} != 'number'     ]] || \
+      [[ ${TYPEOF[$ename]} != 'identifier' ]]
+   then
+      raise parse_error "${expr[value]} is not a valid index."
+   fi
+
+   node['value']="$lname"
+   node['next']="$ename"
+
+   declare -g NODE="$save"
 }
