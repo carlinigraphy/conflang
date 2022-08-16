@@ -125,6 +125,9 @@ function pprint_array {
 }
 
 
+#function pprint_unary { :; }
+
+
 function pprint_boolean {
    local -n node=$NODE
    printf '%s' "${node[value]}"
@@ -168,6 +171,23 @@ function pprint_path {
 function pprint_identifier {
    local -n node=$NODE
    printf '%s' "${node[value]}"
+}
+
+
+function pprint_ext_var {
+   local -n node=$NODE
+   local -- var_name="${node[value]}" 
+
+   if [[ "${ENV_DIFF[$var_name]}" ]] ; then
+      raise stomped_env_var "$var_name"
+   fi
+
+   if [[ ! -v "$var_name" ]] ; then
+      raise missing_env_var "$var_name"
+   fi
+
+   local -n var="$var_name"
+   printf '%s' "$var"
 }
 
 

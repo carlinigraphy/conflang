@@ -182,8 +182,10 @@ function mk_index {
    declare -g  NODE=$nname
    local   -n  node=$nname
 
-   node['value']=
-   node['next']=
+   node['left']=
+   node['expr']=
+
+   TYPEOF[$nname]='index'
 }
 
 
@@ -308,6 +310,25 @@ function mk_env_var {
 
    # shellcheck disable=SC2034
    TYPEOF[$nname]='env_var'
+}
+
+
+function mk_int_var {
+   (( ++NODE_NUM ))
+   local   -- nname="NODE_${NODE_NUM}"
+   declare -gA $nname
+   declare -g  NODE=$nname
+   local   -n  node=$nname
+
+   # Copied over, so we can ditch the raw tokens after the parser.
+   node['value']=
+   node['offset']=
+   node['lineno']=
+   node['colno']=
+   node['file']=
+
+   # shellcheck disable=SC2034
+   TYPEOF[$nname]='int_var'
 }
 
 
@@ -629,10 +650,6 @@ function p_array {
 function p_env_var {
    p_munch 'DOLLAR'
 
-   if p_match 'L_BRACE' ; then
-      local surround='yes'
-   fi
-
    mk_env_var
    local -n node=$NODE
    node['value']=${CURRENT[value]}
@@ -640,10 +657,19 @@ function p_env_var {
    node['lineno']=${CURRENT[lineno]}
    node['colno']=${CURRENT[colno]}
    node['file']=${CURRENT[file]}
+}
 
-   if [[ $surround ]] ; then
-      p_munch 'R_BRACE' "expecting \`}' after variable."
-   fi
+
+function p_int_var {
+   p_munch 'PERCENT'
+
+   mk_int_var
+   local -n node=$NODE
+   node['value']=${CURRENT[value]}
+   node['offset']=${CURRENT[offset]}
+   node['lineno']=${CURRENT[lineno]}
+   node['colno']=${CURRENT[colno]}
+   node['file']=${CURRENT[file]}
 }
 
 
@@ -709,14 +735,10 @@ function p_path {
 # Had to do a little bit of tomfoolery with the binding powers. Shifted
 # everything up by 1bp (+2), so the lowest is lbp=3 rbp=4.
 
-#declare -gA prefix_binding_power=(
-#   [NOT]=10
-#   [BANG]=10
-#   [MINUS]=10
-#)
+declare -gA prefix_binding_power=(
+   [MINUS]=10
+)
 declare -gA NUD=(
-   [NOT]='p_unary'
-   [BANG]='p_unary'
    [MINUS]='p_unary'
    [PATH]='p_path'
    [TRUE]='p_boolean'
@@ -725,50 +747,29 @@ declare -gA NUD=(
    [INTEGER]='p_integer'
    [IDENTIFIER]='p_identifier'
    [DOLLAR]='p_env_var'
+   [PERCENT]='p_int_var'
    [L_PAREN]='p_group'
    [L_BRACKET]='p_array'
 )
 
 
-declare -gA infix_binding_power=(
-   [OR]=3
-   [AND]=3
-   #[EQ]=5
-   #[NE]=5
-   #[LT]=7
-   #[LE]=7
-   #[GT]=7
-   #[GE]=7
-   #[PLUS]=9
-   #[MINUS]=9
-   #[STAR]=11
-   #[SLASH]=11
-   [L_PAREN]=13
-)
-declare -gA LED=(
-   [OR]='p_compop'
-   [AND]='p_compop'
-   #[EQ]='p_binary'
-   #[NE]='p_binary'
-   #[LT]='p_binary'
-   #[LE]='p_binary'
-   #[GT]='p_binary'
-   #[GE]='p_binary'
-   #[PLUS]='p_binary'
-   #[MINUS]='p_binary'
-   #[STAR]='p_binary'
-   #[SLASH]='p_binary'
-   [L_PAREN]='p_func_call'
-)
+#declare -gA infix_binding_power=(
+#   [OR]=3
+#   [AND]=3
+#)
+#declare -gA LED=(
+#   [OR]='p_compop'
+#   [AND]='p_compop'
+#)
 
 
 declare -gA postfix_binding_power=(
-   [L_BRACKET]=3
    [CONCAT]=15
+   [DOT]=17
 )
 declare -gA RID=(
-   [L_BRACKET]='p_index'
    [CONCAT]='p_concat'
+   [DOT]='p_index'
 )
 
 
@@ -782,6 +783,8 @@ function p_expression {
 
    if [[ -z $fn ]] ; then
       raise parse_error "not an expression: ${CURRENT[type]}."
+      # TODO: error reporting
+      # This has got to be one of the least helpful error messages here. Woof.
    fi
 
    $fn ; lhs=$NODE
@@ -807,6 +810,7 @@ function p_expression {
 
          $fn "$lhs"
          continue
+         lhs=$NODE
       fi
 
       #────────────────────────────( infix )────────────────────────────────────
@@ -838,29 +842,22 @@ function p_group {
 }
 
 
-function p_binary {
-   local -- lhs="$1" op="$2" rbp="$3"
-
-   mk_binary
-   local -- save=$NODE
-   local -n node=$NODE
-
-   p_expression "$rbp"
-
-   node['op']="$op"
-   node['left']="$lhs"
-   node['right']="$NODE"
-
-   declare -g NODE=$save
-}
-
-
 function p_unary {
-   local -- op="$2" rbp="$3"
+   local -- op=${CURRENT[type]}
+   local -- rbp="${prefix_binding_power[$op]}"
 
-   mk_binary
+   p_advance # past operator
+
+   mk_unary
    local -- save=$NODE
    local -n node=$NODE
+
+   # This is a little gimicky. Explanation:
+   # We've defined type to be equal to the nameref to the current token's type
+   # at the top of the function. When the current token changes, the previously
+   # defined `$type` does as well. By re-declaring the variable with the value
+   # of itself, it loses the reference.
+   local -- op="$op"
 
    p_expression "$rbp"
 
@@ -875,7 +872,7 @@ function p_concat {
    local -- lname="$1"
    local -n last="$lname"
 
-   p_advance # past the 'CONCAT' token
+   p_advance # past the `CONCAT'
 
    p_expression
    last['next']=$NODE
@@ -886,24 +883,15 @@ function p_index {
    local -- lname="$1"
    local -n last="$lname"
 
+   p_advance # past the `DOT'
+
    mk_index
-   local -- save=$NODE
-   local -n node=$NODE
+   local -- iname="$NODE"
+   local -n index="$iname"
 
-   p_advance # past the 'DOT'
    p_expression
+   index['left']="$last"
+   index['expr']="$NODE"
 
-   local -- ename="$NODE"
-   local -n expr="$ename"
-
-   if [[ ${TYPEOF[$ename]} != 'number'     ]] || \
-      [[ ${TYPEOF[$ename]} != 'identifier' ]]
-   then
-      raise parse_error "${expr[value]} is not a valid index."
-   fi
-
-   node['value']="$lname"
-   node['next']="$ename"
-
-   declare -g NODE="$save"
+   declare -g NODE="$iname"
 }

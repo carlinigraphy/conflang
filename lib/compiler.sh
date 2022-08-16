@@ -748,11 +748,14 @@ function compile_unary {
    local -- save=$NODE
    local -n node=$save
 
-   # The only unary expression right now is negation.
    walk_compiler "${node[rhs]}"
    local -i rhs=$DATA
 
-   (( DATA = -1 * rhs ))
+   case "${node[op]}" in
+      'MINUS')    (( DATA = -1 * rhs )) ;;
+      *) raise parse_error "${node[op],,} is not a unary operator."
+   esac
+
    declare -g NODE=$save
 }
 
@@ -822,9 +825,6 @@ function compile_identifier {
 
 
 function compile_env_var {
-   : "There's a chance we may have stomped on an environment variable from the
-      user."
-
    local -n node=$NODE
    local -- var_name="${node[value]}" 
 
@@ -832,10 +832,31 @@ function compile_env_var {
       raise stomped_env_var "$var_name"
    fi
 
-   if [[ ! -v "$var_name" ]] ; then
+   if [[ ! "$var_name" ]] ; then
       raise missing_env_var "$var_name"
    fi
 
    local -n var="$var_name"
    declare -g DATA="$var"
+}
+
+
+function compile_int_var {
+   local -n node="$NODE"
+   local -- var="${node[value]}"
+
+   local -n symtab="$SYMTAB"
+   local -- symbol_name="${symtab[$val]}"
+
+   if [[ ! "$symbol_name" ]] ; then
+      raise missing_int_var "$var_name"
+   fi
+
+   local -n symbol="$symbol_name"
+   walk_compiler "${symbol[node]}"
+}
+
+
+function compile_index {
+   :
 }

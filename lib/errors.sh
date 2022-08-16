@@ -14,9 +14,10 @@ declare -gA EXIT_STATUS=(
    [missing_file]=9
    [missing_env_var]=10
    [stomped_env_var]=11
-   [invalid_interpolation_char]=12
-   [unescaped_interpolation_brace]=13
-   [munch_error]=14
+   [missing_int_var]=12
+   [invalid_interpolation_char]=13
+   [unescaped_interpolation_brace]=14
+   [munch_error]=145
 )
 
 function raise {
@@ -106,4 +107,8 @@ function print_missing_env_var {
 
 function print_stomped_env_var {
    printf 'Name Error: env variable %q stomped by program variable.\n'  "$1"
+}
+
+function print_missing_int_var {
+   printf 'Name Error: internal variable %q is not defined.\n'  "$1"
 }
