@@ -257,13 +257,16 @@ if [[ "$child_root" ]] ; then
    merge_symtab "$parent_symtab" "$child_symtab"
 fi
 
-# Reset pointer back to the parent symtab. Allows use in the compiler.
-SYMTAB="$parent_symtab"
+# Reset pointer back to the parent symtab. Allows use in the compiler. Kinda
+# goofy to handle the whole implicit `%inline' nonsense here.
+declare -n _symtab="$parent_symtab"
+declare -n _inline="${_symtab[%inline]}"
+declare -- SYMTAB="${_inline[symtab]}"
 
 # shellcheck disable=SC2128
-# It thinks the parent_symtab is an array itself, rather than the name of an
+# ^-- thinks the parent_symtab is an array itself, rather than the name of an
 # array.
-#pprint_symtab "$SYMTAB"
+#pprint_symtab "$parent_symtab"  ##DEBUG
 
 # Second dump of all the declared variables. By diffing with the last dump of
 # variables, we can determine which were defined here, and what was pre-

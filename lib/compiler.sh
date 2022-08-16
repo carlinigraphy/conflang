@@ -846,10 +846,10 @@ function compile_int_var {
    local -- var="${node[value]}"
 
    local -n symtab="$SYMTAB"
-   local -- symbol_name="${symtab[$val]}"
+   local -- symbol_name="${symtab[$var]}"
 
    if [[ ! "$symbol_name" ]] ; then
-      raise missing_int_var "$var_name"
+      raise missing_int_var "$var"
    fi
 
    local -n symbol="$symbol_name"
@@ -858,5 +858,5 @@ function compile_int_var {
 
 
 function compile_index {
-   :
+   :;
 }

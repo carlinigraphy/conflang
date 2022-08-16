@@ -94,21 +94,21 @@ function print_type_error { :; }
 
 #────────────────────────────────( key errors )─────────────────────────────────
 function print_index_error {
-   printf 'Index Error: %q not found.\n'  "$1"
+   printf "Index Error: \`%s' not found.\n"  "$1"
 }
 
 function print_name_error {
-   printf 'Name Error: %q already defined in this scope.\n'  "$1"
+   printf "Name Error: \`%s' already defined in this scope.\n"  "$1"
 }
 
 function print_missing_env_var {
-   printf 'Name Error: env variable %q is not defined.\n'  "$1"
+   printf "Name Error: env variable \`%s' is not defined.\n"  "$1"
 }
 
 function print_stomped_env_var {
-   printf 'Name Error: env variable %q stomped by program variable.\n'  "$1"
+   printf "Name Error: env variable \`%s' stomped by program variable.\n"  "$1"
 }
 
 function print_missing_int_var {
-   printf 'Name Error: internal variable %q is not defined.\n'  "$1"
+   printf "Name Error: internal variable \`%s' is not defined.\n"  "$1"
 }

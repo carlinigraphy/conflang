@@ -182,12 +182,39 @@ function pprint_ext_var {
       raise stomped_env_var "$var_name"
    fi
 
-   if [[ ! -v "$var_name" ]] ; then
+   if [[ ! "$var_name" ]] ; then
       raise missing_env_var "$var_name"
    fi
 
    local -n var="$var_name"
    printf '%s' "$var"
+}
+
+
+function pprint_int_var {
+   local -n node=$NODE
+   local -- var="${node[value]}" 
+
+   local -n symtab="$SYMTAB"
+   local -- symbol_name="${symtab[$var]}"
+
+   if [[ ! "$symbol_name" ]] ; then
+      raise missing_int_var "$var"
+   fi
+
+   local -n symbol="$symbol_name"
+   local -- nname="${symbol[node]}"
+   local -n node="$nname"
+
+   case "${TYPEOF[$nname]}" in
+      'decl_variable')
+            walk_pprint "${node[expr]}"
+            ;;
+
+      'decl_section')
+            walk_pprint "$nname"
+            ;;
+   esac
 }
 
 
