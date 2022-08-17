@@ -809,8 +809,8 @@ function p_expression {
          fi
 
          $fn "$lhs"
-         continue
          lhs=$NODE
+         continue
       fi
 
       #────────────────────────────( infix )────────────────────────────────────
@@ -890,7 +890,7 @@ function p_index {
    local -n index="$iname"
 
    p_expression
-   index['left']="$last"
+   index['left']="$lname"
    index['expr']="$NODE"
 
    declare -g NODE="$iname"

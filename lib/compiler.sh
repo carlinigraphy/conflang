@@ -858,5 +858,33 @@ function compile_int_var {
 
 
 function compile_index {
-   :;
+   : "An 'index' is a combination of an...
+         .left   expression
+         .right  index expression
+
+      - The left must compile to an expression that is subscriptable (section or
+        array.
+      - The right must compile to an expression that is a valid index (integer
+        or identifier)."
+
+   local -n node="$NODE"
+
+   local -- save_symtab="$SYMTAB"
+   local -n symtab="$SYMTAB"
+
+   walk_compiler "${node[left]}" 
+   local -- left="$DATA"
+
+   walk_compiler "${node[right]}"
+   local -- right="$DATA"
+
+   # CURRENT:
+   # Need to pass a reference to the current symbol table here. That should
+   # likely happen in one of the initial phases of the compiler. Attach a
+   # .symtab reference to each node that contains an identifier or an internal
+   # variable.
+
+   #declare -g DATA=
+
+   declare -g SYMTAB="$save_symtab"
 }
