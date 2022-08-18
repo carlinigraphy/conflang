@@ -218,6 +218,17 @@ function pprint_int_var {
 }
 
 
+function pprint_index {
+   local -n node=$NODE
+
+   walk_pprint "${node[left]}" 
+
+   printf '['
+   walk_pprint "${node[right]}"
+   printf ']'
+}
+
+
 #───────────────────────────────( dump garbage )────────────────────────────────
 # I certainly could've done this with fewer expressions, but at this point that's
 # not really my main concern.
@@ -228,8 +239,8 @@ function dump_everything {
       -e 's,([[:alnum:]_])=\(,\1,'           # (strip opening paren)
       -e 's,\)$,,'                           # (strip closing paren)
       -e 's,\[,\n  [,g'                      # (puts keys on new line)
-      -e 's,^declare\s-[-Aaig]+\s,,'         # declare -a NODE    ->  NODE
-      -e 's,\[([[:alpha:]%]+)\]=,\1: ,g'     # [file]="value"     ->  file: "value"
+      -e 's,^declare\s-[-Aaig]+\s,,'         # declare -a NODE ->  NODE
+      -e 's,\[([[:alpha:]%]+)\]=,\1: ,g'     # [file]="value"  ->  file: "value"
    )
 
    (  # shellcheck disable=SC2154

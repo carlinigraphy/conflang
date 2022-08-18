@@ -101,9 +101,6 @@ function mk_context_block {
    declare -ga $nname
    declare -g  NODE=$nname
 
-   local -n node=$nname
-   node=()
-
    TYPEOF[$nname]='context_block'
 }
 
@@ -139,9 +136,6 @@ function mk_array {
    local   --  nname="NODE_${NODE_NUM}"
    declare -ga $nname
    declare -g  NODE=$nname
-
-   local -n node=$nname
-   node=()
 
    TYPEOF[$nname]='array'
 }
@@ -183,7 +177,7 @@ function mk_index {
    local   -n  node=$nname
 
    node['left']=
-   node['expr']=
+   node['right']=
 
    TYPEOF[$nname]='index'
 }
@@ -637,12 +631,19 @@ function p_array {
    local -- save=$NODE
    local -n node=$NODE
 
-   while ! p_check 'R_BRACKET' ; do
+   until p_check 'R_BRACKET' ; do
       p_expression
       node+=( "$NODE" )
    done
 
-   p_munch 'R_BRACKET' "expecting \`]' after array."
+   # TODO: error reporting
+   # If the user forgets a closing bracket, the error will be an "invalid
+   # expression" from the parser, rather than a specific error pertaining to
+   # the array function. I guess this is another problem of not having a
+   # specific delimiter between expressions. I think the "simplicity" of my
+   # grammar is starting to make parsing and error reporting very difficult.
+   # Very similar things are happening with variable declaration syntax.
+
    declare -g NODE=$save
 }
 
@@ -773,6 +774,8 @@ declare -gA RID=(
 )
 
 
+declare -gi _LEVEL=0
+
 function p_expression {
    local -i min_bp=${1:-1}
 
@@ -781,10 +784,14 @@ function p_expression {
 
    local -- fn=${NUD[${CURRENT[type]}]}
 
+   (( _LEVEL++ ))
+   echo " ${_LEVEL} Enter Pratt"            ##DEBUG
+   echo "  - ${CURRENT[value]}"  ##DEBUG
+
    if [[ -z $fn ]] ; then
-      raise parse_error "not an expression: ${CURRENT[type]}."
       # TODO: error reporting
       # This has got to be one of the least helpful error messages here. Woof.
+      raise parse_error "not an expression: ${CURRENT[type]}."
    fi
 
    $fn ; lhs=$NODE
@@ -794,6 +801,8 @@ function p_expression {
    # ending expressions.
    p_check 'SEMI' && return
    p_advance
+
+   #declare -p $CURRENT_NAME
 
    while :; do
       op=$CURRENT ot=${CURRENT[type]}
@@ -831,6 +840,9 @@ function p_expression {
 
       lhs=$NODE
    done
+
+   echo "$_LEVEL ${CURRENT[value]}"
+   (( _LEVEL-- ))
 
    declare -g NODE=$lhs
 }
@@ -891,7 +903,7 @@ function p_index {
 
    p_expression
    index['left']="$lname"
-   index['expr']="$NODE"
+   index['right']="$NODE"
 
    declare -g NODE="$iname"
 }
