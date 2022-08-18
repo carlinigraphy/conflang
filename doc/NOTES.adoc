@@ -256,3 +256,100 @@ empty string indicates the beginning of the day. The date string format is more
 complex than is easily documented here but is fully described in the info
 documentation.
 ----
+
+
+== Syntax 2: Electric Fuckmealoo
+
+My intent was to make a syntax that was simple, easy to read, and easy to write.
+Eliminating delimiters between array elements, `=` or `:` in variable declarations serve this goal.
+It adds a simplicity in legibility, and a simplicity in refactoring.
+
+Unfortunately any simplicity that's provided is invalidated by the difficulty in parsing, and lack of clear error reporting.
+
+My initial design influence was the easy of writing nginx config files.
+Blocks are easily defined by squiggly braces.
+Keys are simple identifiers, followed by a value terminated by a semicolon.
+
+We may need to add minimal symbols to aid in parsing, but moreso anchor the error reporting.
+(This is most obvious when running into an unexpected token in an array.)
+
+.New syntax
+[source]
+----
+# Section declarations remain the same.
+section {
+   # ...
+}
+
+# Variable declarations are as follows.
+var;                       # 1. Raw declaration: no type, no value
+var (str);                 # 2. Declaration w/ type, no value
+var: "value";              # 3. Declaration w/ value, no type
+var (str): "value";        # 4. Declaration with type and value
+
+# Arrays will need a delimiter. Final element may still have delim after it.
+# PS fuck you json.
+var (array:str): [
+   "one",
+   "two",
+];
+----
+
+I'm not sold on the typedefs right now.
+Surround with parens may be unnecessary.
+Not one hundy on the colon separator either.
+
+.What about
+
+[source]
+----
+var str: "this";
+var array: [ ... ];
+var array[str]: [ ... ];
+----
+
+It's interesting, though types strictly have a singular subtype.
+Don't need a bracket, as we cannot have something such as:
+`hash[int, string]`.
+
+.Straight-up shotgunning ideas here
+[source]
+----
+var array->str: [ "str" ];
+var array->array->str:  [["s1"], ["s2"]];
+
+var array/string: ...
+# ^-- no, this looks like an option
+----
+
+The `/` syntax is interesting, but I think as an "internal variable" syntax.
+Currently all internal vars must start at the root, and provide a full path.
+Sorta defeats the purpose of having lexical scoping in sections if we can't
+do relative vars. What about...
+
+.Variables are paths
+[source]
+----
+global {
+   items (array:str) {
+      "one",
+      "two",
+      "three",
+   }
+
+   item_one (str): .items/0;
+}
+
+item_two (str): /global/items/0;
+----
+
+I think it's honestly a pretty neat syntax, and instantly understandable from a unix perspective...
+except for a configuration file format with a native '`path`' data type, it's obvious to mistake this syntax with an actual directory path.
+
+I've always thought that a ``/``-separated (raerpb `.` or `[index]`) is better.
+Naturally indicates absolute vs. relative indexes, and feels very "familiar".
+
+Just not right for this context.
+
+For now going to use types surrounded by parens, with a colon separating the expression.
+Array elements will be delimited by a comma.
