@@ -31,18 +31,18 @@ First thing anyone wants to see is some example syntax.
 .config.cfg
 ----
 # Basic key:value pairs.
-name  "Marcus";
-age   30;
+name : "Marcus";
+age  : 30;
 
 # Arrays.
-projects [
-   "shql"
-   "conf"
+projects : [
+   "shql",
+   "conf",
 ];
 
 # Sections.
 globals {
-   scope  "outer";
+   scope : "outer";
 
    sub-heading {
       scope  "inner";

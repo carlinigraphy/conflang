@@ -82,7 +82,7 @@ function pprint_decl_variable {
    fi
 
    if [[ ${node[expr]} ]] ; then
-      printf ' '
+      printf ': '
       walk_pprint "${node[expr]}"
       printf ';\n'
    fi

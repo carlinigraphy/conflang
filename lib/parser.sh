@@ -350,7 +350,9 @@ function p_advance {
 
 
 function p_check {
-   [[ "${CURRENT[type]}" == "$1" ]]
+   # Allows for passing in something like: "L_BRACKET,STRING,INTEGER" to check
+   # multiple tokens.
+   [[ ,"$1", ==  *,${CURRENT[type]},* ]]
 }
 
 
@@ -478,6 +480,10 @@ function p_constrain {
       raise parse_error 'may not specify multiple constrain blocks.'
    fi
 
+   # TODO: refactor
+   # This should probably just call `p_array`. Then we can pull the paths out
+   # from within it? Rearpb making it a special case.
+
    p_munch 'L_BRACKET' "expecting \`[' to begin array of paths."
    while ! p_check 'R_BRACKET' ; do
       p_path
@@ -543,22 +549,28 @@ function p_decl_variable {
    node['name']=$name
 
    # Typedefs.
-   if p_check 'IDENTIFIER' ; then
+   if p_match 'L_PAREN' ; then
       p_typedef
       node['type']=$NODE
    fi
 
    # Expressions.
-   if ! p_check 'L_BRACE' && ! p_check 'SEMI' ; then
+   if p_match 'COLON' ; then
       p_expression
       node['expr']=$NODE
    fi
 
-   # Context blocks.
-   if p_match 'L_BRACE' ; then
-      p_context_block
-      node['context']=$NODE
+   # TODO: error reporting
+   # Needs line/column number & printout.
+   if p_match 'STRING,INTEGER,BOOLEAN,PATH,L_BRACKET' ; then
+      raise parse_error "expecting \`:' before expression."
    fi
+
+   # Context blocks.
+   #if p_match 'L_BRACE' ; then
+   #   p_context_block
+   #   node['context']=$NODE
+   #fi
 
    p_munch 'SEMI' "expecting \`;' after declaration."
    declare -g NODE=$save
@@ -567,7 +579,7 @@ function p_decl_variable {
 
 function p_typedef {
    p_identifier
-   p_munch 'IDENTIFIER' 'expecting identifier for typedef.'
+   p_munch 'IDENTIFIER' 'typedef requires an identifier.'
 
    local -- name=$NODE
 
@@ -585,6 +597,7 @@ function p_typedef {
       type_['subtype']=$NODE
    done
 
+   p_munch 'R_PAREN' "typedef must be closed by \`)'."
    declare -g NODE=$save
 }
 
@@ -623,6 +636,179 @@ function p_context {
    node['name']=$ident
 }
 
+#───────────────────────────────( expressions )─────────────────────────────────
+# Thanks daddy Pratt.
+#
+# Had to do a little bit of tomfoolery with the binding powers. Shifted
+# everything up by 1bp (+2), so the lowest is lbp=3 rbp=4.
+
+declare -gA prefix_binding_power=(
+   [MINUS]=10
+)
+declare -gA NUD=(
+   [MINUS]='p_unary'
+   [PATH]='p_path'
+   [TRUE]='p_boolean'
+   [FALSE]='p_boolean'
+   [STRING]='p_string'
+   [INTEGER]='p_integer'
+   [IDENTIFIER]='p_identifier'
+   [DOLLAR]='p_env_var'
+   [PERCENT]='p_int_var'
+   [L_PAREN]='p_group'
+   [L_BRACKET]='p_array'
+)
+
+
+#declare -gA infix_binding_power=(
+#   [OR]=3
+#   [AND]=3
+#)
+#declare -gA LED=(
+#   [OR]='p_compop'
+#   [AND]='p_compop'
+#)
+
+
+declare -gA postfix_binding_power=(
+   [CONCAT]=15
+   [DOT]=17
+)
+declare -gA RID=(
+   [CONCAT]='p_concat'
+   [DOT]='p_index'
+)
+
+
+declare -gi _LEVEL=0
+
+function p_expression {
+   local -i min_bp=${1:-1}
+
+   local -- lhs op
+   local -i lbp=0 rbp=0
+
+   local -- fn=${NUD[${CURRENT[type]}]}
+
+   if [[ -z $fn ]] ; then
+      # TODO: error reporting
+      # This has got to be one of the least helpful error messages here. Woof.
+      raise parse_error "not an expression: ${CURRENT[type],,}."
+   fi
+
+   $fn ; lhs=$NODE
+
+   # THINKIES:
+   # I feel like there has to be a more elegant way of handling a semicolon
+   # ending expressions.
+   p_check 'SEMI' && return
+   p_advance
+
+   #declare -p $CURRENT_NAME
+
+   while :; do
+      op=$CURRENT ot=${CURRENT[type]}
+
+      #───────────────────────────( postfix )───────────────────────────────────
+      lbp=${postfix_binding_power[$ot]:-0}
+
+      if [[ $lbp -ge $min_bp ]] ; then
+         fn="${RID[${CURRENT[type]}]}"
+
+         if [[ ! $fn ]] ; then
+            raise parse_error "not a postfix expression: ${CURRENT[type],,}."
+         fi
+
+         $fn "$lhs"
+         lhs=$NODE
+         continue
+      fi
+
+      #────────────────────────────( infix )────────────────────────────────────
+      lbp=${infix_binding_power[ot]:-0}
+      (( rbp = (lbp == 0 ? 0 : lbp+1) ))
+
+      if [[ $rbp -lt $min_bp ]] ; then
+         break
+      fi
+
+      p_advance
+
+      fn=${LED[${CURRENT[type]}]}
+      if [[ ! $fn ]] ; then
+         raise parse_error "not an infix expression: ${CURRENT[type],,}."
+      fi
+      $fn  "$lhs"  "$op"  "$rbp"
+
+      lhs=$NODE
+   done
+
+   declare -g NODE=$lhs
+}
+
+
+function p_group {
+   p_expression
+   p_munch 'R_PAREN' "expecting \`)' after group."
+}
+
+
+function p_unary {
+   local -- op=${CURRENT[type]}
+   local -- rbp="${prefix_binding_power[$op]}"
+
+   p_advance # past operator
+
+   mk_unary
+   local -- save=$NODE
+   local -n node=$NODE
+
+   # This is a little gimicky. Explanation:
+   # We've defined type to be equal to the nameref to the current token's type
+   # at the top of the function. When the current token changes, the previously
+   # defined `$type` does as well. By re-declaring the variable with the value
+   # of itself, it loses the reference.
+   local -- op="$op"
+
+   p_expression "$rbp"
+
+   node['op']="$op"
+   node['right']="$NODE"
+
+   declare -g NODE=$save
+}
+
+
+function p_concat {
+   local -- lname="$1"
+   local -n last="$lname"
+
+   p_advance # past the `CONCAT'
+
+   p_expression
+   last['next']=$NODE
+}
+
+
+function p_index {
+   local -- lname="$1"
+   local -n last="$lname"
+
+   p_advance # past the `DOT'
+
+   mk_index
+   local -- iname="$NODE"
+   local -n index="$iname"
+
+   p_expression
+   index['left']="$lname"
+   index['right']="$NODE"
+
+   declare -g NODE="$iname"
+}
+
+
+_l=0
 
 function p_array {
    p_munch 'L_BRACKET'
@@ -634,15 +820,10 @@ function p_array {
    until p_check 'R_BRACKET' ; do
       p_expression
       node+=( "$NODE" )
-   done
 
-   # TODO: error reporting
-   # If the user forgets a closing bracket, the error will be an "invalid
-   # expression" from the parser, rather than a specific error pertaining to
-   # the array function. I guess this is another problem of not having a
-   # specific delimiter between expressions. I think the "simplicity" of my
-   # grammar is starting to make parsing and error reporting very difficult.
-   # Very similar things are happening with variable declaration syntax.
+      p_check 'R_BRACKET' && break
+      p_munch 'COMMA' "array elements must be separated by \`,'."
+   done
 
    declare -g NODE=$save
 }
@@ -728,182 +909,4 @@ function p_path {
    node['lineno']=${CURRENT[lineno]}
    node['colno']=${CURRENT[colno]}
    node['file']=${CURRENT[file]}
-}
-
-#───────────────────────────────( expressions )─────────────────────────────────
-# Thanks daddy Pratt.
-#
-# Had to do a little bit of tomfoolery with the binding powers. Shifted
-# everything up by 1bp (+2), so the lowest is lbp=3 rbp=4.
-
-declare -gA prefix_binding_power=(
-   [MINUS]=10
-)
-declare -gA NUD=(
-   [MINUS]='p_unary'
-   [PATH]='p_path'
-   [TRUE]='p_boolean'
-   [FALSE]='p_boolean'
-   [STRING]='p_string'
-   [INTEGER]='p_integer'
-   [IDENTIFIER]='p_identifier'
-   [DOLLAR]='p_env_var'
-   [PERCENT]='p_int_var'
-   [L_PAREN]='p_group'
-   [L_BRACKET]='p_array'
-)
-
-
-#declare -gA infix_binding_power=(
-#   [OR]=3
-#   [AND]=3
-#)
-#declare -gA LED=(
-#   [OR]='p_compop'
-#   [AND]='p_compop'
-#)
-
-
-declare -gA postfix_binding_power=(
-   [CONCAT]=15
-   [DOT]=17
-)
-declare -gA RID=(
-   [CONCAT]='p_concat'
-   [DOT]='p_index'
-)
-
-
-declare -gi _LEVEL=0
-
-function p_expression {
-   local -i min_bp=${1:-1}
-
-   local -- lhs op
-   local -i lbp=0 rbp=0
-
-   local -- fn=${NUD[${CURRENT[type]}]}
-
-   (( _LEVEL++ ))
-   echo " ${_LEVEL} Enter Pratt"            ##DEBUG
-   echo "  - ${CURRENT[value]}"  ##DEBUG
-
-   if [[ -z $fn ]] ; then
-      # TODO: error reporting
-      # This has got to be one of the least helpful error messages here. Woof.
-      raise parse_error "not an expression: ${CURRENT[type]}."
-   fi
-
-   $fn ; lhs=$NODE
-
-   # THINKIES:
-   # I feel like there has to be a more elegant way of handling a semicolon
-   # ending expressions.
-   p_check 'SEMI' && return
-   p_advance
-
-   #declare -p $CURRENT_NAME
-
-   while :; do
-      op=$CURRENT ot=${CURRENT[type]}
-
-      #───────────────────────────( postfix )───────────────────────────────────
-      lbp=${postfix_binding_power[$ot]:-0}
-
-      if [[ $lbp -ge $min_bp ]] ; then
-         fn="${RID[${CURRENT[type]}]}"
-
-         if [[ ! $fn ]] ; then
-            raise parse_error "not a postfix expression: ${CURRENT[type]}."
-         fi
-
-         $fn "$lhs"
-         lhs=$NODE
-         continue
-      fi
-
-      #────────────────────────────( infix )────────────────────────────────────
-      lbp=${infix_binding_power[ot]:-0}
-      (( rbp = (lbp == 0 ? 0 : lbp+1) ))
-
-      if [[ $rbp -lt $min_bp ]] ; then
-         break
-      fi
-
-      p_advance
-
-      fn=${LED[${CURRENT[type]}]}
-      if [[ ! $fn ]] ; then
-         raise parse_error "not an infix expression: ${CURRENT[type]}."
-      fi
-      $fn  "$lhs"  "$op"  "$rbp"
-
-      lhs=$NODE
-   done
-
-   echo "$_LEVEL ${CURRENT[value]}"
-   (( _LEVEL-- ))
-
-   declare -g NODE=$lhs
-}
-
-
-function p_group {
-   p_expression
-   p_munch 'R_PAREN' "expecting \`)' after group."
-}
-
-
-function p_unary {
-   local -- op=${CURRENT[type]}
-   local -- rbp="${prefix_binding_power[$op]}"
-
-   p_advance # past operator
-
-   mk_unary
-   local -- save=$NODE
-   local -n node=$NODE
-
-   # This is a little gimicky. Explanation:
-   # We've defined type to be equal to the nameref to the current token's type
-   # at the top of the function. When the current token changes, the previously
-   # defined `$type` does as well. By re-declaring the variable with the value
-   # of itself, it loses the reference.
-   local -- op="$op"
-
-   p_expression "$rbp"
-
-   node['op']="$op"
-   node['right']="$NODE"
-
-   declare -g NODE=$save
-}
-
-
-function p_concat {
-   local -- lname="$1"
-   local -n last="$lname"
-
-   p_advance # past the `CONCAT'
-
-   p_expression
-   last['next']=$NODE
-}
-
-
-function p_index {
-   local -- lname="$1"
-   local -n last="$lname"
-
-   p_advance # past the `DOT'
-
-   mk_index
-   local -- iname="$NODE"
-   local -n index="$iname"
-
-   p_expression
-   index['left']="$lname"
-   index['right']="$NODE"
-
-   declare -g NODE="$iname"
 }
