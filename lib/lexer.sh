@@ -142,9 +142,9 @@ function scan {
       # Symbols.
       case $CURRENT in
          '.')  Token        'DOT' "$CURRENT"  ; continue ;;
+         ',')  Token      'COMMA' "$CURRENT"  ; continue ;;
          ';')  Token       'SEMI' "$CURRENT"  ; continue ;;
          ':')  Token      'COLON' "$CURRENT"  ; continue ;;
-         '-')  Token      'MINUS' "$CURRENT"  ; continue ;;
          '$')  Token     'DOLLAR' "$CURRENT"  ; continue ;;
          '%')  Token    'PERCENT' "$CURRENT"  ; continue ;;
          '?')  Token   'QUESTION' "$CURRENT"  ; continue ;;

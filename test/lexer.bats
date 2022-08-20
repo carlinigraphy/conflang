@@ -50,19 +50,20 @@ function setup {
    init_scanner
    scan
 
-   declare -A EXP_0=(  [type]="COLON"     [value]=":" )
-   declare -A EXP_1=(  [type]="SEMI"      [value]=";" )
-   declare -A EXP_2=(  [type]="MINUS"     [value]="-" )
-   declare -A EXP_3=(  [type]="DOLLAR"    [value]="$" )
-   declare -A EXP_4=(  [type]="PERCENT"   [value]="%" )
-   declare -A EXP_5=(  [type]="QUESTION"  [value]="?" )
-   declare -A EXP_6=(  [type]="L_PAREN"   [value]="(" )
-   declare -A EXP_7=(  [type]="R_PAREN"   [value]=")" )
-   declare -A EXP_8=(  [type]="L_BRACKET" [value]="[" )
-   declare -A EXP_9=(  [type]="R_BRACKET" [value]="]" )
-   declare -A EXP_10=( [type]="L_BRACE"   [value]="{" )
-   declare -A EXP_11=( [type]="R_BRACE"   [value]="}" )
-   declare -A EXP_12=( [type]="EOF"       [value]=""  )
+   declare -A EXP_0=(  [type]="DOT"        [value]="." )
+   declare -A EXP_1=(  [type]="COMMA"      [value]="," )
+   declare -A EXP_2=(  [type]="SEMI"       [value]=";" )
+   declare -A EXP_3=(  [type]="COLON"      [value]=":" )
+   declare -A EXP_4=(  [type]="DOLLAR"     [value]="$" )
+   declare -A EXP_5=(  [type]="PERCENT"    [value]="%" )
+   declare -A EXP_6=(  [type]="QUESTION"   [value]="?" )
+   declare -A EXP_7=(  [type]="L_PAREN"    [value]="(" )
+   declare -A EXP_8=(  [type]="R_PAREN"    [value]=")" )
+   declare -A EXP_9=(  [type]="L_BRACKET"  [value]="[" )
+   declare -A EXP_10=( [type]="R_BRACKET"  [value]="]" )
+   declare -A EXP_11=( [type]="L_BRACE"    [value]="{" )
+   declare -A EXP_12=( [type]="R_BRACE"    [value]="}" )
+   declare -A EXP_13=( [type]="EOF"        [value]=""  )
 
    for idx in "${!TOKENS[@]}" ; do
       local -- tname="${TOKENS[$idx]}"
