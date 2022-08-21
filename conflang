@@ -271,11 +271,9 @@ for d in "${_ENV_DIFF[@]}" ; do
 done
 
 walk_compiler "$parent_root"
-#walk_pprint   "$parent_root"
+walk_pprint   "$parent_root"
 
 #───────────────────────────────────( api )─────────────────────────────────────
-## DISABLED API WHILE WORKING ON MERGING TREES AND WHATNOT.
-
 source "${LIBDIR}"/api.sh
 # Exports (USER ACCESSIBLE):
 #  RV
