@@ -28,29 +28,77 @@ The project is in the designing/writing itself.
 
 First thing anyone wants to see is some example syntax.
 
-.config.cfg
+.Features snapshot
 ----
-# Basic key:value pairs.
+# Key value pairs.
 name : "Marcus";
 age  : 30;
 
-# Arrays.
-projects : [
-   "shql",
-   "conf",
+# Basic types.
+name (str): "Marcus";
+
+# Complex types.
+names (array:str): [
+   "Marcus",
+   "Aurelius",
 ];
 
 # Sections.
 globals {
-   scope : "outer";
+   scope: "outer";
 
    sub-heading {
-      scope  "inner";
+      scope: "inner";
    }
 }
 
+# Environment variables.
+homedir (path): $HOME;
+
+# Internal variables.
+homedir_copy: %homedir;
+
+# String interpolation.
+project_dir : "{$HOME}/projects/";
+sub_dir     : "{%project_dir}/sub/";
+
 # Import other files.
 %include './sub-file.conf';
+
+# Enforce constraints on child-config files.
+%constrain [
+   "./sub1.conf",
+   "./sub2.conf",
+];
+----
+
+.Example '`real`' file
+----
+common {
+   colors (array:str) [
+      "#hex...";
+      "#hex...";
+      "#hex...";
+      "#hex...";
+      "#hex...";
+      "#hex...";
+      "#hex...";
+   ];
+}
+
+window {
+   geometry {
+      height (int): 100;
+      width  (int): 80;
+   }
+
+   theme {
+      foreground: %common.colors.0;
+      foreground: %common.colors.1;
+   }
+}
+
+%include './bindings.conf';
 ----
 
 
