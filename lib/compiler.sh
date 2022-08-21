@@ -858,19 +858,11 @@ function compile_int_var {
 
 
 function compile_index {
-   : "An 'index' is a combination of an...
-         .left   expression
-         .right  index expression
-
-      The left must compile to an expression that is subscriptable (section or
-      array.
-
-      The right must compile to an expression that is a valid index (integer or
-      identifier)."
+   : "An 'index' is a combination of...
+         .left   subscriptable expression (section, array)
+         .right  index expression (identifier, integer)"
 
    local -n node="$NODE"
-
-   declare -p $NODE
 
    walk_compiler "${node[left]}" 
    local -n left="$DATA"

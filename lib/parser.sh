@@ -719,8 +719,14 @@ function p_expression {
             raise parse_error "not a postfix expression: ${CURRENT[type],,}."
          fi
 
+         local -n l=$lhs
+         echo "  BEFORE: ${TYPEOF[$lhs]}${l[value]:+ :: ${l[value]}}"
+
          $fn "$lhs"
          lhs=$NODE
+
+         local -n l=$lhs
+         echo "  AFTER : ${TYPEOF[$lhs]}${l[value]:+ :: ${l[value]}}"
          continue
       fi
 
@@ -791,24 +797,21 @@ function p_concat {
 
 
 function p_index {
-   local -- lname="$1"
-   local -n last="$lname"
+   local -- last="$1"
 
    p_advance # past the `DOT'
 
    mk_index
-   local -- iname="$NODE"
-   local -n index="$iname"
+   local -- save="$NODE"
+   local -n index="$NODE"
 
    p_expression
-   index['left']="$lname"
+   index['left']="$last"
    index['right']="$NODE"
 
-   declare -g NODE="$iname"
+   declare -g NODE="$save"
 }
 
-
-_l=0
 
 function p_array {
    p_munch 'L_BRACKET'

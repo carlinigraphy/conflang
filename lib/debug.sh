@@ -223,9 +223,8 @@ function pprint_index {
 
    walk_pprint "${node[left]}" 
 
-   printf '['
+   printf '.'
    walk_pprint "${node[right]}"
-   printf ']'
 }
 
 
