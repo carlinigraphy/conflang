@@ -106,6 +106,14 @@ function pprint_typedef {
 }
 
 
+function pprint_typecast {
+   local -n node="$NODE"
+   walk_pprint "${node[expr]}" 
+   printf ' -> '
+   walk_pprint "${node[typedef]}" 
+}
+
+
 function pprint_array {
    local -- save=$NODE
    local -n node=$save
@@ -174,7 +182,7 @@ function pprint_identifier {
 }
 
 
-function pprint_ext_var {
+function pprint_env_var {
    local -n node=$NODE
    local -- var_name="${node[value]}" 
 

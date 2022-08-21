@@ -159,6 +159,21 @@ function scan {
          '}')  Token    'R_BRACE' "$CURRENT"  ; continue ;;
       esac
 
+      # Typecast, or minus.
+      if [[ $CURRENT == '-' ]] ; then
+         l_advance
+
+         # If subsequent `>', is an arrow for typecast.
+         if [[ $CURRENT == '>' ]] ; then
+            l_advance
+            Token 'ARROW' '->'
+         else
+            Token 'MINUS' '-'
+         fi
+
+         continue
+      fi
+
       # f-{strings,paths}
       if [[ $CURRENT == 'f' ]] ; then
          if   [[ $PEEK == '"' ]] ; then

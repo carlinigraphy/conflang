@@ -142,20 +142,6 @@ function mk_array {
 
 
 function mk_typedef {
-   ## psdudo.
-   #> class Typedef:
-   #>    kind     : identifier = None
-   #>    subtype  : Typedef    = None     (opt)
-   #
-   # Example, representing a list[string]:
-   #> Type(
-   #>    kind: 'list',
-   #>    subtype: Type(
-   #>       kind: 'string',
-   #>       subtype: None
-   #>    )
-   #> )
-
    (( ++NODE_NUM ))
    local nname="NODE_${NODE_NUM}"
    declare -gA $nname
@@ -166,6 +152,20 @@ function mk_typedef {
    node['subtype']=       # Sub `Type' node
 
    TYPEOF[$nname]='typedef'
+}
+
+
+function mk_typecast {
+   (( ++NODE_NUM ))
+   local nname="NODE_${NODE_NUM}"
+   declare -gA $nname
+   declare -g  NODE=$nname
+
+   local -n node=$nname
+   node['expr']=
+   node['typedef']=
+
+   TYPEOF[$nname]='typecast'
 }
 
 
@@ -551,6 +551,7 @@ function p_decl_variable {
    # Typedefs.
    if p_match 'L_PAREN' ; then
       p_typedef
+      p_munch 'R_PAREN' "typedef must be closed by \`)'."
       node['type']=$NODE
    fi
 
@@ -579,7 +580,7 @@ function p_decl_variable {
 
 function p_typedef {
    p_identifier
-   p_munch 'IDENTIFIER' 'typedef requires an identifier.'
+   p_munch 'IDENTIFIER' 'type declarations must be identifiers.'
 
    local -- name=$NODE
 
@@ -597,7 +598,6 @@ function p_typedef {
       type_['subtype']=$NODE
    done
 
-   p_munch 'R_PAREN' "typedef must be closed by \`)'."
    declare -g NODE=$save
 }
 
@@ -643,7 +643,7 @@ function p_context {
 # everything up by 1bp (+2), so the lowest is lbp=3 rbp=4.
 
 declare -gA prefix_binding_power=(
-   [MINUS]=10
+   [MINUS]=9
 )
 declare -gA NUD=(
    [MINUS]='p_unary'
@@ -671,10 +671,12 @@ declare -gA NUD=(
 
 
 declare -gA postfix_binding_power=(
-   [CONCAT]=15
-   [DOT]=17
+   [ARROW]='3'
+   [CONCAT]=5
+   [DOT]=7
 )
 declare -gA RID=(
+   [ARROW]='p_typecast'
    [CONCAT]='p_concat'
    [DOT]='p_index'
 )
@@ -782,6 +784,17 @@ function p_unary {
 
 
 function p_concat {
+   : 'String (and path) interpolation are parsed as a high left-associative
+      postfix operator.
+      > first (str): "Marcus";
+      > greet (str): "Hello {%first}.";
+
+      Parses to...
+      > str(value: "Hello",
+      >     next:  int_var(value: first,
+      >                    next:  str(value: ".",
+      >                               next: None)'
+
    local -- lname="$1"
    local -n last="$lname"
 
@@ -789,6 +802,37 @@ function p_concat {
 
    p_expression
    last['next']=$NODE
+}
+
+
+function p_typecast {
+   : 'Typecasts are a postfix operator. The previous lhs is passed in as the
+      1st argument.
+
+      Typecasts should have a low binding power, as they must apply to the
+      entirety of the lhs expression, rather than binding to solely the last
+      component of it.
+
+      Example:
+      > num_times_ten: "{%count}0" -> int;
+
+      Should compile to...  ("" + %count + "0") -> int
+      Rather than      ...  ("" + %count +) ("0" -> int)'
+
+   local -- last="$1"
+
+   p_advance # past the `ARROW'
+
+   mk_typecast
+   local -- save=$NODE
+   local -n node=$NODE
+
+   p_typedef
+
+   node['expr']="$last"
+   node['typedef']="$NODE"
+
+   declare -g NODE="$save"
 }
 
 

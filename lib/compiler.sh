@@ -474,6 +474,16 @@ function merge_type {
 # Holds the intended target from a typedef. Compared to sub-expression's Types.
 declare -- TARGET_TYPE=
 
+# For type comparisons, we need to have raw type values to compare things to.
+# Each default type is created as a TYPE node globally with an underscore prefix.
+# Example, `_INTEGER` is a Type(kind: 'INTEGER', subtype: None).
+for t in "${DEFAULT_TYPES[@]}" ; do
+   mk_type
+   declare -- "_$t"="$TYPE"
+   declare -n _type="$TYPE"
+   _type['kind']="$t"
+done
+
 
 function type_equality {
    [[ "$1" ]] || return 1
@@ -569,6 +579,12 @@ function semantics_typedef {
 }
 
 
+function semantics_typecast {
+   local -n node="$NODE"
+   walk_semantics "${node[typedef]}" 
+}
+
+
 function semantics_unary {
    local -- save=$NODE
    local -n node=$save
@@ -577,8 +593,18 @@ function semantics_unary {
    # unary may only be the type of the expression. Realistically the type may
    # only be an integer.
    walk_semantics ${node[right]}
+   local -- type="$TYPE"
 
-   declare -g NODE=$save
+   if [[ ${node[left]} == 'MINUS' ]] ; then
+      if ! type_equality  '_INTEGER'  "$type" ; then
+         raise type_error "$save"
+      fi
+   else
+      raise parse_error "unary expressions aside from \`minus' are unsupported."
+   fi
+
+   declare -g TYPE="$type"
+   declare -g NODE="$save"
 }
 
 
@@ -733,6 +759,12 @@ function compile_decl_variable {
 
    declare -g KEY="$key"
    declare -g NODE=$save
+}
+
+
+function compile_typecast {
+   local -n node="$NODE"
+   walk_compiler "${node[expr]}" 
 }
 
 
