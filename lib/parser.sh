@@ -711,6 +711,7 @@ function p_expression {
 
       #───────────────────────────( postfix )───────────────────────────────────
       lbp=${postfix_binding_power[$ot]:-0}
+      (( rbp = (lbp == 0 ? 0 : lbp+1) ))
 
       if [[ $lbp -ge $min_bp ]] ; then
          fn="${RID[${CURRENT[type]}]}"
@@ -719,14 +720,9 @@ function p_expression {
             raise parse_error "not a postfix expression: ${CURRENT[type],,}."
          fi
 
-         local -n l=$lhs
-         echo "  BEFORE: ${TYPEOF[$lhs]}${l[value]:+ :: ${l[value]}}"
-
-         $fn "$lhs"
+         $fn "$lhs" "$rbp"
          lhs=$NODE
 
-         local -n l=$lhs
-         echo "  AFTER : ${TYPEOF[$lhs]}${l[value]:+ :: ${l[value]}}"
          continue
       fi
 
@@ -798,6 +794,7 @@ function p_concat {
 
 function p_index {
    local -- last="$1"
+   local -- rbp="$2"
 
    p_advance # past the `DOT'
 
@@ -805,7 +802,7 @@ function p_index {
    local -- save="$NODE"
    local -n index="$NODE"
 
-   p_expression
+   p_expression "$rbp"
    index['left']="$last"
    index['right']="$NODE"
 
