@@ -87,10 +87,16 @@ function print_parse_error {
 }
 
 function print_invalid_type_error {
-   printf 'Type Error: %q not defined.\n'  "$1"
+   printf 'Type Error: %s not defined.\n'  "$1"
 }
 
-function print_type_error { :; }
+function print_type_error {
+   declare -n node="$1"
+
+   printf 'Type Error: [%s:%s] invalid type.\n' \
+      "${node[lineno]}" \
+      "${node[colno]}"
+}
 
 #────────────────────────────────( key errors )─────────────────────────────────
 function print_index_error {

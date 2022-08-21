@@ -470,118 +470,118 @@ function merge_type {
 }
 
 
-##─────────────────────────────( semantic analysis )─────────────────────────────
-## Easy way of doing semantic analysis is actually similar to how we did the node
-## traversal in the `conf()` function. Globally point to a Type() node.
-## Everything at that level should match the Type.kind property. Descend into
-## node, set global Type to previous Type.subtype (if exists). Continue semantic
-## analysis.
-# 
-## Holds the intended target from a typedef. Compared to sub-expression's Types.
-#declare -- TARGET_TYPE=
+#─────────────────────────────( semantic analysis )─────────────────────────────
+# Holds the intended target from a typedef. Compared to sub-expression's Types.
+declare -- TARGET_TYPE=
 
 
+function type_equality {
+   [[ "$1" ]] || return 1
+   local -- t1_name="$1"
+   local -n t1="$1"
 
-#function type_equality {
-#   [[ "$1" ]] || return 1
-#   local -- t1_name="$1"
-#   local -n t1="$1"
-#
-#   [[ "$2" ]] || return 1
-#   local -- t2_name="$2"
-#   local -n t2="$2"
-#
-#   if [[ ${t1[kind]} != ${t2[kind]} ]] ; then
-#      return 1
-#   fi
-#
-#   if [[ ${t1[subtype]} ]] ; then
-#      type_equality "${t1[subtype]}" "${t2[subtype]}" 
-#      return $?
-#   fi
-#
-#   return 0
-#}
+   [[ "$2" ]] || return 1
+   local -- t2_name="$2"
+   local -n t2="$2"
+
+   if [[ ${t1[kind]} == 'ANY' ]] ; then
+      return 0
+   fi
+
+   if [[ ${t1[kind]} != ${t2[kind]} ]] ; then
+      return 1
+   fi
+
+   if [[ ${t1[subtype]} ]] ; then
+      type_equality "${t1[subtype]}" "${t2[subtype]}" 
+      return $?
+   fi
+
+   return 0
+}
 
 
-#
-#function walk_semantics {
-#   declare -g NODE="$1"
-#   semantics_${TYPEOF[$NODE]}
-#}
-#
-#
-#function semantics_decl_section {
-#   local -- save=$NODE
-#   local -n node=$save
-#
-#   declare -n items="${node[items]}" 
-#   for each in "${items[@]}"; do
-#      walk_semantics $each
-#   done
-#
-#   declare -g NODE=$save
-#}
-#
-#
-#function semantics_decl_variable {
-#   local -- save=$NODE
-#   local -n node=$save
-#
-#   # Type declarations cannot be nested. Thus this must be a "top level". Clear
-#   # any previously set TARGET_TYPE, and start anew.
-#   declare -g TARGET_TYPE=
-#
-#   # If there's no type declaration, or expression, there's nothing to do in
-#   # this phase.
-#   [[ -z ${node[type]} || -z ${node[expr]} ]] && return
-#
-#   walk_semantics ${node[type]}
-#   local -n target=$TARGET_TYPE
-#
-#   walk_semantics ${node[expr]}
-#   local -n expr_type=$TYPE
-#
-#   if [[ "${target[kind]}" != "${expr_type[kind]}" ]] ; then
-#      #raise 'type_error' "${target[kind]}" "${expr_type[kind]}"
-#      echo "Type Error. Wants(${target[kind]}), got(${expr_type[kind]})" 1>&2
-#      exit -1
-#   fi
-#
-#   declare -g NODE=$save
-#}
-#
-#
-#function semantics_typedef {
-#   local -- save=$NODE
-#   local -n node=$save
-#
-#   walk_semantics ${node[kind]}
-#   local -- tname=$TYPE
-#   local -n type=$TYPE
-#
-#   if [[ -n ${node[subtype]} ]] ; then
-#      walk_semantics ${node[subtype]}
-#      type[subtype]=$TYPE
-#   fi
-#
-#   declare -g TARGET_TYPE=$tname
-#   declare -g NODE=$save
-#}
-#
-#
-# This can only occur within a validation section. Validation expressions must
-# return a boolean.
-#function semantics_unary {
-#   local -- save=$NODE
-#   local -n node=$save
-#
-#   walk_semantics ${node[right]}
-#
-#   declare -g NODE=$save
-#}
-#
-#
+function walk_semantics {
+   declare -g NODE="$1"
+   semantics_${TYPEOF[$NODE]}
+}
+
+
+function semantics_decl_section {
+   local -- symtab_name="$SYMTAB"
+   local -n symtab="$symtab_name"
+
+   local -- save=$NODE
+   local -n node=$save
+   local -- name="${node[value]}"
+
+   # Set symtab to point to the newly descended scope.
+   SYMTAB="${symtab[$name]}"
+
+   declare -n items="${node[items]}" 
+   for each in "${items[@]}"; do
+      walk_semantics $each
+   done
+
+   declare -g SYMTAB="$symtab_name"
+   declare -g NODE=$save
+}
+
+
+function semantics_decl_variable {
+   local -- save=$NODE
+   local -n node=$save
+
+   # Type declarations cannot be nested. Thus this must be a "top level". Clear
+   # any previously set TARGET_TYPE, and start anew.
+   declare -g TARGET_TYPE=
+
+   # If there's no type declaration, or expression, there's nothing to do in
+   # this phase.
+   [[ ! ${node[type]} || ! ${node[expr]} ]] && return
+
+   walk_semantics "${node[type]}"
+   walk_semantics "${node[expr]}"
+
+   if ! type_equality  "$TYPE"  "$TARGET_TYPE" ; then
+      raise type_error "$save"
+   fi
+
+   declare -g NODE=$save
+}
+
+
+function semantics_typedef {
+   local -- save=$NODE
+   local -n node=$save
+
+   walk_semantics ${node[kind]}
+   local -- tname=$TYPE
+   local -n type=$TYPE
+
+   if [[ ${node[subtype]} ]] ; then
+      walk_semantics ${node[subtype]}
+      type[subtype]=$TYPE
+   fi
+
+   declare -g TARGET_TYPE=$tname
+   declare -g NODE=$save
+}
+
+
+function semantics_unary {
+   local -- save=$NODE
+   local -n node=$save
+
+   # Right now the only unary nodes are negation, e.g., `-1`. The type of the
+   # unary may only be the type of the expression. Realistically the type may
+   # only be an integer.
+   walk_semantics ${node[right]}
+
+   declare -g NODE=$save
+}
+
+
 #function semantics_array {
 #   local -- save=$NODE
 #   local -n node=$save
@@ -592,7 +592,7 @@ function merge_type {
 #
 #   # If we're not enforcing some constraints on the subtypes, then don't check
 #   # them.
-#   [[ -z ${target[subtype]} ]] && return
+#   [[ ${target[subtype]} ]] && return
 #
 #   declare -g TARGET_TYPE=${target[subtype]}
 #   local   -n subtype=${target[subtype]}
@@ -615,57 +615,49 @@ function merge_type {
 #   declare -g TARGET_TYPE=$target_save
 #   declare -g NODE=$save
 #}
-#
-#
-#function semantics_boolean {
-#   mk_type
-#   local -- tname=$TYPE
-#   local -n type=$TYPE
-#   type[kind]='BOOLEAN'
-#}
-#
-#
-#function semantics_integer {
-#   mk_type
-#   local -- tname=$TYPE
-#   local -n type=$TYPE
-#   type[kind]='INTEGER'
-#}
-#
-#
-#function semantics_string {
-#   mk_type
-#   local -- tname=$TYPE
-#   local -n type=$TYPE
-#   type[kind]='STRING'
-#}
-#
-#
-#function semantics_path {
-#   mk_type
-#   local -- tname=$TYPE
-#   local -n type=$TYPE
-#   type[kind]='PATH'
-#}
-#
-#
+
+
+function semantics_boolean {
+   mk_type
+   local -- tname=$TYPE
+   local -n type=$TYPE
+   type[kind]='BOOLEAN'
+}
+
+
+function semantics_integer {
+   mk_type
+   local -- tname=$TYPE
+   local -n type=$TYPE
+   type[kind]='INTEGER'
+}
+
+
+function semantics_string {
+   mk_type
+   local -- tname=$TYPE
+   local -n type=$TYPE
+   type[kind]='STRING'
+}
+
+
+function semantics_path {
+   mk_type
+   local -- tname=$TYPE
+   local -n type=$TYPE
+   type[kind]='PATH'
+}
+
+
+## Not yet sure if we need this, need to think things through a little bit more.
+## Where can we run into raw identifiers that we'll `walk` to? Or at all, now
+## that I think about it. Only instances of identifiers are:
+## - section names
+## - variable names
+## - type names
+## - indices
 #function semantics_identifier {
-#   mk_type
-#   local -- tname=$TYPE
-#   local -n type=$TYPE
-#
-#   local -n node=$NODE
-#   local -- kind=${BUILT_INS[${node[value]}]}
-#   if [[ -z $kind ]] ; then
-#      echo "Invalid type \`${node[value]}\`" 1>&2
-#      exit -1
-#   fi
-#
-#   type[kind]=$kind
 #}
-## pass.
-## No semantics to be checked here. Identifiers can only occur as names to
-## elements, or function calls.
 
 
 #─────────────────────────────────( compiler )──────────────────────────────────
