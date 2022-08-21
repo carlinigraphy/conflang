@@ -276,13 +276,11 @@ walk_compiler "$parent_root"
 #───────────────────────────────────( api )─────────────────────────────────────
 ## DISABLED API WHILE WORKING ON MERGING TREES AND WHATNOT.
 
-#child_data_root=$_DATA_ROOT
-#source "${LIBDIR}"/api.sh
+source "${LIBDIR}"/api.sh
 # Exports (USER ACCESSIBLE):
 #  RV
 #  conf()
 
 # Example usage:
-#conf sub2 ; echo "${RV@Q}"
-
-conf l2 ; echo "${RV@Q}"
+#conf section key
+#echo "${RV@Q}"
