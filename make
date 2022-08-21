@@ -54,6 +54,10 @@ case "$1" in
             ;;
 
 
+   'edit')  exec nvim "${PROGDIR}"/conflang "${PROGDIR}"/lib/* 
+            ;;
+
+
    'run')   shift
             exec "${PROGDIR}"/conflang "$@"
             ;;
