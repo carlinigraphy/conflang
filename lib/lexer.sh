@@ -161,10 +161,8 @@ function scan {
 
       # Typecast, or minus.
       if [[ $CURRENT == '-' ]] ; then
-         l_advance
-
          # If subsequent `>', is an arrow for typecast.
-         if [[ $CURRENT == '>' ]] ; then
+         if [[ $PEEK == '>' ]] ; then
             l_advance
             Token 'ARROW' '->'
          else

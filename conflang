@@ -262,11 +262,12 @@ for d in "${_ENV_DIFF[@]}" ; do
    ENV_DIFF[$d]='yes'
 done
 
-#walk_semantics "$parent_root"
+walk_semantics "$parent_root"
 walk_compiler  "$parent_root"
 #walk_pprint    "$parent_root"
 
 #───────────────────────────────────( api )─────────────────────────────────────
+# shellcheck source=./lib/api.sh
 source "${LIBDIR}"/api.sh
 # Exports (USER ACCESSIBLE):
 #  conf()   - query data

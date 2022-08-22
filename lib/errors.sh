@@ -1,5 +1,19 @@
 #!/bin/bash
 
+#trap 'traceback $?' ERR EXIT
+#function traceback {
+#   printf 'Traceback:\n'
+#   for (( i=${#FUNCNAME[@]}-1; i>=0 ; --i )) ; do
+#      printf '%5sln.%4d in %-25s%s\n' \
+#         ''                           \
+#         "${BASH_LINENO[i-1]}"        \
+#         "${FUNCNAME[i]}"             \
+#         "${BASH_SOURCE[i]}"
+#   done
+#   exit "$1"
+#}
+
+
 # TODO:
 # Exit statuses should be unique. BATS test to `sort | uniq` keys, compare len.
 declare -gA EXIT_STATUS=(
@@ -77,7 +91,7 @@ function print_munch_error {
    printf 'Parse Error: [%s:%s] expected %s, received %s. %s\n' \
       "${got[lineno]}"  \
       "${got[colno]}"   \
-      "${1,,}"          \
+      "${expect,,}"     \
       "${got[type],,}"  \
       "${msg^}"
 }
@@ -92,10 +106,14 @@ function print_invalid_type_error {
 
 function print_type_error {
    declare -n node="$1"
+   declare -- msg="$2"
 
-   printf 'Type Error: [%s:%s] invalid type.\n' \
+   printf 'Type Error: [%s:%s] invalid type.%s\n' \
       "${node[lineno]}" \
-      "${node[colno]}"
+      "${node[colno]}"  \
+      "${msg:+ ${msg^}}"
+      # Passing in a message is not required. If supplied, capitalize the first
+      # word and prefix with a leading space.
 }
 
 #────────────────────────────────( key errors )─────────────────────────────────

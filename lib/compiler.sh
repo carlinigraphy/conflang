@@ -25,7 +25,7 @@ declare -A DEFAULT_TYPES=(
 
 # Dict(s) of name -> Type mappings... and other information.
 declare -- SYMTAB=
-declare -i SYMTAB_NUM=${SYMTAB_NUM:-0}
+declare -i SYMTAB_NUM=0
 
 function mk_symtab {
    (( SYMTAB_NUM++ ))
@@ -486,17 +486,20 @@ done
 
 
 function type_equality {
-   [[ "$1" ]] || return 1
-   local -- t1_name="$1"
    local -n t1="$1"
-
-   [[ "$2" ]] || return 1
-   local -- t2_name="$2"
-   local -n t2="$2"
 
    if [[ ${t1[kind]} == 'ANY' ]] ; then
       return 0
    fi
+
+   # In the case of...
+   #  t1(type: array, subtype: any)
+   #  t2(type: array, subtype: None)
+   # ...the first type_equality() on their .type will match, but the second must
+   # not throw an exception. It is valid to have a missing (or different) type,
+   # if the principal type is ANY.
+   [[ "$2" ]] || return 1
+   local -n t2="$2"
 
    if [[ ${t1[kind]} != ${t2[kind]} ]] ; then
       return 1
@@ -523,10 +526,10 @@ function semantics_decl_section {
 
    local -- save=$NODE
    local -n node=$save
-   local -- name="${node[value]}"
+   local -n name="${node[name]}"
 
    # Set symtab to point to the newly descended scope.
-   SYMTAB="${symtab[$name]}"
+   SYMTAB="${symtab[${name[value]}]}"
 
    declare -n items="${node[items]}" 
    for each in "${items[@]}"; do
@@ -595,9 +598,9 @@ function semantics_unary {
    walk_semantics ${node[right]}
    local -- type="$TYPE"
 
-   if [[ ${node[left]} == 'MINUS' ]] ; then
+   if [[ ${node[op]} == 'MINUS' ]] ; then
       if ! type_equality  '_INTEGER'  "$type" ; then
-         raise type_error "$save"
+         raise type_error "${node[right]}" "unary minus only supports integers."
       fi
    else
       raise parse_error "unary expressions aside from \`minus' are unsupported."
@@ -644,46 +647,29 @@ function semantics_unary {
 
 
 function semantics_boolean {
-   mk_type
-   local -- tname=$TYPE
-   local -n type=$TYPE
-   type[kind]='BOOLEAN'
+   TYPE='_BOOLEAN'
 }
 
 
 function semantics_integer {
-   mk_type
-   local -- tname=$TYPE
-   local -n type=$TYPE
-   type[kind]='INTEGER'
+   TYPE='_INTEGER'
 }
 
 
 function semantics_string {
-   mk_type
-   local -- tname=$TYPE
-   local -n type=$TYPE
-   type[kind]='STRING'
+   TYPE='_STRING'
 }
 
 
 function semantics_path {
-   mk_type
-   local -- tname=$TYPE
-   local -n type=$TYPE
-   type[kind]='PATH'
+   TYPE='_PATH'
 }
 
 
-## Not yet sure if we need this, need to think things through a little bit more.
-## Where can we run into raw identifiers that we'll `walk` to? Or at all, now
-## that I think about it. Only instances of identifiers are:
-## - section names
-## - variable names
-## - type names
-## - indices
-#function semantics_identifier {
-#}
+# Really just need this here so we don't throw a bash error. No compilation is
+# done, as there's no semantic checks that involve walk()'ing an identifier. We
+# really only need the [value] of the identifier itself.
+function semantics_identifier { :; }
 
 
 #─────────────────────────────────( compiler )──────────────────────────────────
@@ -691,7 +677,7 @@ function semantics_path {
 # shellcheck disable=SC1007
 # ^-- thinks I'm trying to assign a var, rather than declare empty variables.
 declare -- KEY= DATA=
-declare -i DATA_NUM=${TYPE_NUM:-0}
+declare -i DATA_NUM=0
 
 function mk_compile_dict {
    (( DATA_NUM++ ))

@@ -706,8 +706,6 @@ function p_expression {
    p_check 'SEMI' && return
    p_advance
 
-   #declare -p $CURRENT_NAME
-
    while :; do
       op=$CURRENT ot=${CURRENT[type]}
 
@@ -715,7 +713,14 @@ function p_expression {
       lbp=${postfix_binding_power[$ot]:-0}
       (( rbp = (lbp == 0 ? 0 : lbp+1) ))
 
+      echo "lhs: (${TYPEOF[$lhs]}) $(declare -p $lhs)"   ##DEBUG
+      echo "  $(declare -p ot)"        ##DEBUG
+      echo "  $(declare -p lbp)"       ##DEBUG
+      echo "  $(declare -p rbp)"       ##DEBUG
+      echo "  $(declare -p min_bp)"    ##DEBUG
+
       if [[ $lbp -ge $min_bp ]] ; then
+         echo "  **RID"  ##DEBUG
          fn="${RID[${CURRENT[type]}]}"
 
          if [[ ! $fn ]] ; then
@@ -767,13 +772,6 @@ function p_unary {
    local -- save=$NODE
    local -n node=$NODE
 
-   # This is a little gimicky. Explanation:
-   # We've defined type to be equal to the nameref to the current token's type
-   # at the top of the function. When the current token changes, the previously
-   # defined `$type` does as well. By re-declaring the variable with the value
-   # of itself, it loses the reference.
-   local -- op="$op"
-
    p_expression "$rbp"
 
    node['op']="$op"
@@ -790,7 +788,7 @@ function p_concat {
       > greet (str): "Hello {%first}.";
 
       Parses to...
-      > str(value: "Hello",
+      > str(value: "Hello ",
       >     next:  int_var(value: first,
       >                    next:  str(value: ".",
       >                               next: None)'

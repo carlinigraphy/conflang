@@ -246,16 +246,18 @@ function dump_everything {
       -e 's,([[:alnum:]_])=\(,\1,'           # (strip opening paren)
       -e 's,\)$,,'                           # (strip closing paren)
       -e 's,\[,\n  [,g'                      # (puts keys on new line)
-      -e 's,^declare\s-[-Aaig]+\s,,'         # declare -a NODE ->  NODE
+      -e 's,^declare\s-[-Aaig]+\s,\n,'       # declare -a NODE ->  NODE
       -e 's,\[([[:alpha:]%]+)\]=,\1: ,g'     # [file]="value"  ->  file: "value"
    )
 
-   (  # shellcheck disable=SC2154
-      # ^-- doesn't know these are defined in ./conflang
-      declare -p parent_symtab child_symtab
+   (
+      declare -p parent_symtab
+      if [[ $child_symtab ]] ; then
+         declare -p child_symtab
+      fi
 
       # shellcheck disable=SC2086
       # ^-- thinks we don't want globbing here. We do.
-      declare -p ${!NODE_*} ${!SYMTAB*} ${!SYMBOL_*} ${!TYPE_*}
+      declare -p ${!NODE_*} ${!SYMTAB*} ${!SYMBOL_*} ${!TYPE_*} ${!_DATA*}
    ) | sort -V -k3 | sed "${sed_params[@]}"
 }
