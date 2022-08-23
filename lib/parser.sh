@@ -687,24 +687,21 @@ declare -gi _LEVEL=0
 function p_expression {
    local -i min_bp=${1:-1}
 
-   local -- lhs op
+   local op lhs
    local -i lbp=0 rbp=0
 
-   local -- fn=${NUD[${CURRENT[type]}]}
+   local token="$CURRENT_NAME"
+   local type="${CURRENT[type]}"
 
+   local fn="${NUD[$type]}"
    if [[ -z $fn ]] ; then
       # TODO: error reporting
       # This has got to be one of the least helpful error messages here. Woof.
       raise parse_error "not an expression: ${CURRENT[type],,}."
    fi
 
-   $fn ; lhs=$NODE
-
-   # THINKIES:
-   # I feel like there has to be a more elegant way of handling a semicolon
-   # ending expressions.
-   p_check 'SEMI' && return
    p_advance
+   $fn "$token" ; lhs=$NODE
 
    while :; do
       op=$CURRENT ot=${CURRENT[type]}
@@ -713,14 +710,7 @@ function p_expression {
       lbp=${postfix_binding_power[$ot]:-0}
       (( rbp = (lbp == 0 ? 0 : lbp+1) ))
 
-      echo "lhs: (${TYPEOF[$lhs]}) $(declare -p $lhs)"   ##DEBUG
-      echo "  $(declare -p ot)"        ##DEBUG
-      echo "  $(declare -p lbp)"       ##DEBUG
-      echo "  $(declare -p rbp)"       ##DEBUG
-      echo "  $(declare -p min_bp)"    ##DEBUG
-
       if [[ $lbp -ge $min_bp ]] ; then
-         echo "  **RID"  ##DEBUG
          fn="${RID[${CURRENT[type]}]}"
 
          if [[ ! $fn ]] ; then
@@ -728,7 +718,7 @@ function p_expression {
          fi
 
          $fn "$lhs" "$rbp"
-         lhs=$NODE
+         lhs="$NODE"
 
          continue
       fi
@@ -747,9 +737,9 @@ function p_expression {
       if [[ ! $fn ]] ; then
          raise parse_error "not an infix expression: ${CURRENT[type],,}."
       fi
-      $fn  "$lhs"  "$op"  "$rbp"
 
-      lhs=$NODE
+      $fn  "$lhs"  "$op"  "$rbp"
+      lhs="$NODE"
    done
 
    declare -g NODE=$lhs
@@ -763,10 +753,10 @@ function p_group {
 
 
 function p_unary {
-   local -- op=${CURRENT[type]}
-   local -- rbp="${prefix_binding_power[$op]}"
+   local -n prev="$1"
+   local -- op="${prev[type]}"
 
-   p_advance # past operator
+   local -- rbp="${prefix_binding_power[$op]}"
 
    mk_unary
    local -- save=$NODE
@@ -788,18 +778,29 @@ function p_concat {
       > greet (str): "Hello {%first}.";
 
       Parses to...
-      > str(value: "Hello ",
-      >     next:  int_var(value: first,
-      >                    next:  str(value: ".",
-      >                               next: None)'
+      > str(value:  "Hello ",
+      >     concat: int_var(value:  first,
+      >                     concat: str(value:  ".",
+      >                                 concat: None)'
 
-   local -- lname="$1"
-   local -n last="$lname"
+   local -- save="$1"
+   local -- rbp="$2"
 
-   p_advance # past the `CONCAT'
+   # To simplify (I think) parsing string/path interpolation, instead of
+   # creating a concatentation AST node or some such containing an array of the
+   # pieces, each part has a `.concat` key, with the value of the node to
+   # concatenate with.
+   local -n tail="$save"
+   until [[ ! ${tail['concat']} ]] ; do
+      local -n tail=${tail['concat']}
+   done
 
-   p_expression
-   last['next']=$NODE
+   p_advance # past CONCAT.
+
+   p_expression "$rbp"
+   tail['concat']=$NODE
+
+   declare -g NODE="$save"
 }
 
 
@@ -814,12 +815,12 @@ function p_typecast {
       Example:
       > num_times_ten: "{%count}0" -> int;
 
-      Should compile to...  ("" + %count + "0") -> int
-      Rather than      ...  ("" + %count +) ("0" -> int)'
+      Should compile to  ...  ("" + %count + "0") -> int
+      Rather than        ...  ("" + %count +) ("0" -> int)'
 
-   local -- last="$1"
+   local -- prev="$1"
 
-   p_advance # past the `ARROW'
+   p_advance # past ARROW.
 
    mk_typecast
    local -- save=$NODE
@@ -827,7 +828,7 @@ function p_typecast {
 
    p_typedef
 
-   node['expr']="$last"
+   node['expr']="$prev"
    node['typedef']="$NODE"
 
    declare -g NODE="$save"
@@ -837,8 +838,6 @@ function p_typecast {
 function p_index {
    local -- last="$1"
    local -- rbp="$2"
-
-   p_advance # past the `DOT'
 
    mk_index
    local -- save="$NODE"
@@ -853,8 +852,6 @@ function p_index {
 
 
 function p_array {
-   p_munch 'L_BRACKET'
-
    mk_array
    local -- save=$NODE
    local -n node=$NODE
@@ -867,88 +864,107 @@ function p_array {
       p_munch 'COMMA' "array elements must be separated by \`,'."
    done
 
+   p_munch 'R_PAREN' "array must be closed by \`]'."
    declare -g NODE=$save
 }
 
 
 function p_env_var {
-   p_munch 'DOLLAR'
+   local -n token="$CURRENT_NAME"
+   p_advance # past DOLLAR.
 
    mk_env_var
    local -n node=$NODE
-   node['value']=${CURRENT[value]}
-   node['offset']=${CURRENT[offset]}
-   node['lineno']=${CURRENT[lineno]}
-   node['colno']=${CURRENT[colno]}
-   node['file']=${CURRENT[file]}
+   node['value']=${token[value]}
+   node['offset']=${token[offset]}
+   node['lineno']=${token[lineno]}
+   node['colno']=${token[colno]}
+   node['file']=${token[file]}
 }
 
 
 function p_int_var {
-   p_munch 'PERCENT'
+   local -n token="$CURRENT_NAME"
+   p_advance # past PERCENT.
 
    mk_int_var
    local -n node=$NODE
-   node['value']=${CURRENT[value]}
-   node['offset']=${CURRENT[offset]}
-   node['lineno']=${CURRENT[lineno]}
-   node['colno']=${CURRENT[colno]}
-   node['file']=${CURRENT[file]}
+   node['value']=${token[value]}
+   node['offset']=${token[offset]}
+   node['lineno']=${token[lineno]}
+   node['colno']=${token[colno]}
+   node['file']=${token[file]}
 }
 
 
 function p_identifier {
+   local -n token="${1:-$CURRENT_NAME}"
+   # There are instances in which `p_identifier` is called directly. For
+   # example, within the `p_declaration` function. When the entrypoint is *not*
+   # through the Pratt parser, falling back to the current token name is a
+   # reasonable and expected default. Unit/integration tests should
+   # specifically cover any edge cases.
+
    mk_identifier
    local -n node=$NODE
-   node['value']=${CURRENT[value]}
-   node['offset']=${CURRENT[offset]}
-   node['lineno']=${CURRENT[lineno]}
-   node['colno']=${CURRENT[colno]}
-   node['file']=${CURRENT[file]}
+   node['value']=${token[value]}
+   node['offset']=${token[offset]}
+   node['lineno']=${token[lineno]}
+   node['colno']=${token[colno]}
+   node['file']=${token[file]}
 }
 
 
 function p_boolean {
+   local -n token="$1"
+
    mk_boolean
    local -n node=$NODE
-   node['value']=${CURRENT[value]}
-   node['offset']=${CURRENT[offset]}
-   node['lineno']=${CURRENT[lineno]}
-   node['colno']=${CURRENT[colno]}
-   node['file']=${CURRENT[file]}
+   node['value']=${token[value]}
+   node['offset']=${token[offset]}
+   node['lineno']=${token[lineno]}
+   node['colno']=${token[colno]}
+   node['file']=${token[file]}
 }
 
 
 function p_integer {
+   local -n token="$1"
+
    mk_integer
    local -n node=$NODE
-   node['value']=${CURRENT[value]}
-   node['offset']=${CURRENT[offset]}
-   node['lineno']=${CURRENT[lineno]}
-   node['colno']=${CURRENT[colno]}
-   node['file']=${CURRENT[file]}
+   node['value']=${token[value]}
+   node['offset']=${token[offset]}
+   node['lineno']=${token[lineno]}
+   node['colno']=${token[colno]}
+   node['file']=${token[file]}
 }
 
 
 function p_string {
+   local -n token="$1"
+
    mk_string
    local -n node=$NODE
-   node['value']=${CURRENT[value]}
-   node['offset']=${CURRENT[offset]}
-   node['lineno']=${CURRENT[lineno]}
-   node['colno']=${CURRENT[colno]}
-   node['file']=${CURRENT[file]}
-   node['next']=''
-   # ^-- for string interpolation, concatenate with the subsequent node.
+   node['value']=${token[value]}
+   node['offset']=${token[offset]}
+   node['lineno']=${token[lineno]}
+   node['colno']=${token[colno]}
+   node['file']=${token[file]}
+   node['concat']=''
+   # ^-- for string interpolation, concatenate with the subsequent node. This
+   # will appear on each in the chain of linked interpolation nodes.
 }
 
 
 function p_path {
+   local -n token="$1"
+
    mk_path
    local -n node=$NODE
-   node['value']=${CURRENT[value]}
-   node['offset']=${CURRENT[offset]}
-   node['lineno']=${CURRENT[lineno]}
-   node['colno']=${CURRENT[colno]}
-   node['file']=${CURRENT[file]}
+   node['value']=${token[value]}
+   node['offset']=${token[offset]}
+   node['lineno']=${token[lineno]}
+   node['colno']=${token[colno]}
+   node['file']=${token[file]}
 }

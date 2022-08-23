@@ -378,7 +378,7 @@ function l_fstring {
 
       # Start of f-string.
       if [[ $CURRENT == '{' ]] ; then
-         if [[ "${buffer[-1]}" == '\' ]] ; then
+         if [[ $buffer && "${buffer[-1]}" == '\' ]] ; then
             unset buffer[-1]
             buffer+=( "$CURRENT" )
             continue
@@ -445,7 +445,7 @@ function l_fpath {
 
       # Start of f-path.
       if [[ $CURRENT == '{' ]] ; then
-         if [[ "${buffer[-1]}" == '\' ]] ; then
+         if [[ $buffer && "${buffer[-1]}" == '\' ]] ; then
             unset buffer[-1]
             buffer+=( "$CURRENT" )
             continue

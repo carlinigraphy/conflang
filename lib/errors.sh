@@ -1,17 +1,19 @@
 #!/bin/bash
 
 #trap 'traceback $?' ERR EXIT
-#function traceback {
-#   printf 'Traceback:\n'
-#   for (( i=${#FUNCNAME[@]}-1; i>=0 ; --i )) ; do
-#      printf '%5sln.%4d in %-25s%s\n' \
-#         ''                           \
-#         "${BASH_LINENO[i-1]}"        \
-#         "${FUNCNAME[i]}"             \
-#         "${BASH_SOURCE[i]}"
-#   done
-#   exit "$1"
-#}
+function traceback {
+   local -i depth="$1"
+   (( depth = (depth < 1 ? 1 : depth) ))
+
+   printf 'Traceback:\n'
+   for (( i=${#FUNCNAME[@]}-1; i>="$depth" ; --i )) ; do
+      printf '%5sln.%4d in %-25s%s\n' \
+         ''                           \
+         "${BASH_LINENO[i-1]}"        \
+         "${FUNCNAME[i]}"             \
+         "${BASH_SOURCE[i]##*/}"
+   done
+}
 
 
 # TODO:

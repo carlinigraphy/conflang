@@ -529,7 +529,8 @@ function semantics_decl_section {
    local -n name="${node[name]}"
 
    # Set symtab to point to the newly descended scope.
-   SYMTAB="${symtab[${name[value]}]}"
+   local   -n symbol="${symtab[${name[value]}]}"
+   declare -g SYMTAB="${symbol[symtab]}"
 
    declare -n items="${node[items]}" 
    for each in "${items[@]}"; do
@@ -706,9 +707,17 @@ function walk_compiler {
 
 
 function compile_decl_section {
+   local -- symtab_name="$SYMTAB"
+   local -n symtab="$symtab_name"
+
    # Save reference to current NODE. Restored at the end.
    local -- save=$NODE
    local -n node=$save
+   local -n name="${node[name]}"
+
+   # Set symtab to point to the newly descended scope.
+   local   -n symbol="${symtab[${name[value]}]}"
+   declare -g SYMTAB="${symbol[symtab]}"
 
    # Create data dictionary object.
    mk_compile_dict
@@ -726,6 +735,7 @@ function compile_decl_section {
 
    declare -g KEY="$key"
    declare -g DATA="$dname"
+   declare -g SYMTAB="$symtab_name"
    declare -g NODE="$save"
 }
 
@@ -758,7 +768,7 @@ function compile_unary {
    local -- save=$NODE
    local -n node=$save
 
-   walk_compiler "${node[rhs]}"
+   walk_compiler "${node[right]}"
    local -i rhs=$DATA
 
    case "${node[op]}" in
@@ -804,10 +814,10 @@ function compile_string {
    local -n node=$NODE
    local -- string="${node[value]}"
 
-   while [[ "${node[next]}" ]] ; do
-      walk_compiler "${node[next]}"
+   while [[ "${node[concat]}" ]] ; do
+      walk_compiler "${node[concat]}"
       string+="$DATA"
-      local -n node="${node[next]}"
+      local -n node="${node[concat]}"
    done
 
    declare -g DATA="$string"
@@ -818,10 +828,10 @@ function compile_path {
    local -n node=$NODE
    local -- path="${node[value]}"
 
-   while [[ "${node[next]}" ]] ; do
-      walk_compiler "${node[next]}"
+   while [[ "${node[concat]}" ]] ; do
+      walk_compiler "${node[concat]}"
       path+="$DATA"
-      local -n node="${node[next]}"
+      local -n node="${node[concat]}"
    done
 
    declare -g DATA="$path"

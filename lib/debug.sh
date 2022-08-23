@@ -47,9 +47,17 @@ function walk_pprint {
 
 
 function pprint_decl_section {
+   local -- symtab_name="$SYMTAB"
+   local -n symtab="$symtab_name"
+
    # Save reference to current NODE. Restored at the end.
    local -- save=$NODE
    local -n node=$save
+   local -n name="${node[name]}"
+
+   # Set symtab to point to the newly descended scope.
+   local   -n symbol="${symtab[${name[value]}]}"
+   declare -g SYMTAB="${symbol[symtab]}"
 
    walk_pprint "${node[name]}"
    printf ' {\n'
@@ -64,6 +72,7 @@ function pprint_decl_section {
    (( INDENTATION-- ))
    printf "%$(( INDENTATION * INDENT_FACTOR ))s}\n" ''
 
+   declare -g SYMTAB="$symtab_name"
    declare -g NODE="$save"
 }
 
@@ -152,10 +161,10 @@ function pprint_string {
    local -n node=$NODE
    local -- string="${node[value]}"
 
-   while [[ "${node[next]}" ]] ; do
-      walk_compiler "${node[next]}"
+   while [[ "${node[concat]}" ]] ; do
+      walk_compiler "${node[concat]}"
       string+="$DATA"
-      local -n node="${node[next]}"
+      local -n node="${node[concat]}"
    done
 
    printf '"%s"' "$string"
@@ -163,13 +172,17 @@ function pprint_string {
 
 
 function pprint_path {
+   : 'NOTE: This function must call the **walk_COMPILER** function, raerpb
+      `walk_pprint`. Need to collate all the concat chunks, then print the
+      totality as a string.'
+
    local -n node=$NODE
    local -- path="${node[value]}"
 
-   while [[ "${node[next]}" ]] ; do
-      walk_compiler "${node[next]}"
+   while [[ "${node[concat]}" ]] ; do
+      walk_compiler "${node[concat]}"
       path+="$DATA"
-      local -n node="${node[next]}"
+      local -n node="${node[concat]}"
    done
 
    printf "'%s'" "$path"
