@@ -93,9 +93,9 @@ function pprint_decl_variable {
    if [[ ${node[expr]} ]] ; then
       printf ': '
       walk_pprint "${node[expr]}"
-      printf ';\n'
    fi
 
+   printf ';\n'
    declare -g NODE=$save
 }
 
@@ -142,7 +142,17 @@ function pprint_array {
 }
 
 
-#function pprint_unary { :; }
+function pprint_unary {
+   local -n node=$NODE
+   local -- op
+
+   case "${node[op]}" in
+      'MINUS') op='-'
+   esac
+
+   printf '%s' "$op"
+   walk_pprint "${node[right]}"
+}
 
 
 function pprint_boolean {
