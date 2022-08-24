@@ -14,15 +14,6 @@
 declare -- NODE=
 
 #───────────────────────────────( symbol table )────────────────────────────────
-declare -A DEFAULT_TYPES=(
-   [int]='INTEGER'
-   [str]='STRING'
-   [bool]='BOOLEAN'
-   [path]='PATH'
-   [array]='ARRAY'
-)
-
-
 # Dict(s) of name -> Type mappings... and other information.
 declare -- SYMTAB=
 declare -i SYMTAB_NUM=0
@@ -51,9 +42,32 @@ function mk_type {
    declare -g  TYPE=$tname
    local   -n  type=$tname
 
-   type['kind']=
-   type['subtype']=
+   type['kind']=     #-> str
+   type['subtype']=  #-> Type
 }
+
+declare -A PRIMITIVE_TYPE=(
+   [int]='INTEGER'
+   [str]='STRING'
+   [bool]='BOOLEAN'
+)
+
+declare -A COMPLEX_TYPE=(
+   [path]='PATH'
+   [array]='ARRAY'
+)
+
+# For type comparisons, we need to have raw type values to compare things to.
+# Each default type is created as a TYPE node globally with an underscore prefix.
+# Example, `$_INTEGER` is a Type(kind: 'INTEGER'). Cannot do this for complex
+# types, as there are no instances. We'd be setting the `.subtype` of the global
+# node itself.
+for t in "${PRIMITIVE_TYPE[@]}" ; do
+   mk_type
+   declare -- "_${t}"="$TYPE"       #  e.g., `declare _INTEGER=$TYPE`
+   declare -n _type="$TYPE"
+   _type['kind']="$t"
+done
 
 
 declare -- SYMBOL=
@@ -209,6 +223,11 @@ function symtab_typedef {
    local -- tname=$TYPE
 
    if [[ ${node['subtype']} ]] ; then
+      # CURRENT:
+      # Need to make sure the user is not assigning a sub-type a non-array.
+      # Or maybe also non-paths? As we want to allow for optional :file and
+      # :dir subtypes to paths down the line.
+
       walk_symtab "${node[subtype]}"
       type['subtype']=$TYPE
    fi
@@ -218,20 +237,31 @@ function symtab_typedef {
 }
 
 
-# Identifiers in this context are used only as type names.
 function symtab_identifier {
-   local -- nname=$NODE
-   local -n node=$NODE
+   # Identifiers in this context are only used in typecasts.
 
-   local -- kind=${DEFAULT_TYPES[${node[value]}]}
-   if [[ ! $kind ]] ; then
-      raise invalid_type_error "${node[value]}"
+   local -n node=$NODE
+   local -- value="${node[value]}"
+
+   if [[ ! ${PRIMITIVE_TYPE[$value]} ]] &&\
+      [[ ! ${COMPLEX_TYPE[$value]}   ]]
+   then
+      raise invalid_type_error "$value"
    fi
 
-   mk_type
-   local -- tname=$TYPE
-   local -n type=$TYPE
-   type[kind]="$kind"
+   # We've globally declared variables `_INTEGER`, `_PATH`, etc. that point to
+   # a TYPE_$n node. Allows us to not need to re-make primitive types all the
+   # time. Can access the values by prefixing the string type *name* ("INTEGER",
+   # "BOOLEAN") with an underscore, and nameref'ing it.
+   if [[ ${PRIMITIVE_TYPE[$value]} ]] ; then
+      local -n type_pointer="_${PRIMITIVE_TYPE[$value]}"
+      declare -g TYPE="$type_pointer"
+   elif [[ ${COMPLEX_TYPE[$value]} ]] ; then
+      mk_type
+      local -- type_name=$TYPE
+      local -n type=$TYPE
+      type[kind]="${COMPLEX_TYPE[$value]}"
+   fi
 }
 
 #───────────────────────────────( merge trees )─────────────────────────────────
@@ -471,20 +501,6 @@ function merge_type {
 
 
 #─────────────────────────────( semantic analysis )─────────────────────────────
-# Holds the intended target from a typedef. Compared to sub-expression's Types.
-declare -- TARGET_TYPE=
-
-# For type comparisons, we need to have raw type values to compare things to.
-# Each default type is created as a TYPE node globally with an underscore prefix.
-# Example, `_INTEGER` is a Type(kind: 'INTEGER', subtype: None).
-for t in "${DEFAULT_TYPES[@]}" ; do
-   mk_type
-   declare -- "_$t"="$TYPE"
-   declare -n _type="$TYPE"
-   _type['kind']="$t"
-done
-
-
 function type_equality {
    local -n t1="$1"
 
@@ -545,20 +561,26 @@ function semantics_decl_section {
 function semantics_decl_variable {
    local -- save=$NODE
    local -n node=$save
-
-   # Type declarations cannot be nested. Thus this must be a "top level". Clear
-   # any previously set TARGET_TYPE, and start anew.
-   declare -g TARGET_TYPE=
+   local -n name="${node[name]}"
 
    # If there's no type declaration, or expression, there's nothing to do in
    # this phase.
    [[ ! ${node[type]} || ! ${node[expr]} ]] && return
 
-   walk_semantics "${node[type]}"
+   # Sets target type. The type of the expression should match the type of
+   # the typedef in the symbol table.
+   local -n symtab="$SYMTAB"
+   local -n symbol="${symtab[${name[value]}]}"
+   local -- target="${symbol[type]}"
+
+   # Sets TYPE
    walk_semantics "${node[expr]}"
 
-   if ! type_equality  "$TYPE"  "$TARGET_TYPE" ; then
-      raise type_error "$save"
+   if ! type_equality  "$target"  "$TYPE" ; then
+      # TODO: error reporting
+      # The location node is inaccurate. Need to create a CURSOR node for every
+      # expression.
+      raise type_error "${node[expr]}"
    fi
 
    declare -g NODE=$save
@@ -578,14 +600,13 @@ function semantics_typedef {
       type[subtype]=$TYPE
    fi
 
-   declare -g TARGET_TYPE=$tname
    declare -g NODE=$save
 }
 
 
 function semantics_typecast {
    local -n node="$NODE"
-   walk_semantics "${node[typedef]}" 
+   walk_semantics ${node[typedef]}
 }
 
 
@@ -612,65 +633,80 @@ function semantics_unary {
 }
 
 
-#function semantics_array {
-#   local -- save=$NODE
-#   local -n node=$save
-#
-#   # Save reference to the type that's expected of us.
-#   local -- target_save=$TARGET_TYPE
-#   local -n target=$TARGET_TYPE
-#
-#   # If we're not enforcing some constraints on the subtypes, then don't check
-#   # them.
-#   [[ ${target[subtype]} ]] && return
-#
-#   declare -g TARGET_TYPE=${target[subtype]}
-#   local   -n subtype=${target[subtype]}
-#
-#   for nname in "${node[@]}"; do
-#      walk_semantics $nname
-#      local -n child=$TYPE
-#
-#      if [[ ${subtype[kind]} != ${child[kind]} ]] ; then
-#         #raise 'type_error' "${subtype[kind]}" "${child[kind]}"
-#         echo "Type Error. Wants(${subtype[kind]}), got(${child[kind]})" 1>&2
-#         exit -1
-#      fi
-#   done
-#
-#   mk_type
-#   local -n type=$TYPE
-#   type[kind]='ARRAY'
-#
-#   declare -g TARGET_TYPE=$target_save
-#   declare -g NODE=$save
-#}
+function semantics_array {
+   local -- save=$NODE
+   local -n node=$save
 
+   # The user *can* have an array of differing types, but not if the type is
+   # declared with a subtype. E.g, `array:str`.
+   local -A types_found=()
 
-function semantics_boolean {
-   TYPE='_BOOLEAN'
+   for item in "${node[@]}" ; do
+      walk_semantics "$item"
+      local -n type=$TYPE
+      local -- kind="${type[kind]}"
+      types_found[$kind]=''
+   done
+
+   local type_string=''
+   for type in "${!types_found[@]}" ; do
+      type_string+="${type_string:+|}${type_string}"
+   done
+
+   # Top-level array.
+   mk_type
+   local -- array_name=$TYPE
+   local -n array=$TYPE
+   array[kind]="ARRAY"
+
+   # Top-level array.
+   mk_type
+   local -- subtype_name=$TYPE
+   local -n subtype=$TYPE
+   subtype[kind]="$type_string"
+
+   declare -g TYPE="$array_name"
+   declare -g NODE=$save
 }
 
 
-function semantics_integer {
-   TYPE='_INTEGER'
-}
-
-
-function semantics_string {
-   TYPE='_STRING'
-}
-
-
+# Paths can be complex types.
+#  :file
+#  :dir
 function semantics_path {
-   TYPE='_PATH'
+   mk_type
+   local -- subtype_name=$TYPE
+   local -n subtype=$TYPE
+   subtype[kind]="PATH"
 }
 
 
-# Really just need this here so we don't throw a bash error. No compilation is
-# done, as there's no semantic checks that involve walk()'ing an identifier. We
-# really only need the [value] of the identifier itself.
-function semantics_identifier { :; }
+# Primitive types.
+function semantics_boolean { TYPE="$_BOOLEAN"; }
+function semantics_integer { TYPE="$_INTEGER"; }
+function semantics_string  { TYPE="$_STRING";  }
+
+
+# In semantic analysis, we'll only hit this in typecasts.
+function semantics_identifier {
+   local -n node=$NODE
+   local -- value="${node[value]}"
+   local -- kind=${DEFAULT_TYPES[$value]}
+
+   # We've globally declared variables `_INTEGER`, `_PATH`, etc. that point to
+   # a TYPE_$n node. Allows us to not need to re-make primitive types all the
+   # time. Can access the values by prefixing the string type *name* ("INTEGER",
+   # "BOOLEAN") with an underscore, and nameref'ing it.
+   if [[ ${PRIMITIVE_TYPE[$value]} ]] ; then
+      local -n type_pointer="_${PRIMITIVE_TYPE[$value]}"
+      declare -g TYPE="$type_pointer"
+   elif [[ ${COMPLEX_TYPE[$value]} ]] ; then
+      mk_type
+      local -- type_name=$TYPE
+      local -n type=$TYPE
+      type[kind]="${COMPLEX_TYPE[$value]}"
+   fi
+}
 
 
 #─────────────────────────────────( compiler )──────────────────────────────────

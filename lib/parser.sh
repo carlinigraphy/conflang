@@ -864,7 +864,7 @@ function p_array {
       p_munch 'COMMA' "array elements must be separated by \`,'."
    done
 
-   p_munch 'R_PAREN' "array must be closed by \`]'."
+   p_munch 'R_BRACKET' "array must be closed by \`]'."
    declare -g NODE=$save
 }
 

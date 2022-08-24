@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#trap 'traceback $?' ERR EXIT
+#trap 'traceback 2' ERR EXIT
 function traceback {
    local -i depth="$1"
    (( depth = (depth < 1 ? 1 : depth) ))
@@ -33,7 +33,7 @@ declare -gA EXIT_STATUS=(
    [missing_int_var]=12
    [invalid_interpolation_char]=13
    [unescaped_interpolation_brace]=14
-   [munch_error]=145
+   [munch_error]=15
 )
 
 function raise {
