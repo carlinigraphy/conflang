@@ -54,7 +54,12 @@ case "$1" in
             ;;
 
 
-   'edit')  exec nvim "${PROGDIR}"/conflang "${PROGDIR}"/lib/* 
+   'edit')  order=(
+               "${PROGDIR}"/conflang
+               "${PROGDIR}"/lib/{lexer,parser,compiler}.sh
+               "${PROGDIR}"/lib/{errors,debug}.sh
+            )
+            exec nvim "${order[@]}"
             ;;
 
 
