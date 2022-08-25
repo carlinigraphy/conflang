@@ -1,5 +1,4 @@
-#!/bin/bash
-#
+#!/bin/bash #
 # Requires from environment:
 #  ROOT
 #  TYPEOF{}
@@ -12,6 +11,7 @@
 #    to the parent section's .items array.
 
 declare -- NODE=
+
 
 #───────────────────────────────( symbol table )────────────────────────────────
 # Dict(s) of name -> Type mappings... and other information.
@@ -577,9 +577,6 @@ function semantics_decl_variable {
    walk_semantics "${node[expr]}"
 
    if ! type_equality  "$target"  "$TYPE" ; then
-      # TODO: error reporting
-      # The location node is inaccurate. Need to create a CURSOR node for every
-      # expression.
       raise type_error "${node[expr]}"
    fi
 

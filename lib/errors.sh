@@ -52,6 +52,38 @@ function raise {
    exit "${EXIT_STATUS[$type]}"
 }
 
+#────────────────────────────( find expr location )─────────────────────────────
+# When receiving an expression, we may not directly have a node with a .lineno
+# and .colno properties. Example: typecast nodes, or nested expressions. Must
+# walk to provide the "root" of the expression.
+
+declare -a LOC
+
+function walk_location {
+   declare -g LOC="$1"
+   location_${TYPEOF[$LOC]}
+}
+
+
+function location_typecast {
+   local -n node="$LOC"
+   walk_location "${node[expr]}"
+}
+
+
+function semantics_unary {
+   local -n node=$save
+   walk_location "${node[right]}"
+}
+
+# Non-complex nodes, no ability to descend further. Stop here.
+function location_path       { :; }
+function location_boolean    { :; }
+function location_integer    { :; }
+function location_string     { :; }
+function location_identifier { :; }
+
+
 #───────────────────────────────( I/O errors )──────────────────────────────────
 function print_no_input {
    printf 'File Error: missing input file.\n'
@@ -107,12 +139,15 @@ function print_invalid_type_error {
 }
 
 function print_type_error {
-   declare -n node="$1"
-   declare -- msg="$2"
+   local -- _loc="$1"
+   local -- msg="$2"
+
+   walk_location "$_loc"
+   local -n loc="$LOC"
 
    printf 'Type Error: [%s:%s] invalid type.%s\n' \
-      "${node[lineno]}" \
-      "${node[colno]}"  \
+      "${loc[lineno]}" \
+      "${loc[colno]}"  \
       "${msg:+ ${msg^}}"
       # Passing in a message is not required. If supplied, capitalize the first
       # word and prefix with a leading space.
