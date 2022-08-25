@@ -50,7 +50,21 @@ case "$1" in
             ;;
 
 
-   'wc')    exec wc -l "${PROGDIR}"/conflang "${PROGDIR}"/lib/*
+   'wc')    files=(
+               "${PROGDIR}"/conflang
+               "${PROGDIR}"/lib/*
+            )
+            exec wc -l "${files[@]}"
+            ;;
+
+
+   'wc-tests')
+            params=(
+               "${PROGDIR}"/test/
+               -type  f
+               -regex '.*.\(bats\|conf\)'
+            )
+            exec wc -l $(find "${params[@]}")
             ;;
 
 
