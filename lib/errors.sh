@@ -55,6 +55,12 @@ function walk_location {
 }
 
 
+function location_typedef {
+   local -n node="$LOC"
+   walk_location "${node[kind]}"
+}
+
+
 function location_typecast {
    local -n node="$LOC"
    walk_location "${node[expr]}"

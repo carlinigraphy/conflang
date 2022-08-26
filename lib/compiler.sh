@@ -223,10 +223,14 @@ function symtab_typedef {
    local -- tname=$TYPE
 
    if [[ ${node['subtype']} ]] ; then
-      # CURRENT:
-      # Need to make sure the user is not assigning a sub-type a non-array.
-      # Or maybe also non-paths? As we want to allow for optional :file and
-      # :dir subtypes to paths down the line.
+      local -n _typename="${node[kind]}"
+      local -- typename="${_typename[value]}"
+
+      if [[ "${PRIMITIVE_TYPE[$typename]}" ]] ; then
+         raise type_error           \
+               "${node[subtype]}"   \
+               "primitive types are not subscriptable."
+      fi
 
       walk_symtab "${node[subtype]}"
       type['subtype']=$TYPE
