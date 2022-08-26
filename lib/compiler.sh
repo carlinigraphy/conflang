@@ -13,6 +13,63 @@
 declare -- NODE=
 
 
+function mk_metatype {
+   local -- kind="$1"
+   local -- primitive="$2"
+
+   mk_type
+   local -- type_name="$TYPE"
+   local -n type="$TYPE"
+   type['kind']="$kind"
+
+   if [[ "$primitive" ]] ; then
+      unset type['subtype']
+      # This is what is going to make it a `primitive' type. If the
+      # type.subtype is *UNSET* (note, not "set but empty"--unset), then it may
+      # not have a subtype. Complex types have a .subtype prop.
+   fi
+
+   # Create a type representing Types themselves.
+   mk_type
+   local -- parent_type_name="$TYPE"
+   local -n parent_type="$TYPE"
+   parent_type['kind']='TYPE'
+   parent_type['subtype']="$type_name"
+
+   mk_symbol
+   local -n symbol="$SYMBOL"
+   symbol['type']="$parent_type"
+}
+
+
+function populate_globals {
+   local -n symtab="$SYMTAB"
+
+   local -A primitive=(
+      [int]='INTEGER'
+      [str]='STRING'
+      [bool]='BOOLEAN'
+   )
+
+   local -A complex=(
+      [path]='PATH'
+      [array]='ARRAY'
+   )
+
+   # Create symbols for primitive types.
+   for short_name in "${!primitive[@]}" ; do
+      mk_metatype "${primitive[$short_name]}"  'primitive'
+      symtab[$short_name]="$SYMBOL"
+   done
+
+   # Create symbols for complex types.
+   for short_name in "${!complex[@]}" ; do
+      mk_metatype "${primitive[$short_name]}"
+      symtab[$short_name]="$SYMBOL"
+   done
+}
+
+
 #───────────────────────────────( symbol table )────────────────────────────────
 # Dict(s) of name -> Type mappings... and other information.
 declare -- SYMTAB=
@@ -45,29 +102,6 @@ function mk_type {
    type['kind']=     #-> str
    type['subtype']=  #-> Type
 }
-
-declare -A PRIMITIVE_TYPE=(
-   [int]='INTEGER'
-   [str]='STRING'
-   [bool]='BOOLEAN'
-)
-
-declare -A COMPLEX_TYPE=(
-   [path]='PATH'
-   [array]='ARRAY'
-)
-
-# For type comparisons, we need to have raw type values to compare things to.
-# Each default type is created as a TYPE node globally with an underscore prefix.
-# Example, `$_INTEGER` is a Type(kind: 'INTEGER'). Cannot do this for complex
-# types, as there are no instances. We'd be setting the `.subtype` of the global
-# node itself.
-for t in "${PRIMITIVE_TYPE[@]}" ; do
-   mk_type
-   declare -- "_${t}"="$TYPE"       #  e.g., `declare _INTEGER=$TYPE`
-   declare -n _type="$TYPE"
-   _type['kind']="$t"
-done
 
 
 declare -- SYMBOL=
