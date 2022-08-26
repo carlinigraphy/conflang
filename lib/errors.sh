@@ -39,16 +39,6 @@ declare -gA EXIT_STATUS=(
 function raise {
    local type="$1" ; shift
    print_"${type}" "$@" 1>&2
-
-   #printf 'Traceback:\n'
-   #for (( i=${#FUNCNAME[@]}-1; i>=2 ; --i )) ; do
-   #   printf '%5sln.%4d in %-25s%s\n' \
-   #      ''                           \
-   #      "${BASH_LINENO[i-1]}"        \
-   #      "${FUNCNAME[i]}"             \
-   #      "${BASH_SOURCE[i]}"
-   #done
-
    exit "${EXIT_STATUS[$type]}"
 }
 
