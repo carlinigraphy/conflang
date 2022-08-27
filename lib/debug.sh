@@ -15,9 +15,9 @@ function pprint_symtab {
    for key in "${!symtab[@]}" ; do
       local -n symbol="${symtab[$key]}"
       local -n type="${symbol[type]}"
-      local -n node="${symbol[node]}"
 
       if [[ "$key" == '%inline' ]] ; then
+         local -n node="${symbol[node]}"
          local -n name="${node[name]}"
          printf '%s' "${FILES[${name[file]}]##*/}"
       else

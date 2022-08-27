@@ -229,6 +229,8 @@ mk_symtab
 declare -g GLOBALS="$SYMTAB"
 populate_globals
 
+pprint_symtab "$GLOBALS"
+
 # Each section assumes there's a symtab above it. There is a "hidden" top-
 # level section `%inline'. Need to create a parent symtab above to hold it.
 mk_symtab ; parent_symtab=$SYMTAB

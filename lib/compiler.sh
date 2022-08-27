@@ -38,7 +38,7 @@ function mk_metatype {
 
    mk_symbol
    local -n symbol="$SYMBOL"
-   symbol['type']="$parent_type"
+   symbol['type']="$parent_type_name"
 }
 
 
