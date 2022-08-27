@@ -23,17 +23,18 @@ declare -gA EXIT_STATUS=(
    [syntax_error]=2
    [parse_error]=3
    [type_error]=4
-   [index_error]=5
-   [circular_import]=6
-   [name_error]=7
-   [invalid_type_error]=8
-   [missing_file]=9
-   [missing_env_var]=10
-   [stomped_env_var]=11
-   [missing_int_var]=12
-   [invalid_interpolation_char]=13
-   [unescaped_interpolation_brace]=14
-   [munch_error]=15
+   [invalid_type_error]=5
+   [not_a_type]=6
+   [index_error]=7
+   [circular_import]=8
+   [name_error]=9
+   [missing_file]=10
+   [missing_env_var]=11
+   [stomped_env_var]=12
+   [missing_int_var]=13
+   [invalid_interpolation_char]=14
+   [unescaped_interpolation_brace]=15
+   [munch_error]=16
 )
 
 function raise {
@@ -132,6 +133,10 @@ function print_parse_error {
 
 function print_invalid_type_error {
    printf 'Type Error: %s not defined.\n'  "$1"
+}
+
+function print_not_a_type {
+   printf 'Type Error: %s is not a type.\n'  "$1"
 }
 
 function print_type_error {

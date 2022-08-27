@@ -15,18 +15,18 @@ declare -- NODE=
 
 function mk_metatype {
    local -- kind="$1"
-   local -- primitive="$2"
+   local -- complex="$2"
 
    mk_type
    local -- type_name="$TYPE"
    local -n type="$TYPE"
    type['kind']="$kind"
 
-   if [[ "$primitive" ]] ; then
-      unset type['subtype']
-      # This is what is going to make it a `primitive' type. If the
-      # type.subtype is *UNSET* (note, not "set but empty"--unset), then it may
-      # not have a subtype. Complex types have a .subtype prop.
+   if [[ "$complex" ]] ; then
+      type['subtype']=''
+      # This is what makes it a `complex' type. If the type.subtype is
+      # *UNSET* (note, not "set but empty"--unset), then it may not have a
+      # subtype. Complex types have a .subtype prop.
    fi
 
    # Create a type representing Types themselves.
@@ -58,13 +58,13 @@ function populate_globals {
 
    # Create symbols for primitive types.
    for short_name in "${!primitive[@]}" ; do
-      mk_metatype "${primitive[$short_name]}"  'primitive'
+      mk_metatype "${primitive[$short_name]}"
       symtab[$short_name]="$SYMBOL"
    done
 
    # Create symbols for complex types.
    for short_name in "${!complex[@]}" ; do
-      mk_metatype "${primitive[$short_name]}"
+      mk_metatype "${primitive[$short_name]}"  'complex'
       symtab[$short_name]="$SYMBOL"
    done
 }
@@ -99,8 +99,10 @@ function mk_type {
    declare -g  TYPE=$tname
    local   -n  type=$tname
 
-   type['kind']=     #-> str
-   type['subtype']=  #-> Type
+   type['kind']=      #-> str
+   #type['subtype']=  #-> Type
+   # .subtype is only present in complex types. It is unset in primitive types,
+   # which allows for throwing errors in semantic analysis for invalid subtypes.
 }
 
 
@@ -121,6 +123,25 @@ function mk_symbol {
    # Variable declaration symbols are `required' if its NODE has no expression.
    # A Section is considered to be `required' if *any* of its children are
    # required. This is only needed when enforcing constraints upon a child file.
+}
+
+
+function copy_type {
+   : 'Deep copies a Type, returns new identical Type.'
+
+   local -n t0="$1"
+
+   mk_type
+   local -- t1_name="$TYPE"
+   local -n t1="$TYPE"
+   t1['kind']="${t0[kind]}"
+
+   if [[ "${t0['subtype']}" ]] ; then
+      copy_type "${t0['subtype']}" 
+      t1['subtype']="$TYPE"
+   fi
+
+   declare -g TYPE="$t1_name"
 }
 
 
@@ -257,13 +278,16 @@ function symtab_typedef {
    local -- tname=$TYPE
 
    if [[ ${node['subtype']} ]] ; then
-      local -n _typename="${node[kind]}"
-      local -- typename="${_typename[value]}"
+      # A subtype is only valid if the parent type has a .subtype property.
+      # Primitive types are created with this unset. Complex types it is set,
+      # but empty.
+      local -n _parent_type="$tname"
 
-      if [[ "${PRIMITIVE_TYPE[$typename]}" ]] ; then
-         raise type_error           \
-               "${node[subtype]}"   \
-               "primitive types are not subscriptable."
+      # See ./doc/truth.sh for an explanation on the test below.
+      if [[ ! "${_parent_type['subtype']+_}" ]] ; then
+         raise type_error        \
+            "${node[subtype]}"   \
+            "primitive types are not subscriptable."
       fi
 
       walk_symtab "${node[subtype]}"
@@ -277,29 +301,22 @@ function symtab_typedef {
 
 function symtab_identifier {
    # Identifiers in this context are only used in typecasts.
-
    local -n node=$NODE
    local -- value="${node[value]}"
 
-   if [[ ! ${PRIMITIVE_TYPE[$value]} ]] &&\
-      [[ ! ${COMPLEX_TYPE[$value]}   ]]
-   then
+   local -- symbol="${GLOBALS[$value]}"
+   if [[ ! "$symbol" ]] ; then
       raise invalid_type_error "$value"
    fi
 
-   # We've globally declared variables `_INTEGER`, `_PATH`, etc. that point to
-   # a TYPE_$n node. Allows us to not need to re-make primitive types all the
-   # time. Can access the values by prefixing the string type *name* ("INTEGER",
-   # "BOOLEAN") with an underscore, and nameref'ing it.
-   if [[ ${PRIMITIVE_TYPE[$value]} ]] ; then
-      local -n type_pointer="_${PRIMITIVE_TYPE[$value]}"
-      declare -g TYPE="$type_pointer"
-   elif [[ ${COMPLEX_TYPE[$value]} ]] ; then
-      mk_type
-      local -- type_name=$TYPE
-      local -n type=$TYPE
-      type[kind]="${COMPLEX_TYPE[$value]}"
+   local -n symbol_ptr="$symbol"
+
+   local -n type="${symbol_ptr[type]}"
+   if [[ "${type[kind]}" != 'TYPE' ]] ; then
+      raise note_a_type "$value"
    fi
+
+   copy_type "${type[subtype]}"
 }
 
 #───────────────────────────────( merge trees )─────────────────────────────────

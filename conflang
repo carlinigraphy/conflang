@@ -226,10 +226,8 @@ ROOT=$parent_root
 # globally defined identifiers--currently typedefs. After the symbol tables are
 # merged we can copy the types to the root of the parent symtab.
 mk_symtab
-declare -g GLOBALS="$SYMTAB"
+declare -ng GLOBALS="$SYMTAB"
 populate_globals
-
-pprint_symtab "$GLOBALS"
 
 # Each section assumes there's a symtab above it. There is a "hidden" top-
 # level section `%inline'. Need to create a parent symtab above to hold it.
