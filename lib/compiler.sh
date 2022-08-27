@@ -126,9 +126,28 @@ function mk_symbol {
 }
 
 
-function copy_type {
-   : 'Deep copies a Type, returns new identical Type.'
+function extract_type {
+   : 'Pulls the underlying Type from a meta type declaration in the GLOBALS
+      symbol table. Gotta query  symbol.type.subtype:
 
+      Symbol {
+         Type {
+            kind: "TYPE"
+            subtype: Type {
+               kind: "(ARRAY|INTEGER|...)"
+            }
+         }
+      }'
+
+   local str_name="$1"
+
+   local -n symbol="${GLOBALS[$str_name]}"
+   local -n type="${symbol[type]}"
+   copy_type "${type[subtype]}"
+}
+
+
+function copy_type {
    local -n t0="$1"
 
    mk_type
@@ -254,9 +273,7 @@ function symtab_decl_variable {
    else
       # If user does not specify a type declaration, it gets an implicit ANY
       # type that matches anything.
-      mk_type
-      local -n type=$TYPE
-      type['kind']='ANY'
+      extract_type 'any'
       symbol['type']=$TYPE
    fi
 
@@ -304,19 +321,12 @@ function symtab_identifier {
    local -n node=$NODE
    local -- value="${node[value]}"
 
-   local -- symbol="${GLOBALS[$value]}"
-   if [[ ! "$symbol" ]] ; then
+   local -- type="${GLOBALS[$value]}"
+   if [[ ! "$type" ]] ; then
       raise invalid_type_error "$value"
    fi
 
-   local -n symbol_ptr="$symbol"
-
-   local -n type="${symbol_ptr[type]}"
-   if [[ "${type[kind]}" != 'TYPE' ]] ; then
-      raise note_a_type "$value"
-   fi
-
-   copy_type "${type[subtype]}"
+   extract_type "$value"
 }
 
 #───────────────────────────────( merge trees )─────────────────────────────────
@@ -689,6 +699,10 @@ function semantics_array {
    local -- save=$NODE
    local -n node=$save
 
+   # Top-level array.
+   extract_type 'array'
+   local array_name=$TYPE
+
    # The user *can* have an array of differing types, but not if the type is
    # declared with a subtype. E.g, `array:str`.
    local -A types_found=()
@@ -705,60 +719,44 @@ function semantics_array {
       type_string+="${type_string:+|}${type_string}"
    done
 
-   # Top-level array.
-   mk_type
-   local -- array_name=$TYPE
-   local -n array=$TYPE
-   array[kind]="ARRAY"
+   if [[ $type_string ]] ; then
+      # TODO: probably created a 'hidden' type called MIXED. Would allow more
+      # more elegantly handling this problem.
+      #
+      # Cannot use `extract_type` here, as there's the chance for a mixed-type
+      # array.
+      mk_type
+      local -- subtype_name=$TYPE
+      local -n subtype=$TYPE
+      subtype['kind']="$type_string"
+      type['subtype']="$subtype_name"
+   fi
 
-   # Top-level array.
-   mk_type
-   local -- subtype_name=$TYPE
-   local -n subtype=$TYPE
-   subtype[kind]="$type_string"
-
-   declare -g TYPE="$array_name"
+   declare -g TYPE=$array_name
    declare -g NODE=$save
 }
-
-
-# Paths can be complex types.
-#  :file
-#  :dir
-function semantics_path {
-   mk_type
-   local -- subtype_name=$TYPE
-   local -n subtype=$TYPE
-   subtype[kind]="PATH"
-}
-
-
-# Primitive types.
-function semantics_boolean { TYPE="$_BOOLEAN"; }
-function semantics_integer { TYPE="$_INTEGER"; }
-function semantics_string  { TYPE="$_STRING";  }
 
 
 # In semantic analysis, we'll only hit this in typecasts.
 function semantics_identifier {
    local -n node=$NODE
    local -- value="${node[value]}"
-   local -- kind=${DEFAULT_TYPES[$value]}
 
-   # We've globally declared variables `_INTEGER`, `_PATH`, etc. that point to
-   # a TYPE_$n node. Allows us to not need to re-make primitive types all the
-   # time. Can access the values by prefixing the string type *name* ("INTEGER",
-   # "BOOLEAN") with an underscore, and nameref'ing it.
-   if [[ ${PRIMITIVE_TYPE[$value]} ]] ; then
-      local -n type_pointer="_${PRIMITIVE_TYPE[$value]}"
-      declare -g TYPE="$type_pointer"
-   elif [[ ${COMPLEX_TYPE[$value]} ]] ; then
-      mk_type
-      local -- type_name=$TYPE
-      local -n type=$TYPE
-      type[kind]="${COMPLEX_TYPE[$value]}"
-   fi
+   extract_type "$value"
 }
+
+
+# Paths aren't yet complex types, but they will be in the future. For now, we
+# can copy a base Type('PATH'). They will eventually have a :file, :dir, and
+# perhaps others (:fifo, :symlink, etc.).
+function semantics_path {
+   extract_type "path"
+}
+
+
+function semantics_boolean { extract_type 'bool'; }
+function semantics_integer { extract_type 'int';  }
+function semantics_string  { extract_type 'str';  }
 
 
 #─────────────────────────────────( compiler )──────────────────────────────────
