@@ -4,8 +4,8 @@
 function setup {
    load '/usr/lib/bats-assert/load.bash'
    load '/usr/lib/bats-support/load.bash'
-   source "${BATS_TEST_DIRNAME}"/../lib/errors.sh
-   source "${BATS_TEST_DIRNAME}"/../lib/parser.sh
+   source "${BATS_TEST_DIRNAME}"/../../lib/errors.sh
+   source "${BATS_TEST_DIRNAME}"/../../lib/parser.sh
 }
 
 

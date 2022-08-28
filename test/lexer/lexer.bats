@@ -4,9 +4,8 @@
 function setup {
    load '/usr/lib/bats-assert/load.bash'
    load '/usr/lib/bats-support/load.bash'
-   source "${BATS_TEST_DIRNAME}"/../lib/errors.sh
-
-   export lib_lexer="${BATS_TEST_DIRNAME}"/../lib/lexer.sh
+   source "${BATS_TEST_DIRNAME}"/../../lib/errors.sh
+   export lib_lexer="${BATS_TEST_DIRNAME}"/../../lib/lexer.sh
 }
 
 
@@ -29,7 +28,7 @@ function setup {
    : 'Given an empty input file, should successfully lex, generating only the
       final EOF token when closing the file.'
 
-   declare -a FILES=( "${BATS_TEST_DIRNAME}"/share/empty.conf )
+   declare -a FILES=( "${BATS_TEST_DIRNAME}"/../share/empty.conf )
    source "$lib_lexer"
 
    init_scanner
@@ -44,7 +43,7 @@ function setup {
 
 
 @test "identify valid symbols" {
-   declare -a FILES=( "${BATS_TEST_DIRNAME}"/share/symbols.conf )
+   declare -a FILES=( "${BATS_TEST_DIRNAME}"/data/symbols.conf )
    source "$lib_lexer"
 
    init_scanner
@@ -81,7 +80,7 @@ function setup {
 
 
 @test "identify valid literals" {
-   declare -a FILES=( "${BATS_TEST_DIRNAME}"/share/literals.conf )
+   declare -a FILES=( "${BATS_TEST_DIRNAME}"/data/literals.conf )
    source "$lib_lexer"
 
    init_scanner
@@ -124,7 +123,7 @@ function setup {
    : 'While not testing every invalid token, a selection of invalid characters
       should all produce an `ERROR` token, with their value preserved.'
 
-   declare -a FILES=( "${BATS_TEST_DIRNAME}"/share/invalid.conf )
+   declare -a FILES=( "${BATS_TEST_DIRNAME}"/data/invalid.conf )
    source "$lib_lexer"
 
    init_scanner

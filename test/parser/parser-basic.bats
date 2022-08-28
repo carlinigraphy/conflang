@@ -4,10 +4,9 @@
 function setup {
    load '/usr/lib/bats-assert/load.bash'
    load '/usr/lib/bats-support/load.bash'
-   source "${BATS_TEST_DIRNAME}"/../lib/errors.sh
-
-   export lib_lexer="${BATS_TEST_DIRNAME}"/../lib/lexer.sh
-   export lib_parser="${BATS_TEST_DIRNAME}"/../lib/parser.sh
+   source "${BATS_TEST_DIRNAME}"/../../lib/errors.sh
+   export lib_lexer="${BATS_TEST_DIRNAME}"/../../lib/lexer.sh
+   export lib_parser="${BATS_TEST_DIRNAME}"/../../lib/parser.sh
 }
 
 
@@ -27,7 +26,7 @@ function setup {
    : 'While the parser should fail given *NO* tokens in the input, it should
       successfully parse an empty file (only EOF token).'
 
-   source "${BATS_TEST_DIRNAME}"/parser/empty.tokens
+   source "${BATS_TEST_DIRNAME}"/data/empty.tokens
    source "$lib_parser"
    parse
 }
@@ -40,7 +39,7 @@ function setup {
    source "$lib_lexer"
    source "$lib_parser"
 
-   declare -a FILES=( "${BATS_TEST_DIRNAME}"/share/empty.conf )
+   declare -a FILES=( "${BATS_TEST_DIRNAME}"/../share/empty.conf )
 
    init_scanner
    scan
@@ -55,7 +54,7 @@ function setup {
    source "$lib_lexer"
    source "$lib_parser"
 
-   declare -a FILES=( "${BATS_TEST_DIRNAME}"/parser/simple.conf )
+   declare -a FILES=( "${BATS_TEST_DIRNAME}"/data/simple.conf )
 
    init_scanner
    scan
