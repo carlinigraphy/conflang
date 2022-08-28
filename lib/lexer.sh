@@ -67,7 +67,7 @@ function Token {
 
                                      
 #══════════════════════════════════╡ SCANNER ╞══════════════════════════════════
-declare -A KEYWORD=(
+declare -gA KEYWORD=(
    ['true']=true
    ['false']=true
    ['and']=true
@@ -233,7 +233,7 @@ function l_identifier {
       l_advance ; buffer+="$CURRENT"
    done
 
-   if [[ -n ${KEYWORD[$buffer]} ]] ; then
+   if [[ ${KEYWORD[$buffer]} ]] ; then
       Token "${buffer^^}" "$buffer"
    else
       Token 'IDENTIFIER' "$buffer"
@@ -367,7 +367,7 @@ function l_fstring {
 
       # When used outside an expression, closing braces must be escaped.
       if [[ $CURRENT == '}' ]] ; then
-         if [[ "${buffer[-1]}" == '\' ]] ; then
+         if [[ $buffer && "${buffer[-1]}" == '\' ]] ; then
             unset buffer[-1]
             buffer+=( "$CURRENT" )
             continue
@@ -434,7 +434,7 @@ function l_fpath {
 
       # When used outside an expression, closing braces must be escaped.
       if [[ $CURRENT == '}' ]] ; then
-         if [[ "${buffer[-1]}" == '\' ]] ; then
+         if [[ $buffer && "${buffer[-1]}" == '\' ]] ; then
             unset buffer[-1]
             buffer+=( "$CURRENT" )
             continue

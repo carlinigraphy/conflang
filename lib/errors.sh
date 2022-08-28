@@ -16,8 +16,6 @@ function traceback {
 }
 
 
-# TODO:
-# Exit statuses should be unique. BATS test to `sort | uniq` keys, compare len.
 declare -gA EXIT_STATUS=(
    [no_input]=1
    [syntax_error]=2
@@ -106,7 +104,7 @@ function print_syntax_error {
 }
 
 function print_invalid_interpolation_char {
-   printf 'Syntax Error: %q not valid in string interpolation.\n'  "$1"
+   printf "Syntax Error: \`%s' not valid in string interpolation.\n"  "$1"
 }
 
 function print_unescaped_interpolation_brace {

@@ -40,7 +40,7 @@ case "$1" in
                --bash-dont-parse-binary-dir
                --include-path="${PROGDIR}"
                "${PROGDIR}"/.coverage
-               bats --pretty
+               bats -r --pretty
             )
             exec kcov "${kargs[@]}" "${args[@]}" 2>/dev/null
             ;;
