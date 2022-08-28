@@ -28,7 +28,7 @@ case "$1" in
             if [[ ! "$args" ]] ; then
                args=( "${PROGDIR}"/test )
             fi
-            exec bats "${args[@]}"
+            exec bats -r "${args[@]}"
             ;;
 
 
