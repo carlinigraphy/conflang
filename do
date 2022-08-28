@@ -42,11 +42,7 @@ case "$1" in
                "${PROGDIR}"/.coverage
                bats -r --pretty
             )
-            exec kcov "${kargs[@]}" "${args[@]}" 2>/dev/null
-            ;;
-
-
-   'res')   shift
+            kcov "${kargs[@]}" "${args[@]}" 2>/dev/null
             exec xdg-open "${PROGDIR}"/.coverage/index.html
             ;;
 
