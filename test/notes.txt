@@ -1,8 +1,5 @@
 Still needs:
 
-lexer & parser
-   didn't accidentally use a p_ in the lexer, or l_ in the parser
-
 parser
    exceptions
    error tokens
