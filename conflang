@@ -244,8 +244,20 @@ if [[ "$child_root" ]] ; then
    merge_symtab "$parent_symtab" "$child_symtab"
 fi
 
+
 # Reset pointer back to the parent symtab.
 declare -- SYMTAB="$parent_symtab"
+
+# Integrate globals at the root of the top-level symbol table.
+declare -n _symtab="$parent_symtab"
+for global in "${!GLOBALS[@]}" ; do
+   _symtab[$global]="${GLOBALS[$global]}"
+done
+
+# Re-point $GLOBALS at the root of the symbol table.
+declare -g  GLOBALS_NAME="${parent_symtab}"
+declare -gn GLOBALS="${parent_symtab}"
+
 
 # Second dump of all the declared variables. By diffing with the last dump of
 # variables, we can determine which were defined here, and what was pre-
@@ -271,8 +283,8 @@ for d in "${_ENV_DIFF[@]}" ; do
 done
 
 walk_semantics "$parent_root"
-#walk_compiler  "$parent_root"
-#walk_pprint    "$parent_root"
+walk_compiler  "$parent_root"
+walk_pprint    "$parent_root"
 
 #───────────────────────────────────( api )─────────────────────────────────────
 # shellcheck source=./lib/api.sh
