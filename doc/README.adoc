@@ -10,9 +10,9 @@ Declarative config file "`language`" with built-in validation.
 
 == Why it do
 
-Another stepping stone in my path to write a programming language.
+Another stepping stone in my path to write my own programming language.
 
-Many projects in the last few years have been geared towards incrementally writing a programming language.
+Many projects in the last few years have served that goal.
 I consistently find myself hitting sticking points.
 Stemming from both the gaps in my non-existent CS education, as well as difficulties approaching design problems.
 Smaller scale projects, like this one, help me to work through specific conceptual slices.
@@ -20,8 +20,8 @@ Smaller scale projects, like this one, help me to work through specific conceptu
 This is the spiritual successor to `mkconf`, `conf`, and `shql`.
 Each better than the last.
 
-I do not intend for anyone to actually use `conflang`, just as I didn't write `shql` to be used.
-The project is in the designing/writing itself.
+I do not intend for anyone to actually use `conflang`, just as I didn't `shql`.
+Journey over destination and all that.
 
 
 == How it look
@@ -56,11 +56,14 @@ globals {
 homedir (path): $HOME;
 
 # Internal variables.
-homedir_copy: %homedir;
+homedir_ref: %homedir;
 
 # String interpolation.
-project_dir : "{$HOME}/projects/";
-sub_dir     : "{%project_dir}/sub/";
+project_dir : '{$HOME}/projects/';
+sub_dir     : '{%project_dir}/sub/';
+
+# Type casting.
+shell_level : $SHLVL -> int;
 
 # Import other files.
 %include './sub-file.conf';
@@ -76,10 +79,6 @@ sub_dir     : "{%project_dir}/sub/";
 ----
 common {
    colors (array:str) [
-      "#hex...";
-      "#hex...";
-      "#hex...";
-      "#hex...";
       "#hex...";
       "#hex...";
       "#hex...";
@@ -104,20 +103,34 @@ window {
 
 == What it about
 
-Writing small shell files that take configuration parameters can be tricky and tiresome.
-Do you trust the user's input, or validate everything?
-How to handle idempotency?
-For an important utility (backups, managing services) it is vital that input is valid.
-Crashing half way through a backup because an intermediate path does not exist is bad.
-There are often many ways to handle data type mismatches, or invalid input.
+Configuration files are the backbone of unix systems.
+Most every application/tool uses one.
 
-I hope to resolve some of those problems with:
+They have many common problems.
 
-. Declarative, validated, strongly-typed configuration files
-. Easily accessible parameters for the developer
-. Simple to configure for end users
-  .. With _optional_ room to add validation & complexity
-. Good error reporting for everyone
+=== Documentation
+Unless the project maintainer was a benevolent god, thoroughly documenting the file itself, it can be difficult to determine what keys are required or values are expected.
+Is a boolean looking for `true` or `True`, or maybe just anything _truthy_?
+Should integers be in quotes, or standalone?
+Can I include environment variables?
+What about references to other config variables, to keep my code _DRY_.
+
+Who knows.
+
+=== Weak typing
+By their nature, configuration files are untyped.
+Even more modern file formats (json, yaml, toml) don't even have type hinting, let alone strong type requirements.
+For configuring utilities as critical a backup application, or system monitoring services, typing is necessary.
+
+No script should fail due to semantic oversights in the configuration.
+
+=== Inconsistent validation
+Validating a configuration file is left entirely to the program author.
+The extent to which they attempt to catch & appropriately handle edge cases can vary wildly.
+Error reporting is often cryptic, or non-existent.
+
+Programmers don't want to spend their time validating user input.
+Shifting that responsibility to the config file itself allows them to write code.
 
 
 == How you use
