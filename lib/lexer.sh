@@ -395,10 +395,27 @@ function l_fstring {
          Token 'STRING'  "$join"
          Token 'CONCAT'  ''
 
+         # TODO: refactor
+         # This may be a little janky. If the user has an empty expression...
+         #> _: f'{}';
+         #...there will be two subsequent concat tokens, with nothing between.
+         #> path('') CAT CAT path('')
+         #>             ^-- expr would go here.
+         #
+         # In that case we want to only add one concatenation token before, and
+         # omit the closing one.
+         local t0="$TOKEN_NUM"
+
          l_interpolation
          l_advance # past the closing `}'
 
-         Token 'CONCAT'  ''
+         # Only create the closing CONCAT token if there were contents to the
+         # expression.
+         local t1="$TOKEN_NUM"
+         if [[ ! "$t0" -eq "$t1" ]] ; then
+            Token 'CONCAT'  ''
+         fi
+
          continue
       fi
 
@@ -462,10 +479,27 @@ function l_fpath {
          Token 'PATH'    "$join"
          Token 'CONCAT'  ''
 
+         # TODO: refactor
+         # This may be a little janky. If the user has an empty expression...
+         #> _: f'{}';
+         #...there will be two subsequent concat tokens, with nothing between.
+         #> path('') CAT CAT path('')
+         #>             ^-- expr would go here.
+         #
+         # In that case we want to only add one concatenation token before, and
+         # omit the closing one.
+         local t0="$TOKEN_NUM"
+
          l_interpolation
          l_advance # past the closing `}'
 
-         Token 'CONCAT'  ''
+         # Only create the closing CONCAT token if there were contents to the
+         # expression.
+         local t1="$TOKEN_NUM"
+         if [[ ! "$t0" -eq "$t1" ]] ; then
+            Token 'CONCAT'  ''
+         fi
+
          continue
       fi
 
