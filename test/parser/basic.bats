@@ -4,31 +4,12 @@
 function setup {
    load '/usr/lib/bats-assert/load.bash'
    load '/usr/lib/bats-support/load.bash'
-   source "${BATS_TEST_DIRNAME}"/../../lib/errors.sh
-   export lib_lexer="${BATS_TEST_DIRNAME}"/../../lib/lexer.sh
-   export lib_parser="${BATS_TEST_DIRNAME}"/../../lib/parser.sh
-}
 
+   export LIBDIR="${BATS_TEST_DIRNAME}/../../lib"
+   export lib_lexer="${LIBDIR}/lexer.sh"
+   export lib_parser="${LIBDIR}/parser.sh"
 
-@test "successful source" {
-   source "$lib_parser"
-}
-
-
-@test "fails with no tokens" {
-   source "$lib_parser"
-   run parse
-   assert_failure
-}
-
-
-@test "runs with only EOF token" {
-   : 'While the parser should fail given *NO* tokens in the input, it should
-      successfully parse an empty file (only EOF token).'
-
-   source "${BATS_TEST_DIRNAME}"/data/empty.tokens
-   source "$lib_parser"
-   parse
+   source "${LIBDIR}/errors.sh"
 }
 
 
