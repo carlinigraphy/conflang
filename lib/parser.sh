@@ -89,45 +89,8 @@ function mk_decl_variable {
    node['name']=       # identifier
    node['type']=       # type
    node['expr']=       # section, array, int, str, bool, path
-   node['context']=
 
    TYPEOF[$nname]='decl_variable'
-}
-
-
-function mk_context_block {
-   (( ++NODE_NUM ))
-   local   --  nname="NODE_${NODE_NUM}"
-   declare -ga $nname
-   declare -g  NODE=$nname
-
-   TYPEOF[$nname]='context_block'
-}
-
-
-function mk_context_test {
-   (( ++NODE_NUM ))
-   local   -- nname="NODE_${NODE_NUM}"
-   declare -gA $nname
-   declare -g  NODE=$nname
-   local   -n  node=$nname
-
-   node['name']=
-
-   TYPEOF[$nname]='context_test'
-}
-
-
-function mk_context_directive {
-   (( ++NODE_NUM ))
-   local   -- nname="NODE_${NODE_NUM}"
-   declare -gA $nname
-   declare -g  NODE=$nname
-   local   -n  node=$nname
-
-   node['name']=
-
-   TYPEOF[$nname]='context_directive'
 }
 
 
@@ -567,12 +530,6 @@ function p_decl_variable {
       raise parse_error "expecting \`:' before expression."
    fi
 
-   # Context blocks.
-   #if p_match 'L_BRACE' ; then
-   #   p_context_block
-   #   node['context']=$NODE
-   #fi
-
    p_munch 'SEMI' "expecting \`;' after declaration."
    declare -g NODE=$save
 }
@@ -601,40 +558,6 @@ function p_typedef {
    declare -g NODE=$save
 }
 
-
-# THINKIES: I believe a context block can potentially be a postfix expression.
-# Though for now, as it only takes single directives and not expressions or
-# function calls, it lives here.
-function p_context_block {
-   mk_context_block
-   local -- save=$NODE
-   local -n node=$NODE
-
-   while ! p_check 'R_BRACE' ; do
-      p_context
-      node+=( "$NODE" )
-   done
-
-   p_munch 'R_BRACE' "expecting \`}' after context block."
-   declare -g NODE=$save
-}
-
-
-function p_context {
-   p_identifier
-   p_munch 'IDENTIFIER' 'expecting identifier in context block.'
-
-   local -- ident=$NODE
-
-   if p_check 'QUESTION' ; then
-      mk_context_test
-   else
-      mk_context_directive
-   fi
-
-   local -n node=$NODE
-   node['name']=$ident
-}
 
 #───────────────────────────────( expressions )─────────────────────────────────
 # Thanks daddy Pratt.
@@ -708,7 +631,7 @@ function p_expression {
 
       #───────────────────────────( postfix )───────────────────────────────────
       lbp=${postfix_binding_power[$ot]:-0}
-      (( rbp = (lbp == 0 ? 0 : lbp+1) ))
+      (( rbp = (lbp == 0 ? 0 : lbp+1) )) ||:
 
       if [[ $lbp -ge $min_bp ]] ; then
          fn="${RID[${CURRENT[type]}]}"
@@ -725,7 +648,7 @@ function p_expression {
 
       #────────────────────────────( infix )────────────────────────────────────
       lbp=${infix_binding_power[ot]:-0}
-      (( rbp = (lbp == 0 ? 0 : lbp+1) ))
+      (( rbp = (lbp == 0 ? 0 : lbp+1) )) ||:
 
       if [[ $rbp -lt $min_bp ]] ; then
          break
