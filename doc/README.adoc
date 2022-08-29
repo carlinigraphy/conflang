@@ -133,6 +133,17 @@ Programmers don't want to spend their time validating user input.
 Shifting that responsibility to the config file itself allows them to write code.
 
 
+=== Features and portability
+Bash config files must typically sacrifice features for portability.
+You don't want to download the entirety of Python3 just to parse a more complex config file for your project.
+Thus limiting you to easily bash-parsable formats.
+Largely just a series of `KEY=VALUE` lines.
+
+This project aims to provide a decent feature set, writing entirely in the Lord's most venerable language: Bash.
+
+With no external dependencies, this should run anywhere Bash 4.2+ is present.
+
+
 == How you use
 === Developers
 === End users
