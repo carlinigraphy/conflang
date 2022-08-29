@@ -145,62 +145,115 @@ function setup {
 }
 
 
-#@test "declaration w/ identifier" {
-#   skip
-#}
-#
-#
-#@test "declaration w/ array with elements" {
-#   skip
-#}
-#
-#
-#@test "declaration w/ array of arrays" {
-#   skip
-#}
-#
-#
-#@test "declaration w/ array" {
-#   skip
-#}
-#
-#
-#@test "declaration w/ unary" {
-#   skip
-#}
-#
-#
-#@test "declaration w/ internal variable" {
-#}
-#
-#
-#@test "declaration w/ environment variable" {
-#}
-#
-#
-#@test "declaration w/ index" {
-#}
-#
-#
-#@test "declaration w/ typecast" {
-#}
-#
-#
-#@test "section declaration" {
-#   skip
-#}
-#
-#
-#@test "section declaration, nested" }
-#   skip
-#}
-#
-#
-#@test "include" {
-#   skip
-#}
-#
-#
-#@test "exclude" {
-#   skip
-#}
+@test "declaration w/ array" {
+   declare -a FILES=(
+      "${BATS_TEST_DIRNAME}/data/ast/array.conf"
+   )
+   init_scanner ; scan ; parse
+
+   local -n node='NODE_6'
+   assert_equal  "${TYPEOF[NODE_6]}"  'array'
+   assert_equal  "${#node[@]}"        0
+}
+
+
+@test "declaration w/ unary" {
+   declare -a FILES=(
+      "${BATS_TEST_DIRNAME}/data/ast/unary.conf"
+   )
+   init_scanner ; scan ; parse
+
+   local -n node='NODE_6'
+   assert_equal  "${TYPEOF[NODE_6]}"  'unary'
+
+   local -- right_name="${node[right]}"
+   local -n right="${node[right]}"
+   assert_equal  "${TYPEOF[$right_name]}"  'integer'
+   assert_equal  "${right[value]}"          1
+}
+
+
+@test "declaration w/ internal variable" {
+   declare -a FILES=(
+      "${BATS_TEST_DIRNAME}/data/ast/int_var.conf"
+   )
+   init_scanner ; scan ; parse
+
+   local -n node='NODE_6'
+   assert_equal  "${TYPEOF[NODE_6]}"  'int_var'
+   assert_equal  "${node[value]}"     'internal'
+}
+
+
+@test "declaration w/ environment variable" {
+   declare -a FILES=(
+      "${BATS_TEST_DIRNAME}/data/ast/env_var.conf"
+   )
+   init_scanner ; scan ; parse
+
+   local -n node='NODE_6'
+   assert_equal  "${TYPEOF[NODE_6]}"  'env_var'
+   assert_equal  "${node[value]}"     'environment'
+}
+
+
+@test "declaration w/ index" {
+   skip "Apparently broke these when I fixed other expressions in TDOP parser."
+
+   declare -a FILES=(
+      "${BATS_TEST_DIRNAME}/data/ast/index.conf"
+   )
+   init_scanner ; scan ; parse
+
+   local -n node='NODE_5'
+   assert_equal  "${TYPEOF[NODE_6]}"  'index'
+
+   local -n left="${node[left]}"
+   assert_equal  "${TYPEOF[$left]}"   'identifier'
+
+   local -n right="${node[right]}"
+   assert_equal  "${TYPEOF[$right]}"  'integer'
+}
+
+
+@test "declaration w/ typecast" {
+   skip "Apparently broke these when I fixed other expressions in TDOP parser."
+
+   declare -a FILES=(
+      "${BATS_TEST_DIRNAME}/data/ast/typecast.conf"
+   )
+   init_scanner ; scan ; parse
+
+   local -n node='NODE_7'
+   assert_equal  "${TYPEOF[NODE_7]}"    'typecast'
+
+   local -- typedef="${node[typedef]}"
+   assert_equal  "${TYPEOF[$typedef]}"  'typedef'
+
+   local -- expr="${node[expr]}"
+   assert_equal  "${TYPEOF[$expr]}"     'string'
+}
+
+
+@test "section declaration" {
+   declare -a FILES=(
+      "${BATS_TEST_DIRNAME}/data/ast/section.conf"
+   )
+   init_scanner ; scan ; parse
+
+   local -n node='NODE_5'
+   assert_equal  "${TYPEOF[NODE_5]}"  'decl_section'
+
+   local -n items="${node[items]}"
+   assert_equal  "${#items[@]}"       0
+}
+
+
+@test "include" {
+   skip 'NYI'
+}
+
+
+@test "exclude" {
+   skip 'NYI'
+}

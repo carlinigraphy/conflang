@@ -1,10 +1,14 @@
 Still needs:
 
 parser
-   exceptions
-   error tokens
-   error recovery
    include / constrain statements
+   empty arrays
+   arrays of arrays
+   pratt parsing
+      - all expressions
+      - operator precedence
+      - string concatenation & typecasting
+      - unary & typecasting
 
 conflang
    (add an `if __name__ == '__main__'` so can source without executing)
