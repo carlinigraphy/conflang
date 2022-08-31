@@ -228,14 +228,14 @@ function setup {
    )
    init_scanner ; scan ; parse
 
-   local -n node='NODE_7'
-   assert_equal  "${TYPEOF[NODE_7]}"    'typecast'
-
+   local -- node_name='NODE_7'
+   local -n node="$node_name"
    local -- typedef="${node[typedef]}"
-   assert_equal  "${TYPEOF[$typedef]}"  'typedef'
-
    local -- expr="${node[expr]}"
-   assert_equal  "${TYPEOF[$expr]}"     'string'
+
+   assert_equal  "${TYPEOF[$node_name]}"  'typecast'
+   assert_equal  "${TYPEOF[$typedef]}"    'typedef'
+   assert_equal  "${TYPEOF[$expr]}"       'string'
 }
 
 
@@ -245,11 +245,12 @@ function setup {
    )
    init_scanner ; scan ; parse
 
-   local -n node='NODE_5'
-   assert_equal  "${TYPEOF[NODE_5]}"  'decl_section'
-
+   local -- node_name='NODE_5'
+   local -n node="$node_name"
    local -n items="${node[items]}"
-   assert_equal  "${#items[@]}"       0
+
+   assert_equal  "${TYPEOF[$node_name]}"  'decl_section'
+   assert_equal  "${#items[@]}"  0
 }
 
 

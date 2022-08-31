@@ -35,13 +35,41 @@ function setup {
    : 'While the parser should fail given *NO* tokens in the input, it should
       successfully parse an empty file (only EOF token).'
 
-   source "${BATS_TEST_DIRNAME}"/data/empty.tokens
-   source "$lib_parser"
-
-
    local -A TOKEN_0=([type]='EOF' [value]='' )
    local -a TOKENS=( 'TOKEN_0' )
 
    run parse
+   assert_success
+}
+
+
+@test "lexer -> parser with empty file" {
+   : 'More complete test, starting from the lexer, transitioning into the
+      parser. Testing handoff.'
+
+   source "$lib_lexer"
+   source "$lib_parser"
+
+   declare -a FILES=( "${BATS_TEST_DIRNAME}"/../share/empty.conf )
+
+   init_scanner
+   scan
+   parse
+}
+
+
+@test "lexer -> parser with simple data" {
+   : 'Must check the lexer successfully hands off everything to the parser.
+      and no additional global vars/functions are unspecified'
+
+   source "$lib_lexer"
+   source "$lib_parser"
+
+   declare -a FILES=( "${BATS_TEST_DIRNAME}"/data/simple.conf )
+
+   init_scanner
+   scan
+   run parse
+
    assert_success
 }
