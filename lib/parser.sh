@@ -684,7 +684,7 @@ function p_unary {
 
 function p_concat {
    : 'String (and path) interpolation are parsed as a high left-associative
-      postfix operator.
+      infix operator.
       > first (str): "Marcus";
       > greet (str): "Hello {%first}.";
 
@@ -715,7 +715,7 @@ function p_concat {
 
 
 function p_typecast {
-   : 'Typecasts are a postfix operator. The previous lhs is passed in as the
+   : 'Typecasts are a infix operator. The previous lhs is passed in as the
       1st argument.
 
       Typecasts should have a low binding power, as they must apply to the
