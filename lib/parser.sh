@@ -583,29 +583,17 @@ declare -gA NUD=(
 )
 
 
-#declare -gA infix_binding_power=(
-#   [OR]=3
-#   [AND]=3
-#)
-#declare -gA LED=(
-#   [OR]='p_compop'
-#   [AND]='p_compop'
-#)
-
-
-declare -gA postfix_binding_power=(
+declare -gA infix_binding_power=(
    [ARROW]='3'
-   [CONCAT]=5
-   [DOT]=7
+   [DOT]=5
+   [CONCAT]=7
 )
-declare -gA RID=(
+declare -gA LED=(
    [ARROW]='p_typecast'
-   [CONCAT]='p_concat'
    [DOT]='p_index'
+   [CONCAT]='p_concat'
 )
 
-
-declare -gi _LEVEL=0
 
 function p_expression {
    local -i min_bp=${1:-1}
@@ -630,21 +618,21 @@ function p_expression {
       op_type=${CURRENT[type]}
 
       #───────────────────────────( postfix )───────────────────────────────────
-      lbp=${postfix_binding_power[$op_type]:-0}
-      (( rbp = (lbp == 0 ? 0 : lbp+1) )) ||:
+      #lbp=${postfix_binding_power[$op_type]:-0}
+      #(( rbp = (lbp == 0 ? 0 : lbp+1) )) ||:
 
-      if [[ $lbp -ge $min_bp ]] ; then
-         fn="${RID[${CURRENT[type]}]}"
+      #if [[ $lbp -ge $min_bp ]] ; then
+      #   fn="${RID[${CURRENT[type]}]}"
 
-         if [[ ! $fn ]] ; then
-            raise parse_error "not a postfix expression: ${CURRENT[type],,}."
-         fi
+      #   if [[ ! $fn ]] ; then
+      #      raise parse_error "not a postfix expression: ${CURRENT[type],,}."
+      #   fi
 
-         $fn "$lhs" "$rbp"
-         lhs="$NODE"
+      #   $fn "$lhs" "$rbp"
+      #   lhs="$NODE"
 
-         continue
-      fi
+      #   continue
+      #fi
 
       #────────────────────────────( infix )────────────────────────────────────
       lbp=${infix_binding_power[$op_type]:-0}
@@ -656,7 +644,7 @@ function p_expression {
 
       p_advance
 
-      fn=${LED[${CURRENT[type]}]}
+      fn=${LED[$op_type]}
       if [[ ! $fn ]] ; then
          raise parse_error "not an infix expression: ${CURRENT[type],,}."
       fi
@@ -706,8 +694,9 @@ function p_concat {
       >                     concat: str(value:  ".",
       >                                 concat: None)'
 
-   local lhs="$1"
-   local rbp="$2"
+   # We can safely ignore $2. It's the operator, passed in from p_expression().
+   # We already know the operator is a CONCAT.
+   local lhs="$1"  _=$2  rbp="$3"
 
    # To simplify (I think) parsing string/path interpolation, instead of
    # creating a concatentation AST node or some such containing an array of the
@@ -717,8 +706,6 @@ function p_concat {
    until [[ ! ${tail['concat']} ]] ; do
       local -n tail=${tail['concat']}
    done
-
-   p_advance # past CONCAT.
 
    p_expression "$rbp"
    tail['concat']=$NODE
@@ -743,8 +730,6 @@ function p_typecast {
 
    local lhs="$1"
 
-   p_advance # past ARROW.
-
    mk_typecast
    local -- save=$NODE
    local -n node=$NODE
@@ -759,17 +744,16 @@ function p_typecast {
 
 
 function p_index {
-   local -- last="$1"
-   local -- rbp="$2"
+   # We can safely ignore $2. It's the operator, passed in from p_expression().
+   # We already know the operator is a CONCAT.
+   local lhs="$1"  _=$2  rbp="$3"
 
    mk_index
    local -- save="$NODE"
    local -n index="$NODE"
 
-   p_advance # past DOT.
-
    p_expression "$rbp"
-   index['left']="$last"
+   index['left']="$lhs"
    index['right']="$NODE"
 
    declare -g NODE="$save"
