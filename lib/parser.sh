@@ -627,10 +627,10 @@ function p_expression {
    $fn "$token" ; lhs=$NODE
 
    while :; do
-      op=$CURRENT ot=${CURRENT[type]}
+      op_type=${CURRENT[type]}
 
       #───────────────────────────( postfix )───────────────────────────────────
-      lbp=${postfix_binding_power[$ot]:-0}
+      lbp=${postfix_binding_power[$op_type]:-0}
       (( rbp = (lbp == 0 ? 0 : lbp+1) )) ||:
 
       if [[ $lbp -ge $min_bp ]] ; then
@@ -647,7 +647,7 @@ function p_expression {
       fi
 
       #────────────────────────────( infix )────────────────────────────────────
-      lbp=${infix_binding_power[ot]:-0}
+      lbp=${infix_binding_power[$op_type]:-0}
       (( rbp = (lbp == 0 ? 0 : lbp+1) )) ||:
 
       if [[ $rbp -lt $min_bp ]] ; then
@@ -661,7 +661,7 @@ function p_expression {
          raise parse_error "not an infix expression: ${CURRENT[type],,}."
       fi
 
-      $fn  "$lhs"  "$op"  "$rbp"
+      $fn  "$lhs"  "$op_type"  "$rbp"
       lhs="$NODE"
    done
 
@@ -706,14 +706,14 @@ function p_concat {
       >                     concat: str(value:  ".",
       >                                 concat: None)'
 
-   local -- save="$1"
-   local -- rbp="$2"
+   local lhs="$1"
+   local rbp="$2"
 
    # To simplify (I think) parsing string/path interpolation, instead of
    # creating a concatentation AST node or some such containing an array of the
    # pieces, each part has a `.concat` key, with the value of the node to
    # concatenate with.
-   local -n tail="$save"
+   local -n tail="$lhs"
    until [[ ! ${tail['concat']} ]] ; do
       local -n tail=${tail['concat']}
    done
@@ -723,7 +723,7 @@ function p_concat {
    p_expression "$rbp"
    tail['concat']=$NODE
 
-   declare -g NODE="$save"
+   declare -g NODE="$lhs"
 }
 
 
@@ -741,7 +741,7 @@ function p_typecast {
       Should compile to  ...  ("" + %count + "0") -> int
       Rather than        ...  ("" + %count +) ("0" -> int)'
 
-   local -- prev="$1"
+   local lhs="$1"
 
    p_advance # past ARROW.
 
@@ -751,10 +751,10 @@ function p_typecast {
 
    p_typedef
 
-   node['expr']="$prev"
+   node['expr']="$lhs"
    node['typedef']="$NODE"
 
-   declare -g NODE="$save"
+   declare -g NODE="$lhs"
 }
 
 
@@ -765,6 +765,8 @@ function p_index {
    mk_index
    local -- save="$NODE"
    local -n index="$NODE"
+
+   p_advance # past DOT.
 
    p_expression "$rbp"
    index['left']="$last"

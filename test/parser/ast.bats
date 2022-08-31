@@ -198,26 +198,30 @@ function setup {
 
 
 @test "declaration w/ index" {
-   skip "Apparently broke these when I fixed other expressions in TDOP parser."
+   #skip "Apparently broke these when I fixed other expressions in TDOP parser."
 
    declare -a FILES=(
       "${BATS_TEST_DIRNAME}/data/ast/index.conf"
    )
    init_scanner ; scan ; parse
 
-   local -n node='NODE_5'
-   assert_equal  "${TYPEOF[NODE_6]}"  'index'
+   local -- node_name='NODE_8'
+   local -n node="$node_name"
 
-   local -n left="${node[left]}"
-   assert_equal  "${TYPEOF[$left]}"   'identifier'
+   local -- left_name="${node[left]}"
+   local -n left="$left_name"
 
-   local -n right="${node[right]}"
-   assert_equal  "${TYPEOF[$right]}"  'integer'
+   local -- right_name="${node[right]}"
+   local -n right="$right_name"
+
+   assert_equal  "${TYPEOF[$node_name]}"   'index'
+   assert_equal  "${TYPEOF[$left_name]}"   'array'
+   assert_equal  "${TYPEOF[$right_name]}"  'integer'
 }
 
 
 @test "declaration w/ typecast" {
-   skip "Apparently broke these when I fixed other expressions in TDOP parser."
+   #skip "Apparently broke these when I fixed other expressions in TDOP parser."
 
    declare -a FILES=(
       "${BATS_TEST_DIRNAME}/data/ast/typecast.conf"
