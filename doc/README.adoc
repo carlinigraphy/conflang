@@ -153,35 +153,33 @@ The increased transparency makes it easier on both parties.
 Variables are required in the child file if the parent does not have an expression.
 If the parent's variable does have an expression, it serves as a default if omitted in the child.
 
-.Required
-----
-# Required declaration with no type.
-age_1;
+[cols='1,1,3']
+|===
+| _./parent.conf_ | _./child.conf_ | result
 
-# Required declaration w/ type.
-age_2 (int);
-----
+| `age;`
+| <not present>
+| `Key Error: age must be set in ./child.conf`
 
-.Not required
-----
-# Declaration with no type.
-age: 30;
-----
+| `age: 30;`
+| <not present>
+| `age: 30;`
 
-If a variable is declared in the parent with a type, the type may not be over-written in the child.
-Expressions defined in the parent may be over-written in the child.
+| `age: 30;`
+| `age: true;`
+| `age: true;`
 
-.parent.conf
-----
-age  (int): 29;
-name (str);
-----
+| `age (int);`
+| `age: true;`
+| `Type Error: age must be (int)`
 
-.child.conf
-----
-# Type Error: cannot overwrite type from ./parent.conf
-name (path): './path';
-----
+| `age (int);`
+| `age (bool): true`
+| `Type Error: type of age may not be overwritten`
+
+|===
+
+
 
 === Sections
 Sections declared in the parent file are only required if at least one of the variables is required.
