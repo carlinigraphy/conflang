@@ -3,13 +3,6 @@
 # Requires from ENV:
 #  list:path   FILES[]
 
-
-# @current: The parser seems to be strongly misbehaving when %include'ing
-#           (and probably when %constrain'ing) files. I believe it's because
-#           calling init_scanner() isn't actually properly setting up the
-#           scanner again? Or maybe it is.
-
-
 function init_scanner {
    : 'Some variables need to be reset at the start of every run. They hold
       information that should not be carried from file to file.'
@@ -24,9 +17,15 @@ function init_scanner {
 
    # File & character information.
    declare -ga  CHARRAY=()
-   #declare -ga  FILE_LINES=()
-   # TODO: error reporting
-   # Currently 
+
+   # Don't *need* to do this, but it makes debugging and error output
+   # significantly more clear to read. Will only have tokens associated with
+   # this run, rather than simply overwriting old values.
+   #if [[ ${!TOKEN_*} ]] ; then
+   #   unset ${!TOKEN_*}
+   #fi
+   # 2022-09-02: this isn't actually working. Running into parse errors on
+   # %include files.
 
    # Token information.
    declare -ga  TOKENS=()

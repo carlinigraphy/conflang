@@ -26,18 +26,6 @@ declare -ga  INCLUDES=() CONSTRAINTS=()
 # Saves us from a get_type() function call, or some equivalent.
 declare -gA  TYPEOF=()
 
-# Should be reset on every run, as it's unique to this instance of the parser.
-declare -g  ROOT  # Solely used to indicate the root of the AST.
-declare -g  NODE
-declare -g  INCLUDE
-
-# Need to take note of the section.
-# `%include` blocks must reference the target Section to include any included
-# sub-nodes.
-# `%constrain` blocks must check they are not placed anywhere but a top-level
-# %inline section.
-declare -g SECTION
-
 
 function mk_decl_section {
    # 1) create parent
@@ -290,10 +278,24 @@ function mk_int_var {
 
 
 #═══════════════════════════════════╡ utils ╞═══════════════════════════════════
-declare -gi IDX=0
-declare -g  CURRENT  CURRENT_NAME
-# Calls to `advance' both globally set the name of the current/next node(s),
-# e.g., `TOKEN_1', as well as declaring a nameref to the variable itself.
+function init_parser {
+   declare -gi IDX=0
+   declare -g  CURRENT=  CURRENT_NAME=
+   # Calls to `advance' both globally set the name of the current/next node(s),
+   # e.g., `TOKEN_1', as well as declaring a nameref to the variable itself.
+
+   # Should be reset on every run, as it's unique to this instance of the parser.
+   declare -g  ROOT=  # Solely used to indicate the root of the AST.
+   declare -g  NODE=
+   declare -g  INCLUDE=
+
+   # Need to take note of the section.
+   # `%include` blocks must reference the target Section to include any included
+   # sub-nodes.
+   # `%constrain` blocks must check they are not placed anywhere but a top-level
+   # %inline section.
+   declare -g SECTION=
+}
 
 
 function p_advance {

@@ -6,6 +6,8 @@
 # environment variable that we've stomped on, we can accurately report that
 # here.
 readarray -td $'\n' ENV_START < <(
+   # TODO: rewrite this in vanilla bash. Should be possible with readarray, and
+   # native bash pattern matching.
    declare -p | awk '/^declare -/ { sub(/=.*/, "") ; print $3}' | sort
 )
 
@@ -65,9 +67,7 @@ function merge_includes {
          continue
       fi
 
-      # Generate AST for the imported file.
-      # @current
-      init_scanner ; scan ; parse
+      _parse
 
       # Construct array (backwards) of the $ROOT nodes for each %include
       # statement.  Allows us to iter the INCLUDES backwards, and match $idx to
@@ -76,6 +76,9 @@ function merge_includes {
 
       (( idx++ ))
    done
+
+   dump_everything
+   exit
 
    # Iterates bottom-to-top over the %include statements. Appends the items
    # from the included section into the target section.
@@ -138,11 +141,12 @@ function _parse {
    # Some elements of the scanner need to be reset before every run. Vars that
    # hold file-specific information.
    init_scanner
-
    scan
    # Exports:
    #  list  TOKENS[]
 
+   # Equally reset the run-specific information.
+   init_parser
    parse
    # Exports:
    #  str   ROOT
