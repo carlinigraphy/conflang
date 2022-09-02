@@ -1,6 +1,5 @@
 #!/bin/bash #
 # Requires from environment:
-#  ROOT
 #  TYPEOF{}
 #  NODE_*
 #  SECTION
@@ -46,6 +45,7 @@ function populate_globals {
    local -n symtab="$SYMTAB"
 
    local -A primitive=(
+      [any]='ANY'
       [int]='INTEGER'
       [str]='STRING'
       [bool]='BOOLEAN'
@@ -611,15 +611,15 @@ function semantics_decl_section {
 
    # Set symtab to point to the newly descended scope.
    local   -n symbol="${symtab[${name[value]}]}"
-   declare -g SYMTAB="${symbol[symtab]}"
+   SYMTAB="${symbol[symtab]}"
 
-   declare -n items="${node[items]}" 
+   local -n items="${node[items]}" 
    for each in "${items[@]}"; do
       walk_semantics $each
    done
 
-   declare -g SYMTAB="$symtab_name"
-   declare -g NODE=$save
+   SYMTAB="$symtab_name"
+   NODE=$save
 }
 
 
@@ -802,8 +802,8 @@ function compile_decl_section {
    local -n name="${node[name]}"
 
    # Set symtab to point to the newly descended scope.
-   local   -n symbol="${symtab[${name[value]}]}"
-   declare -g SYMTAB="${symbol[symtab]}"
+   local -n symbol="${symtab[${name[value]}]}"
+   SYMTAB="${symbol[symtab]}"
 
    # Create data dictionary object.
    mk_compile_dict

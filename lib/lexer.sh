@@ -3,6 +3,13 @@
 # Requires from ENV:
 #  list:path   FILES[]
 
+
+# @current: The parser seems to be strongly misbehaving when %include'ing
+#           (and probably when %constrain'ing) files. I believe it's because
+#           calling init_scanner() isn't actually properly setting up the
+#           scanner again? Or maybe it is.
+
+
 function init_scanner {
    : 'Some variables need to be reset at the start of every run. They hold
       information that should not be carried from file to file.'

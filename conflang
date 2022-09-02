@@ -1,58 +1,13 @@
 #!/bin/bash
 
-declare -g INPUT="$1"
-
-# Shouldn't code file names/paths into the generated output. If the user has the
-# same file *data*, but it's in a different place, we shouldn't have to
-# re-compile the output.
-# An array of files allows us to map a static file INDEX (stored in the output
-# data), to the possibly dynamic path to the file.
-declare -ga FILES=()
-
-# Stores the $ROOT after each `parse()`. The idx of a root node here should
-# correspond to it's matching INCLUDE_$n from the INCLUDES[] array. Example:
-#> INCLUDE_ROOT [ NODE_10,    NODE_20    ]
-#> INCLUDES     [ INCLUDE_01, INCLUDE_02 ]
-# Meaning...
-# Take the contents of INCLUDE_ROOT[0].items, and drop them into
-# INCLUDES[0].target.items.
-declare -a INCLUDE_ROOT=()
-
-
-function setup {
-   # All variables declared in the environment. Diff against a later dump to
-   # determine only that which was declared in this utility.
-   get_first_env
-
-   # shellcheck disable=SC2155,SC2164
-   declare -g PROGDIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" ; pwd )
-   declare -g LIBDIR="${PROGDIR}/lib"
-
-   # shellcheck source=./lib/errors.sh
-   source "${LIBDIR}"/errors.sh
-
-   if [[ -z "$INPUT" ]] ; then
-      raise no_input
-   fi
-
-   # shellcheck source=./lib/debug.sh
-   source "${LIBDIR}"/debug.sh
-
-   # shellcheck source=./lib/lexer.sh
-   source "${LIBDIR}"/lexer.sh
-
-   # shellcheck source=./lib/parser.sh
-   source "${LIBDIR}"/parser.sh
-   # Exports:
-   #  TOKENS[]
-   #  TOKEN_$n
-
-   # shellcheck source=./lib/compiler.sh
-   source "${LIBDIR}"/compiler.sh
-   # Exports (USER ACCESSIBLE):
-   #  _DATA_ROOT
-   #  _DATA_*
-}
+# Current environment's variables. By diffing with the later dump of
+# variables, we can determine which were defined here, and what was pre-
+# existing from the environment. If the user tries to reference an
+# environment variable that we've stomped on, we can accurately report that
+# here.
+readarray -td $'\n' ENV_START < <(
+   declare -p | awk '/^declare -/ { sub(/=.*/, "") ; print $3}' | sort
+)
 
 
 function add_file {
@@ -93,8 +48,9 @@ function add_file {
 
 function merge_includes {
    # Parse all `%include` files.
-   # For some reason a standard for loop won't let me modify the loop itself while
-   # iterating through it. Options are either a while loop, or a C-style for loop.
+   # For some reason a standard for loop won't let me modify the loop itself
+   # while iterating through it. Options are either a while loop, or a C-style
+   # for loop.
    local -i idx
    while [[ idx -lt ${#INCLUDES[@]} ]] ; do
       local -- insert_node=${INCLUDES[idx]}
@@ -110,19 +66,21 @@ function merge_includes {
       fi
 
       # Generate AST for the imported file.
-      parse
+      # @current
+      init_scanner ; scan ; parse
 
-      # Construct array (backwards) of the $ROOT nodes for each %include statement.
-      # Allows us to iter the INCLUDES backwards, and match $idx to its
-      # corresponding root here.
+      # Construct array (backwards) of the $ROOT nodes for each %include
+      # statement.  Allows us to iter the INCLUDES backwards, and match $idx to
+      # its corresponding root here.
       INCLUDE_ROOT=( "$ROOT" "${INCLUDE_ROOT[@]}" )
 
       (( idx++ ))
    done
 
-   # Iterates bottom-to-top over the %include statements. Appends the 
+   # Iterates bottom-to-top over the %include statements. Appends the items
+   # from the included section into the target section.
    local -i len=${#INCLUDES[@]}
-   for (( idx = (len - 1); idx >= 0; idx-- )) ; do
+   for (( idx=(len - 1); idx >= 0; idx-- )) ; do
       local -- include_name=${INCLUDES[idx]}
       local -n include_node=${include_name}
       # e.g., INCLUDE_1(path: './colors.conf', target: NODE_2)
@@ -139,7 +97,8 @@ function merge_includes {
       #       NODE_16(items: NODE_17, name: NODE_15)
       #       root_items = NODE_17[]
 
-      # For each node in the sub-file, append it to the targetted node's .items[].
+      # For each node in the sub-file, append it to the targetted node's
+      # .items[].
       for n in "${root_items[@]}" ; do
          target_items+=( "$n" )
       done
@@ -192,20 +151,6 @@ function _parse {
 }
 
 
-function get_first_env {
-   declare -ga ENV_START
-
-   # Current environment's variables. By diffing with the later dump of
-   # variables, we can determine which were defined here, and what was pre-
-   # existing from the environment. If the user tries to reference an
-   # environment variable that we've stomped on, we can accurately report that
-   # here.
-   readarray -td $'\n' ENV_START < <(
-      declare -p | awk '/^declare -/ { sub(/=.*/, "") ; print $3}' | sort
-   )
-}
-
-
 function get_second_env {
    # Second dump of all the declared variables. By diffing with the last dump
    # of variables, we can determine which were defined here, and what was pre-
@@ -238,33 +183,38 @@ function get_second_env {
 function _do_parse {
    # Parse the top-level `base' file.
    add_file "$INPUT"
-   _parse ; parent_root=$ROOT
+
+   _parse
+   declare -g PARENT_ROOT=$ROOT
+
    merge_includes
    # Merge all (potentially nested) `%include` statements from the parent file.
 
    # Reset INCLUDE_ROOT[] and INCLUDES[] before parsing the constrain'd
    # file(s).
-   declare -a INCLUDE_ROOT=()  INCLUDES=()
+   declare -ga INCLUDE_ROOT=()  INCLUDES=()
 
-   _f0=${#FILES[@]}
+   local _f0=${#FILES[@]}
    identify_constraint_file 
-   _f1=${#FILES[@]}
+   local _f1=${#FILES[@]}
 
    # This is a little nonsense, but it saves us from creating another global
    # var to track if we've hit a valid child file. `identify_constraint_file()`
    # adds the file to the global FILES[] array. Thus, if array is not of the
    # same len, we added a file. Don't want to parse an additional time if it's
    # not needed.
-   if [[ "${_f0}" != "${_f1}" ]] ; then
+   if [[ $_f0 -ne $_f1 ]] ; then
       # Now parse all the sub-files we're imposing constraints upon.
-      _parse ; child_root=$ROOT
+      _parse
+      declare -g CHILD_ROOT=$ROOT
+
       merge_includes
       # Merge all (potentially nested) `%include` statements from the child
       # file.
    fi
 
    # Restore top-level root node.
-   ROOT=$parent_root
+   declare -g ROOT=$PARENT_ROOT
 }
 
 
@@ -274,17 +224,17 @@ function _do_compile {
    # for any globally defined identifiers--currently typedefs. After the symbol
    # tables are merged we can copy the types to the root of the parent symtab.
    mk_symtab
-   declare -ng GLOBALS="$SYMTAB"
+   declare -gn GLOBALS="$SYMTAB"
    populate_globals
 
    # Each section assumes there's a symtab above it. There is a "hidden" top-
    # level section `%inline'. Need to create a parent symtab above to hold it.
    mk_symtab ; parent_symtab=$SYMTAB
-   walk_symtab "$parent_root"
+   walk_symtab "$PARENT_ROOT"
 
-   if [[ "$child_root" ]] ; then
+   if [[ "$CHILD_ROOT" ]] ; then
       mk_symtab ; child_symtab=$SYMTAB
-      walk_symtab "$child_root"
+      walk_symtab "$CHILD_ROOT"
 
       # shellcheck disable=SC2128
       # It thinks the parent_symtab is an array itself, rather than the name of
@@ -293,7 +243,7 @@ function _do_compile {
    fi
 
    # Reset pointer back to the parent symtab.
-   declare -- SYMTAB="$parent_symtab"
+   declare -g SYMTAB="$parent_symtab"
 
    # Integrate globals at the root of the top-level symbol table.
    declare -n _symtab="$parent_symtab"
@@ -309,28 +259,84 @@ function _do_compile {
    # only what was defined in this script itself.
    get_second_env
 
-   walk_semantics "$parent_root"
-   walk_compiler  "$parent_root"
-   walk_pprint    "$parent_root"
+   walk_semantics "$PARENT_ROOT"
+   #pprint_symtab  "$parent_symtab"
+   #walk_compiler  "$PARENT_ROOT"
+   #walk_pprint    "$PARENT_ROOT"
 }
 
 
 function _main {
-   setup
    _do_parse
    _do_compile
 }
 
 
-if [[ "${BASH_SOURCE[0]}" == "$0" ]] ; then
-   _main
+# If sourced, exit. Equiv. to Python's >if __name__ == '__main__'
+# Nothing below this line will run if sourced, only if invoked directly.
+[[ "${BASH_SOURCE[0]}" == "$0" ]] || exit 0
 
-   # shellcheck source=./lib/api.sh
-   #source "${LIBDIR}"/api.sh
-   # Exports (USER ACCESSIBLE):
-   #  conf()   - query data
-   #  RV       - result of query
-   #
-   #conf homedir
-   #echo "${RV@Q}"
+
+# Symbol table holding the name of the SYMTAB_$n, and a nameref to that symtab.
+declare -g GLOBALS_NAME
+declare -g GLOBALS
+
+# The root NODE_$n of the parent and child AST trees.
+declare -g PARENT_ROOT CHILD_ROOT
+
+# Shouldn't code file names/paths into the generated output. If the user has the
+# same file *data*, but it's in a different place, we shouldn't have to
+# re-compile the output.
+# An array of files allows us to map a static file INDEX (stored in the output
+# data), to the possibly dynamic path to the file.
+declare -ga FILES=()
+
+# Stores the $ROOT after each `parse()`. The idx of a root node here should
+# correspond to it's matching INCLUDE_$n from the INCLUDES[] array. Example:
+#> INCLUDE_ROOT [ NODE_10,    NODE_20    ]
+#> INCLUDES     [ INCLUDE_01, INCLUDE_02 ]
+# Meaning...
+# Take the contents of INCLUDE_ROOT[0].items, and drop them into
+# INCLUDES[0].target.items.
+declare -ga INCLUDE_ROOT=()  INCLUDES=()
+
+# shellcheck disable=SC2155,SC2164
+declare -g PROGDIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" ; pwd )
+declare -g LIBDIR="${PROGDIR}/lib"
+
+# shellcheck source=./lib/errors.sh
+source "${LIBDIR}"/errors.sh
+
+declare -g INPUT="$1"
+if [[ -z "$INPUT" ]] ; then
+   raise no_input
 fi
+
+# shellcheck source=./lib/debug.sh
+source "${LIBDIR}"/debug.sh
+
+# shellcheck source=./lib/lexer.sh
+source "${LIBDIR}"/lexer.sh
+
+# shellcheck source=./lib/parser.sh
+source "${LIBDIR}"/parser.sh
+# Exports:
+#  TOKENS[]
+#  TOKEN_$n
+
+# shellcheck source=./lib/compiler.sh
+source "${LIBDIR}"/compiler.sh
+# Exports (USER ACCESSIBLE):
+#  _DATA_ROOT
+#  _DATA_*
+
+# shellcheck source=./lib/api.sh
+source "${LIBDIR}"/api.sh
+# Exports (USER ACCESSIBLE):
+#  conf()   - query data
+#  RV       - result of query
+#
+
+_main
+#conf homedir
+#echo "${RV@Q}"

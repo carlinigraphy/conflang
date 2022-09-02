@@ -274,11 +274,6 @@ function dump_everything {
    )
 
    (
-      declare -p parent_symtab
-      if [[ $child_symtab ]] ; then
-         declare -p child_symtab
-      fi
-
       # shellcheck disable=SC2086
       # ^-- thinks we don't want globbing here. We do.
       declare -p ${!NODE_*} ${!SYMTAB*} ${!SYMBOL_*} ${!TYPE_*} ${!_DATA*}

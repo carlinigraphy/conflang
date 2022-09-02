@@ -47,9 +47,9 @@ function mk_decl_section {
    declare -g  NODE=$nname
    local   -n  node=$nname
 
-   # 1.5) set global SECTION pointer here
-   #      for validating %constrain blocks, and setting $target of %include's
-   declare -g  SECTION=$nname
+   # Set global SECTION pointer here for validating %constrain blocks, and
+   # setting $target of %include's
+   declare -g SECTION=$nname
 
    # 2) create list to hold the items within the section.
    (( ++NODE_NUM ))
@@ -413,7 +413,9 @@ function p_include {
    mk_include
    local -n include=$INCLUDE
 
-   p_path
+   # When used outside the `p_expression()` function, need to explicitly pass
+   # in a refernce to the current token.
+   p_path "$CURRENT_NAME"
    p_munch 'PATH' "expecting path after %include."
 
    local -n path=$NODE
@@ -449,7 +451,9 @@ function p_constrain {
 
    p_munch 'L_BRACKET' "expecting \`[' to begin array of paths."
    while ! p_check 'R_BRACKET' ; do
-      p_path
+      # When used outside the `p_expression()` function, need to explicitly
+      # pass in a refernce to the current token.
+      p_path "$CURRENT_NAME"
       p_munch 'PATH' 'expecting an array of paths.'
 
       local -n path=$NODE
@@ -479,6 +483,7 @@ function p_declaration {
 
 function p_decl_section {
    local -- name=$NODE
+   local -- sect=$SECTION
 
    mk_decl_section
    local -- save=$NODE
@@ -495,7 +500,8 @@ function p_decl_section {
    done
 
    p_munch 'R_BRACE' "expecting \`}' after section."
-   declare -g NODE=$save
+   declare -g NODE="$save"
+   declare -g SECTION="$sect"
 }
 
 
