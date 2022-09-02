@@ -20,10 +20,6 @@ declare -a INCLUDE_ROOT=()
 
 
 function setup {
-   if [[ -z "$INPUT" ]] ; then
-      raise no_input
-   fi
-
    # All variables declared in the environment. Diff against a later dump to
    # determine only that which was declared in this utility.
    get_first_env
@@ -34,6 +30,10 @@ function setup {
 
    # shellcheck source=./lib/errors.sh
    source "${LIBDIR}"/errors.sh
+
+   if [[ -z "$INPUT" ]] ; then
+      raise no_input
+   fi
 
    # shellcheck source=./lib/debug.sh
    source "${LIBDIR}"/debug.sh
