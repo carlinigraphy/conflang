@@ -138,14 +138,15 @@ function identify_constraint_file {
 
 
 function _parse {
-   # Some elements of the scanner need to be reset before every run. Vars that
-   # hold file-specific information.
+   # Some elements of the scanner/parser need to be reset before every run.
+   # Vars that hold file-specific information.
+
    init_scanner
    scan
    # Exports:
    #  list  TOKENS[]
+   #  dict  TOKEN_*
 
-   # Equally reset the run-specific information.
    init_parser
    parse
    # Exports:

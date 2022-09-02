@@ -11,8 +11,7 @@ declare -gi  NODE_NUM=0
 declare -gi  INCLUDE_NUM=0
 
 # `include` & `constrain` directives are handled by the parser. They don't
-# actually create any "real" nodes. They leave sentinel values that are later
-# resolved.
+# create NODES_$n's.
 declare -ga  INCLUDES=() CONSTRAINTS=()
 # Both hold lists.
 # Sub-objects:

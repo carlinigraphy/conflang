@@ -226,8 +226,8 @@ Other symbols I can use?
 For when I get stuck, what are things I can work on...
 
 * [ ] Error handling
-* [ ] Referencing bash environment variables
-* [ ] Referencing interal variables?
+* [x] Referencing bash environment variables
+* [x] Referencing interal variables?
 * [x] BATS tests
 * [x] Merging child file -> parent
 * [x] Lexing, parsing, and compiling basic (non-directive) .config files
@@ -353,3 +353,20 @@ Just not right for this context.
 
 For now going to use types surrounded by parens, with a colon separating the expression.
 Array elements will be delimited by a comma.
+
+
+== `%constrain` & `%include` statements
+Running into problems here:
+
+[source,bash]
+----
+while ! p_check 'R_BRACE' ; do
+   p_statement
+   items+=( "$NODE" )
+done
+----
+
+If the `p_statement` is an `%include`, it doesn't create a `$NODE`.
+Ooh, an interseting idea... maybe it *should* create a node.
+Make a sentinel NODE whose type is '`include`', and the index for which is saved in the actual `INCLUDE` node along with the `.target`.
+Doesn't need to be a real NODE_* with a `TYPEOF{}`, probably just something called `REPLACE_ME`.
