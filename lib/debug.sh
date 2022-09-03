@@ -59,6 +59,7 @@ function pprint_decl_section {
    local   -n symbol="${symtab[${name[value]}]}"
    declare -g SYMTAB="${symbol[symtab]}"
 
+   printf "%$(( INDENTATION * INDENT_FACTOR ))s" ''
    walk_pprint "${node[name]}"
    printf ' {\n'
 
@@ -201,7 +202,15 @@ function pprint_path {
 
 function pprint_identifier {
    local -n node=$NODE
-   printf '%s' "${node[value]}"
+   local -- value="${node[value]}"
+
+   if [[ "$value" == '%inline' ]] ; then
+      local index=${node['file']}
+      local fname=${FILES[$index]}
+      value="${fname##*/}"
+   fi
+
+   printf '%s' "$value"
 }
 
 

@@ -380,7 +380,12 @@ function p_program {
 
    while ! p_check 'EOF' ; do
       p_statement
-      items+=( "$NODE" )
+
+      # %include/%constrain are statements, but do not have an associated $NODE.
+      # Need to avoid adding an empty string to the section.items[]
+      if [[ $NODE ]] ; then
+         items+=( "$NODE" )
+      fi
    done
 
    p_munch 'EOF'
@@ -420,17 +425,14 @@ function p_include {
    p_munch 'PATH' "expecting path after %include."
 
    local -n path=$NODE
-   include['path']=${path[value]}
    # shellcheck disable=SC2034 
-   # Ignore "appears unused", `shellcheck` doesn't know it's used in a different
-   # file.
+   include['path']=${path[value]}
    include['target']=$SECTION
 
    declare -g NODE=
    # Section declarations loop & append $NODEs to their .items. `include`/
-   # `constrain` directives are technically children of a section, but they
-   # do not live past the parser. Need to explicitly set $NODE to an empty
-   # string, so they are not appended to the parent's .items[].
+   # `constrain` directives are technically children of a section, but they do
+   # not live past the parser.
 }
 
 
@@ -439,7 +441,11 @@ function p_constrain {
    local -n name=${section_ptr[name]}
 
    if [[ ${name[value]} != '%inline' ]] ; then
-      raise parse_error 'constrain blocks may only occur in the top level.'
+      raise parse_error '%constrain may only occur in the top level.'
+   fi
+
+   if [[ ${name[file]} -ne 0 ]] ; then
+      raise parse_error '%constrain may not occur in a sub-file.'
    fi
 
    if [[ "${#CONSTRAINTS[@]}" -gt 0 ]] ; then
@@ -448,8 +454,8 @@ function p_constrain {
 
    # TODO: refactor
    # This should probably just call `p_array`. Then we can pull the paths out
-   # from within it? Rearpb making it a special case.
-
+   # from within it? Rearpb making it a special case. Or maybe just straight
+   # up call `p_expression`. Hmm.
    p_munch 'L_BRACKET' "expecting \`[' to begin array of paths."
    while ! p_check 'R_BRACKET' ; do
       # When used outside the `p_expression()` function, need to explicitly
@@ -462,11 +468,10 @@ function p_constrain {
    done
 
    p_munch 'R_BRACKET' "expecting \`]' after constrain block."
-   declare -g NODE=
+   declare -g NODE='_'
    # Section declarations loop & append $NODEs to their .items. `include`/
-   # `constrain` directives are technically children of a section, but they
-   # do not live past the parser. Need to explicitly set $NODE to an empty
-   # string, so they are not appended to the parent's .items[].
+   # `constrain` directives are technically children of a section, but they do
+   # not live past the parser.
 }
 
 
@@ -497,7 +502,12 @@ function p_decl_section {
 
    while ! p_check 'R_BRACE' ; do
       p_statement
-      items+=( "$NODE" )
+
+      # %include/%constrain are statements, but do not have an associated $NODE.
+      # Need to avoid adding an empty string to the section.items[]
+      if [[ $NODE ]] ; then
+         items+=( "$NODE" )
+      fi
    done
 
    p_munch 'R_BRACE' "expecting \`}' after section."

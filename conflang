@@ -77,9 +77,6 @@ function merge_includes {
       (( idx++ ))
    done
 
-   dump_everything
-   exit
-
    # Iterates bottom-to-top over the %include statements. Appends the items
    # from the included section into the target section.
    local -i len=${#INCLUDES[@]}
@@ -265,9 +262,8 @@ function _do_compile {
    get_second_env
 
    walk_semantics "$PARENT_ROOT"
-   #pprint_symtab  "$parent_symtab"
-   #walk_compiler  "$PARENT_ROOT"
-   #walk_pprint    "$PARENT_ROOT"
+   walk_compiler  "$PARENT_ROOT"
+   walk_pprint    "$PARENT_ROOT"
 }
 
 
