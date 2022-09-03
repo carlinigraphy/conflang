@@ -535,18 +535,16 @@ function merge_type {
    [[ "${t2[kind]}" == 'ANY' ]] && return 0
 
    # case 1.
-   # Parent and child's types match exactly.
-   if [[ ${t1['kind']} == "${t2[kind]}" ]] ; then
-      return 0
-   fi
+   # First match base types.
+   [[ ${t1['kind']} != "${t2[kind]}" ]] && return 1
 
-   # Same as above, but for any subtypes.
+   # Then match subtypes.
    if [[ ${t1['subtype']} ]] ; then
       merge_type "${t1[subtype]}" "${t2[subtype]}"
       return $?
    fi
 
-   return 1
+   return 0
 }
 
 
