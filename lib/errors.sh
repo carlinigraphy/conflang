@@ -23,16 +23,18 @@ declare -gA EXIT_STATUS=(
    [type_error]=4
    [invalid_type_error]=5
    [not_a_type]=6
-   [index_error]=7
-   [circular_import]=8
-   [name_error]=9
-   [missing_file]=10
-   [missing_env_var]=11
-   [stomped_env_var]=12
-   [missing_int_var]=13
-   [invalid_interpolation_char]=14
-   [unescaped_interpolation_brace]=15
-   [munch_error]=16
+   [symbol_mismatch]=7
+   [index_error]=8
+   [circular_import]=9
+   [name_error]=10
+   [missing_file]=11
+   [missing_env_var]=12
+   [stomped_env_var]=13
+   [missing_int_var]=14
+   [invalid_interpolation_char]=15
+   [unescaped_interpolation_brace]=16
+   [munch_error]=17
+   [missing_required]=18
 )
 
 function raise {
@@ -152,6 +154,10 @@ function print_type_error {
       # word and prefix with a leading space.
 }
 
+function print_symbol_mismatch {
+   printf "Type Error: child key \`$1' does not match parent's type.\n"
+}
+
 #────────────────────────────────( key errors )─────────────────────────────────
 function print_index_error {
    printf "Index Error: \`%s' not found.\n"  "$1"
@@ -171,4 +177,8 @@ function print_stomped_env_var {
 
 function print_missing_int_var {
    printf "Name Error: internal variable \`%s' is not defined.\n"  "$1"
+}
+
+function print_missing_required {
+   printf "Key Error: \`$1' required in parent, missing in child.\n"
 }

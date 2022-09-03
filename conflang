@@ -32,8 +32,8 @@ function add_file {
 
    case "$file" in
       # Absolute paths.
-      /*)   fq_path="${file}"             ;;
-      ~*)   fq_path="${file/\~/${HOME}}"  ;;
+      /*)   fq_path="${file}"           ;;
+      ~*)   fq_path="${file/\~/$HOME}"  ;;
 
       # Paths relative to the calling file.
       *)    fq_path=$( realpath -m "${parent}/${file}" -q )
@@ -55,14 +55,15 @@ function merge_includes {
    # for loop.
    local -i idx
    while [[ idx -lt ${#INCLUDES[@]} ]] ; do
-      local -- insert_node=${INCLUDES[idx]}
-      local -n node="$insert_node"
+      local -n node=${INCLUDES[idx]}
       insert_node_path="${node[path]}"
 
       add_file "$insert_node_path"
 
       # File must exist, must be readable.
       if [[ ! -r "${FILES[-1]}" ]] ; then
+         # TODO: refactor
+         # This should be a `raise`, not just a random echo.
          echo -e "File \`${FILES[-1]}' not readable or doesn't exist."
          continue
       fi

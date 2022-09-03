@@ -350,20 +350,6 @@ function symtab_identifier {
 declare -a FQ_LOCATION=()
 declare -- FQ_NAME=
 
-# Don't want to exit instantly on the first missing key. Collect them all,
-# report and fail at the end.
-declare -a MISSING_KEYS=()
-
-# Currently just logs the `path' to the identifier whose type was incorrect.
-# Need to also display file/line/column/expected type information. This is
-# different from a semantic typecheck. We're checking that a parent node is a
-# Section, and the child is as well. Or the parent is a variable declaration,
-# and the child matches.
-declare -a SYMBOL_MISMATCH=()
-
-# Cannot re-declare a typedef that's already been defined.
-declare -a TYPE_REDECLARE=()
-
 
 function merge_symtab {
    local -n parent_symtab=$1
@@ -379,20 +365,21 @@ function merge_symtab {
    done
    
    for p_key in "${!parent_symtab[@]}" ; do
-      FQ_LOCATION+=( "$p_key" )
+      if [[ "$p_key" != '%inline' ]] ; then
+         FQ_LOCATION+=( "$p_key" )
+      fi
+
+      # For error reporting, build a "fully qualified" path to this node.
+      local fq_name=''
+      for s in "${FQ_LOCATION[@]}" ; do
+         fq_name+="${fq_name:+.}${s}"
+      done
+      declare -g FQ_NAME="$fq_name"
 
       # Parent Symbol.
       local -- p_sym_name="${parent_symtab[$p_key]}"
       local -n p_sym=$p_sym_name
       local -- p_node=${p_sym[node]}
-
-      # For error reporting, build a "fully qualified" path to this node.
-      local fq_name=''
-      for s in "${FQ_LOCATION[@]}" ; do
-         fq_name+="${s}."
-      done
-      fq_name+="${p_key}"
-      FQ_NAME="$fq_name"
 
       # Parent type information.
       local -- p_type_name="${p_sym[type]}"
@@ -452,26 +439,23 @@ function merge_section {
    # Child section is missing, but was required in the parent.
    if [[ ! "$c_sym_name" ]] ; then
       if [[ "${p_sym[required]}" ]] ; then
-         MISSING_KEYS+=( "$FQ_NAME" )
-         return 1
+         raise missing_required "$FQ_NAME"
+      else
+         # If child section was missing, but not required... nothing to do. We
+         # gucci & scoochie.
+         return 0
       fi
-
-      # If child section was missing, but not required... nothing to do. We
-      # gucci & scoochie.
-      return 0
    fi
 
    local -n c_sym="$c_sym_name"
    local -n c_type="${c_sym[type]}"
-   
+
    # case 2.
    # Found child node under the same identifier, but not a Section.
    if [[ ${c_type[kind]} != 'SECTION' ]] ; then
-      SYMBOL_MISMATCH+=( "$FQ_NAME" )
-      return 1
+      raise symbol_mismatch "${FQ_NAME}"
    fi
 
-   SECTION="${p_sym[node]}"
    merge_symtab "${p_sym[symtab]}" "${c_sym[symtab]}"
 }
 
@@ -494,10 +478,10 @@ function merge_variable {
    # case 1a.
    if [[ ! "$c_sym_name" ]] ; then
       if [[ "${p_sym[required]}" ]] ; then
-         MISSING_KEYS+=( "$FQ_NAME" )
-         return 1
+         raise missing_required "$FQ_NAME"
+      else
+         return 0
       fi
-      return 0
    fi
 
    local -n c_sym="$c_sym_name"
@@ -506,15 +490,13 @@ function merge_variable {
    # Expecting a variable declaration, child is actually a Section.
    local -n c_type="${c_sym[type]}" 
    if [[ "${c_type[kind]}" == 'SECTION' ]] ; then
-      SYMBOL_MISMATCH+=( "$FQ_NAME" )
-      return 1
+      raise symbol_mismatch "${FQ_NAME}"
    fi
 
    # case 2b.
    # The type of the child must defer to the type of the parent.
    if ! merge_type "${p_sym[type]}" "${c_sym[type]}" ; then
-      TYPE_REDECLARE+=( "$FQ_NAME" )
-      return 1
+      raise symbol_mismatch "${FQ_NAME}"
    fi
 
    # If we haven't hit any errors, can safely copy over the child's value to the
