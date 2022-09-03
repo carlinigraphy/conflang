@@ -5,7 +5,7 @@
 :pygments-style:           algol_nu
 :pygments-linenums-mode:   table
 
-Declarative config file "`language`" with built-in validation.
+Configuration file format & language, featuring strong typing and a small but robust feature set.
 
 
 == Why it do
