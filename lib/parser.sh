@@ -496,8 +496,8 @@ function p_decl_section {
    local -n node=$NODE
    local -n items=${node['items']}
 
+   #  ┌── incorrectly identified error by `shellcheck`.
    # shellcheck disable=SC2128 
-   # Incorrectly identified error by `shellcheck`.
    node['name']="$name"
 
    while ! p_check 'R_BRACE' ; do
@@ -524,8 +524,8 @@ function p_decl_variable {
    local -- save=$NODE
    local -n node=$NODE
 
+   #  ┌── incorrectly identified error by `shellcheck`.
    # shellcheck disable=SC2128
-   # Incorrectly identified error by `shellcheck`.
    node['name']=$name
 
    # Typedefs.
@@ -562,8 +562,8 @@ function p_typedef {
    local -- save=$NODE
    local -n type_=$save
 
+   #  ┌── incorrectly identified error by `shellcheck`.
    # shellcheck disable=SC2128
-   # Incorrectly identified error by `shellcheck`.
    type_['kind']=$name
 
    while p_match 'COLON' ; do

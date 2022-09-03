@@ -504,8 +504,8 @@ function merge_variable {
    local -n p_node="${p_sym[node]}" 
    local -n c_node="${c_sym[node]}" 
    if [[ "${c_node[expr]}" ]] ; then
+      #  ┌── does not understand namerefs
       # shellcheck disable=SC2034
-      # ^-- does not understand namerefs
       p_node['expr']="${c_node[expr]}" 
    fi
 
@@ -746,8 +746,8 @@ function semantics_string  { extract_type 'str';  }
 
 #─────────────────────────────────( compiler )──────────────────────────────────
 # TODO: documentation
+#  ┌── thinks I'm trying to assign a var, rather than declare empty variables.
 # shellcheck disable=SC1007
-# ^-- thinks I'm trying to assign a var, rather than declare empty variables.
 declare -- KEY= DATA=
 declare -i DATA_NUM=0
 
