@@ -399,8 +399,11 @@ function merge_symtab {
       local -n p_type=$p_type_name
 
       # Child Symbol.
+      # The child symbol may not necessarily exist. These cases, and the error
+      # reporting, are both handled in their respective functions:
+      # `merge_variable`, `merge_section`.
       local -- c_sym_name="${child_symtab[$p_key]}"
-      
+
       # shellcheck disable=SC2184
       unset child_keys["$p_key"]
       # Pop reference to child symbol from the `child_keys[]` copy. Will allow
@@ -419,13 +422,13 @@ function merge_symtab {
    # Any additional keys from the child need to be copied into both...
    #  1. the parent's .items[] array
    #  2. the parent's symbol table
-   for c_key in "${child_keys[@]}" ; do
+   for c_key in "${!child_keys[@]}" ; do
       # Add to symtab.
       parent_symtab[$c_key]="${child_symtab[$c_key]}" 
 
       local -n c_sym="${child_symtab[$c_key]}"
-      local -n section=$SECTION
-      local -n items="${section[items]}"
+      local -n parent=$PARENT_ROOT
+      local -n items="${parent[items]}"
 
       # Add to items.
       items+=( "${c_sym[node]}" )

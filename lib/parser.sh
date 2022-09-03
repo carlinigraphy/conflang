@@ -468,7 +468,7 @@ function p_constrain {
    done
 
    p_munch 'R_BRACKET' "expecting \`]' after constrain block."
-   declare -g NODE='_'
+   declare -g NODE=
    # Section declarations loop & append $NODEs to their .items. `include`/
    # `constrain` directives are technically children of a section, but they do
    # not live past the parser.
