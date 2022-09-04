@@ -441,7 +441,7 @@ function p_constrain {
    local -n name=${section_ptr[name]}
 
    if [[ ${name[value]} != '%inline' ]] ; then
-      raise parse_error '%constrain may only occur in the top level.'
+      raise parse_error '%constrain may not occur in a section.'
    fi
 
    if [[ ${name[file]} -ne 0 ]] ; then

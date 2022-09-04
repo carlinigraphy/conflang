@@ -235,9 +235,12 @@ function pprint_int_var {
    local -n node=$NODE
    local -- var="${node[value]}" 
 
-   local -n symtab="$SYMTAB"
-   local -- symbol_name="${symtab[$var]}"
+   # Internal vars are absolute paths, always beginning at the root of the
+   # symbol table.
+   local -n inline="${GLOBALS[%inline]}"
+   local -n symtab="${inline[symtab]}"
 
+   local symbol_name="${symtab[$var]}"
    if [[ ! "$symbol_name" ]] ; then
       raise missing_int_var "$var"
    fi

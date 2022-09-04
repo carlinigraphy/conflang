@@ -64,7 +64,7 @@ function populate_globals {
 
    # Create symbols for complex types.
    for short_name in "${!complex[@]}" ; do
-      mk_metatype "${primitive[$short_name]}"  'complex'
+      mk_metatype "${complex[$short_name]}"  'complex'
       symtab[$short_name]="$SYMBOL"
    done
 }
@@ -298,10 +298,13 @@ function symtab_typedef {
       # A subtype is only valid if the parent type has a .subtype property.
       # Primitive types are created with this unset. Complex types it is set,
       # but empty.
-      local -n _parent_type="$tname"
 
-      # See ./doc/truth.sh for an explanation on the test below.
-      if [[ ! "${_parent_type['subtype']+_}" ]] ; then
+      # See ./doc/truth.sh for an explanation on the test below. Tests if the
+      # type either has a populated .subtype field, or the field is SET, but
+      # empty.
+      if [[ ! "${node['subtype']+_}" ]] && \
+         [[ ! "${node['subtype']}"   ]]
+      then
          raise type_error        \
             "${node[subtype]}"   \
             "primitive types are not subscriptable."
@@ -934,9 +937,12 @@ function compile_int_var {
    local -n node="$NODE"
    local -- var="${node[value]}"
 
-   local -n symtab="$SYMTAB"
-   local -- symbol_name="${symtab[$var]}"
+   # Internal vars are absolute paths, always beginning at the root of the
+   # symbol table.
+   local -n inline="${GLOBALS[%inline]}"
+   local -n symtab="${inline[symtab]}"
 
+   local symbol_name="${symtab[$var]}"
    if [[ ! "$symbol_name" ]] ; then
       raise missing_int_var "$var"
    fi
