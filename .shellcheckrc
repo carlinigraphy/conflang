@@ -1,6 +1,47 @@
 # https://github.com/koalaman/shellcheck/wiki/Ignore
 
+# Should still periodically run with...
+#  `shellcheck -i SC2128 -i SC2053 ...`
+# ...just to make sure we're not shadowing unintended errors.
+
+external-sources=true
+
+disable=SC1003
+#  "Want to escape a single quote?"
+#     This is never what I'm trying to do. Almost always trying to represent a
+#     backslash character as '\'.
+#
+
+disable=SC2034
+#  "... appears unused"
+#     This is almost always in the context of a nameref initializing attributes
+#     of a Token, Node, or some pseudo-class.
+
+disable=SC2053
+#  "Quote the right-hand side of [[ ... ]]"
+#     This is always done intentionally when the quotes are missing. Either I
+#     know it will only expand to a NODE_*, TYPE_*, or primitive type such as
+#     an integer.
+
+disable=SC2059
+#  "Don't use variables in the printf format string."
+#     Sometimes it saves space, and is faster. Particularly when I need to
+#     double-quote the format string so I can use a backtick for: `...'
+
+disable=SC2086
+#  "Double quote to prevent globbing"
+#     This is always done intentionally when the quotes are missing. Either I
+#     know it will only expand to a NODE_*, TYPE_*, or primitive type such as
+#     an integer.
+
+disable=SC2128
+#  "Expanding an array without an index only gives the first element."
+#     These are only used in tests to see if the array is empty. For example:
+#     > [[ ! $array ]]
+#     There are also times in which namerefs do not apparently play nicely with
+#     shellcheck, and it believes something that *isn't* an array is one.
+
 disable=SC2178 
-# "variable was used as ... but is now ..."
-# When using namerefs, this will occur all the time. The same name is used in
-# different functions to reference different data types.
+#  "variable was used as ... but is now ..."
+#     When using namerefs, this will occur all the time. The same name is used
+#     in different functions to reference different data types.

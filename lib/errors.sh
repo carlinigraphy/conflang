@@ -69,7 +69,7 @@ function location_typecast {
 
 
 function semantics_unary {
-   local -n node=$save
+   local -n node="$LOC"
    walk_location "${node[right]}"
 }
 

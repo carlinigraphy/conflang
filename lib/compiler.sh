@@ -1,4 +1,5 @@
-#!/bin/bash #
+#!/bin/bash
+#
 # Requires from environment:
 #  TYPEOF{}
 #  NODE_*

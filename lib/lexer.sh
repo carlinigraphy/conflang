@@ -1,4 +1,8 @@
 #!/bin/bash
+# shellcheck disable=SC2184
+#  "Quote arguments to `unset` so they're not glob expanded"
+#     Only ever unsetting a single character in an array of single characters.
+#     No ability to glob expand to anything else.
 #
 # Requires from ENV:
 #  list:path   FILES[]

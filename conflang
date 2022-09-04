@@ -260,7 +260,6 @@ function _do_compile {
    done
 
    # Re-point $GLOBALS at the root of the symbol table.
-   declare -g  GLOBALS_NAME="${parent_symtab}"
    declare -gn GLOBALS="${parent_symtab}"
 
    # Dump all variables in the environment. Diff against the `get_first_env` for
@@ -285,7 +284,6 @@ function _main {
 
 
 # Symbol table holding the name of the SYMTAB_$n, and a nameref to that symtab.
-declare -g GLOBALS_NAME
 declare -g GLOBALS
 
 # The root NODE_$n of the parent and child AST trees.

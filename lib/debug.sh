@@ -184,7 +184,7 @@ function pprint_string {
 
 function pprint_path {
    : 'NOTE: This function must call the **walk_COMPILER** function, raerpb
-      `walk_pprint`. Need to collate all the concat chunks, then print the
+      walk_pprint. Need to collate all the concat chunks, then print the
       totality as a string.'
 
    local -n node=$NODE

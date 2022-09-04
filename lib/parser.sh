@@ -279,21 +279,21 @@ function mk_int_var {
 #═══════════════════════════════════╡ utils ╞═══════════════════════════════════
 function init_parser {
    declare -gi IDX=0
-   declare -g  CURRENT=  CURRENT_NAME=
+   declare -g  CURRENT=''  CURRENT_NAME=''
    # Calls to `advance' both globally set the name of the current/next node(s),
    # e.g., `TOKEN_1', as well as declaring a nameref to the variable itself.
 
    # Should be reset on every run, as it's unique to this instance of the parser.
-   declare -g  ROOT=  # Solely used to indicate the root of the AST.
-   declare -g  NODE=
-   declare -g  INCLUDE=
+   declare -g  ROOT=''  # Solely used to indicate the root of the AST.
+   declare -g  NODE=''
+   declare -g  INCLUDE=''
 
    # Need to take note of the section.
    # `%include` blocks must reference the target Section to include any included
    # sub-nodes.
    # `%constrain` blocks must check they are not placed anywhere but a top-level
    # %inline section.
-   declare -g SECTION=
+   declare -g SECTION=''
 }
 
 
@@ -476,7 +476,7 @@ function p_constrain {
 
 
 function p_declaration {
-   p_identifier
+   p_identifier "$CURRENT_NAME"
    p_munch 'IDENTIFIER' "expecting variable declaration."
 
    if p_match 'L_BRACE' ; then
@@ -553,7 +553,7 @@ function p_decl_variable {
 
 
 function p_typedef {
-   p_identifier
+   p_identifier "$CURRENT_NAME"
    p_munch 'IDENTIFIER' 'type declarations must be identifiers.'
 
    local -- name=$NODE
@@ -824,12 +824,7 @@ function p_int_var {
 
 
 function p_identifier {
-   local -n token="${1:-$CURRENT_NAME}"
-   # There are instances in which `p_identifier` is called directly. For
-   # example, within the `p_declaration` function. When the entrypoint is *not*
-   # through the Pratt parser, falling back to the current token name is a
-   # reasonable and expected default. Unit/integration tests should
-   # specifically cover any edge cases.
+   local -n token="$1"
 
    mk_identifier
    local -n node=$NODE
