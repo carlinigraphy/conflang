@@ -46,6 +46,7 @@ function setup {
       [mk_unary]='yes'
       [mk_env_var]='yes' 
       [mk_int_var]='yes' 
+      [init_parser]='yes'
       [parse]='yes'
    )
 
@@ -66,7 +67,7 @@ function setup {
       fi
    done
 
-   assert_equal "${#missing_prefix[@]}"  0
+   assert_equal "${missing_prefix[@]}"  ''
 }
 
 

@@ -7,7 +7,7 @@ function setup {
 
    export LIBDIR="${BATS_TEST_DIRNAME}/../../lib"
    export lib_parser="${LIBDIR}/parser.sh"
-   export lib_lexer="${LIBDIR}/parser.sh"
+   export lib_lexer="${LIBDIR}/lexer.sh"
 
    source "${LIBDIR}/errors.sh"
 }
@@ -35,7 +35,9 @@ function setup {
    : 'While the parser should fail given *NO* tokens in the input, it should
       successfully parse an empty file (only EOF token).'
 
-   local -A TOKEN_0=([type]='EOF' [value]='' )
+   source "$lib_parser"
+
+   local -A TOKEN_0=( [type]='EOF' [value]='' )
    local -a TOKENS=( 'TOKEN_0' )
 
    run parse
