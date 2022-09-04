@@ -252,13 +252,3 @@ function setup {
    assert_equal  "${TYPEOF[$node_name]}"  'decl_section'
    assert_equal  "${#items[@]}"  0
 }
-
-
-@test "include" {
-   skip 'NYI'
-}
-
-
-@test "exclude" {
-   skip 'NYI'
-}
