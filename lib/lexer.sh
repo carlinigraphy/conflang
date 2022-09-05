@@ -7,6 +7,18 @@
 # Requires from ENV:
 #  list:path   FILES[]
 
+declare -gi TOKEN_NUM=0
+
+declare -gA KEYWORD=(
+   ['true']=true
+   ['false']=true
+   ['and']=true
+   ['or']=true
+   ['not']=true
+   ['include']=true
+   ['constrain']=true
+)
+
 function init_scanner {
    : 'Some variables need to be reset at the start of every run. They hold
       information that should not be carried from file to file.'
@@ -19,21 +31,10 @@ function init_scanner {
       raise no_input
    fi
 
-   # File & character information.
+   declare -g   CURRENT=''  PEEK=''
+
    declare -ga  CHARRAY=()
-
-   # Don't *need* to do this, but it makes debugging and error output
-   # significantly more clear to read. Will only have tokens associated with
-   # this run, rather than simply overwriting old values.
-   #if [[ ${!TOKEN_*} ]] ; then
-   #   unset ${!TOKEN_*}
-   #fi
-   # 2022-09-02: this isn't actually working. Running into parse errors on
-   # %include files.
-
-   # Token information.
    declare -ga  TOKENS=()
-   declare -gi  TOKEN_NUM=0
 
    declare -gA  FREEZE CURSOR=(
       [offset]=-1
@@ -76,21 +77,6 @@ function Token {
 }
 
                                      
-#══════════════════════════════════╡ SCANNER ╞══════════════════════════════════
-declare -gA KEYWORD=(
-   ['true']=true
-   ['false']=true
-   ['and']=true
-   ['or']=true
-   ['not']=true
-   ['include']=true
-   ['constrain']=true
-)
-
-
-declare -g  CURRENT PEEK
-declare -ga CHARRAY=()      # Array of each character in the file.
-
 function l_advance {
    # Advance cursor position, pointing to each sequential character. Also incr.
    # the column number indicator. If we go to a new line, it's reset to 0.
@@ -116,15 +102,6 @@ function l_advance {
 
 
 function scan {
-   # Creating secondary line buffer to do better debug output printing. It would
-   # be more efficient to *only* hold a buffer of lines up until each newline.
-   # Unpon an error, we'd only need to save the singular line, then can resume
-   #mapfile -td $'\n' FILE_LINES < "${FILES[-1]}"
-   # TODO: error reporting
-   # Will need a separate array for each file. Probably have a second array
-   # parallel to FILES[]. The index of the FILE will match the name of the
-   # array holding the lines.
-
    # For easier lookahead, read all characters first into an array. Allows us
    # to seek/index very easily.
    while read -rN1 character ; do
@@ -213,7 +190,9 @@ function scan {
          # Bash only natively handles integers. It's not able to do floats
          # without bringing `bc` or something. For now, that's all we'll also
          # support. Maybe later I'll add a float type, just so I can write some
-         # external functions that support float comparisons.
+         # external functions that support float comparisons. Or maybe you just
+         # accept that you're taking a performance hit by using floats. More
+         # subshells and whatnot.
          l_number ; continue
       fi
 
