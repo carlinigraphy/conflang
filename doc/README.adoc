@@ -7,6 +7,12 @@
 
 Configuration file format & language, featuring strong typing and a small but robust feature set.
 
+NOTE:
+This project started its life (sadly) on git.
+Development correctly continued with mercurial after rev. 30 or so.
+This repository contains the commit history after that point.
+The early history is present in https://github.com/hre-utils/conflang.bak.
+
 
 == Why it do
 Another stepping stone in my path to write my own programming language.
