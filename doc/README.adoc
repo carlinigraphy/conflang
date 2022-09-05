@@ -11,7 +11,7 @@ NOTE:
 This project started its life (sadly) on git.
 Development correctly continued with mercurial after rev. 30 or so.
 This repository contains the commit history after that point.
-The early history is present in https://github.com/hre-utils/conflang.bak.
+The early history is present in https://github.com/hre-utils/conflang.bak[hre-utils/conflang.bak] prior to https://github.com/hre-utils/conflang.bak/commit/09def4e[09def4e].
 
 
 == Why it do
