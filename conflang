@@ -5,12 +5,13 @@
 # existing from the environment. If the user tries to reference an
 # environment variable that we've stomped on, we can accurately report that
 # here.
-readarray -td $'\n' ENV_START < <(
-   # TODO: rewrite this in vanilla bash. Should be possible with readarray, and
-   # native bash pattern matching.
-   declare -p | awk '/^declare -/ { sub(/=.*/, "") ; print $3}' | sort
-)
-
+ifs="$IFS" ; IFS=$'\n'
+for line in $(declare -p) ; do
+   if [[ "$line" =~ ^declare\ -(-|[xraAin]+)\ ([^=]+) ]] ; then
+      ENV_START+=( "${BASH_REMATCH[1]}" )
+   fi
+done
+IFS="$ifs"
 
 function add_file {
    # Serves to both ensure we don't have circular imports, as well as resolving
@@ -165,9 +166,14 @@ function diff_env {
    # existing from the environment. If the user tries to reference an
    # environment variable that we've stomped on, we can accurately report that
    # here.
-   readarray -td $'\n' ENV_END < <(
-      declare -p | awk '/^declare -/ { sub(/=.*/, "") ; print $3}' | sort
-   )
+   ifs="$IFS" ; IFS=$'\n'
+   for line in $(declare -p) ; do
+      if [[ "$line" =~ ^declare\ -(-|[xraAin]+)\ ([^=]+) ]] ; then
+         ENV_END+=( "${BASH_REMATCH[1]}" )
+      fi
+   done
+   IFS="$ifs"
+
    readarray -td $'\n' _ENV_DIFF < <(
       comm -13 <(
          printf '%s\n' "${ENV_START[@]}") <(printf '%s\n' "${ENV_END[@]}"
