@@ -159,7 +159,7 @@ function _parse {
 }
 
 
-function get_second_env {
+function diff_env {
    # Second dump of all the declared variables. By diffing with the last dump
    # of variables, we can determine which were defined here, and what was pre-
    # existing from the environment. If the user tries to reference an
@@ -247,7 +247,7 @@ function _do_compile {
       # shellcheck disable=SC2128
       # It thinks the parent_symtab is an array itself, rather than the name of
       # an array.
-      merge_symtab "$parent_symtab" "$child_symtab"
+      merge_symtab "$PARENT_ROOT"  "$parent_symtab"  "$child_symtab"
    fi
 
    # Reset pointer back to the parent symtab.
@@ -264,7 +264,7 @@ function _do_compile {
 
    # Dump all variables in the environment. Diff against the `get_first_env` for
    # only what was defined in this script itself.
-   get_second_env
+   diff_env
 
    walk_semantics "$PARENT_ROOT"
    walk_compiler  "$PARENT_ROOT"

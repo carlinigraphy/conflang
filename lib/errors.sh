@@ -155,7 +155,12 @@ function print_type_error {
 }
 
 function print_symbol_mismatch {
-   printf "Type Error: child key \`$1' does not match parent's type.\n"
+   local fq_name=''
+   for part in "${FQ_LOCATION[@]}" ; do
+      fq_name+="${fq_name:+.}${part}"
+   done
+
+   printf "Type Error: child key \`${fq_name}' does not match parent's type.\n"
 }
 
 #────────────────────────────────( key errors )─────────────────────────────────
@@ -180,5 +185,10 @@ function print_missing_int_var {
 }
 
 function print_missing_required {
-   printf "Key Error: \`$1' required in parent, missing in child.\n"
+   local fq_name=''
+   for part in "${FQ_LOCATION[@]}" ; do
+      fq_name+="${fq_name:+.}${part}"
+   done
+
+   printf "Key Error: \`${fq_name}' required in parent, missing in child.\n"
 }

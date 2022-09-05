@@ -14,8 +14,9 @@ declare -- NODE=
 
 
 function mk_metatype {
-   local -- kind="$1"
-   local -- complex="$2"
+   local name="$1"
+   local kind="$2"
+   local complex="$3"
 
    mk_type
    local -- type_name="$TYPE"
@@ -39,6 +40,7 @@ function mk_metatype {
    mk_symbol
    local -n symbol="$SYMBOL"
    symbol['type']="$parent_type_name"
+   symbol['name']="$name"
 }
 
 
@@ -59,13 +61,13 @@ function populate_globals {
 
    # Create symbols for primitive types.
    for short_name in "${!primitive[@]}" ; do
-      mk_metatype "${primitive[$short_name]}"
+      mk_metatype "$short_name"  "${primitive[$short_name]}"
       symtab[$short_name]="$SYMBOL"
    done
 
    # Create symbols for complex types.
    for short_name in "${!complex[@]}" ; do
-      mk_metatype "${complex[$short_name]}"  'complex'
+      mk_metatype "$short_name"  "${complex[$short_name]}"  'complex'
       symtab[$short_name]="$SYMBOL"
    done
 }
@@ -117,13 +119,19 @@ function mk_symbol {
    declare -g  SYMBOL=$sname
    local   -n  symbol=$sname
 
-   symbol['type']=
-   symbol['node']=
-   symbol['symtab']=
+   symbol['type']=    #> TYPE
+   symbol['node']=    #> NODE
+   symbol['symtab']=  #> SYMTAB
+
+   symbol['name']=    #> str
+   # While it isn't really required, it's substantially easier if we have a
+   # string name, rather than needing to pull it from the symbol.node.name.value
+
    symbol['required']=
    # Variable declaration symbols are `required' if its NODE has no expression.
    # A Section is considered to be `required' if *any* of its children are
    # required. This is only needed when enforcing constraints upon a child file.
+
 }
 
 
@@ -187,12 +195,13 @@ function symtab_decl_section {
    # a child tree into the parent's. Any identifiers that are present in a
    # child's symtab but not a parents are directly appended into the parent's
    # tree. The only way that's possible is with a reference to the node itself.
-   symbol[node]=$node_name
+   symbol['node']=$node_name
 
    # Get string value of identifier node.
    local -- identifier_node=${node[name]}
    local -n identifier=$identifier_node
    local -- name="${identifier[value]}"
+   symbol['name']="$name"
 
    # Add reference to current symbol in parent's SYMTAB. First check if the user
    # has already defined a variable with the same name in this symtab.
@@ -259,6 +268,7 @@ function symtab_decl_variable {
    local -- identifier_node=${node[name]}
    local -n identifier=$identifier_node
    local -- name="${identifier[value]}"
+   symbol['name']="$name"
 
    # Add reference to current symbol in parent's SYMTAB. First check if the user
    # has already defined a variable with the same name in this symtab.
@@ -342,43 +352,28 @@ function symtab_identifier {
 
 # Gives friendly means of reporting to the user where an error has occurred.
 # As we descend into each symtab, push its name to the stack. Print by doing a
-# FQ_LOCATION.join('.'). Example:
-#
-#> FQ_LOCATION=([0]='global' [1]='subsection')
-#> identifier=${node[name]}
-#>
-#> for s in "${FQ_LOCATION[@]}" ; do
-#>    echo -n "${s}."
-#> done
-#> echo "${identifier}"  # -> [$section.]+$identifier -> sect1.sect2.key
+# FQ_LOCATION.join('.')
 declare -a FQ_LOCATION=()
-declare -- FQ_NAME=
 
 
 function merge_symtab {
-   local -n parent_symtab=$1
-   local -n child_symtab=$2
+   local -n parent=$1
+   local -n parent_symtab=$2
+   local -n child_symtab=$3
 
    # We iterate over the parent symtab. So we're guaranteed to hit every key
    # there. The child symtab may contain *extra* keys that we need to merge in.
    # Every time we match a key from the parent->child, we can pop it from this
    # copy. Anything left is a duplicate that must be merged.
-   local -A child_keys=()
+   local -A overflow=()
    for k in "${!child_symtab[@]}" ; do
-      child_keys["$k"]=
+      overflow["$k"]=
    done
    
    for p_key in "${!parent_symtab[@]}" ; do
       if [[ "$p_key" != '%inline' ]] ; then
          FQ_LOCATION+=( "$p_key" )
       fi
-
-      # For error reporting, build a "fully qualified" path to this node.
-      local fq_name=''
-      for s in "${FQ_LOCATION[@]}" ; do
-         fq_name+="${fq_name:+.}${s}"
-      done
-      declare -g FQ_NAME="$fq_name"
 
       # Parent Symbol.
       local -- p_sym_name="${parent_symtab[$p_key]}"
@@ -396,8 +391,8 @@ function merge_symtab {
       local -- c_sym_name="${child_symtab[$p_key]}"
 
       # shellcheck disable=SC2184
-      unset child_keys["$p_key"]
-      # Pop reference to child symbol from the `child_keys[]` copy. Will allow
+      unset overflow["$p_key"]
+      # Pop reference to child symbol from the `overflow[]` copy. Will allow
       # us to check at the end if there are leftover keys that are defined in
       # the child, but not in the parent.
 
@@ -413,12 +408,11 @@ function merge_symtab {
    # Any additional keys from the child need to be copied into both...
    #  1. the parent's .items[] array
    #  2. the parent's symbol table
-   for c_key in "${!child_keys[@]}" ; do
+   for c_key in "${!overflow[@]}" ; do
       # Add to symtab.
       parent_symtab[$c_key]="${child_symtab[$c_key]}" 
 
       local -n c_sym="${child_symtab[$c_key]}"
-      local -n parent=$PARENT_ROOT
       local -n items="${parent[items]}"
 
       # Add to items.
@@ -460,7 +454,8 @@ function merge_section {
       raise symbol_mismatch "${FQ_NAME}"
    fi
 
-   merge_symtab "${p_sym[symtab]}" "${c_sym[symtab]}"
+   merge_symtab "${p_sym[node]}"  "${p_sym[symtab]}"  "${c_sym[symtab]}"
+   #               ^-- parent node   ^-- parent symtab   ^-- child symtab
 }
 
 
@@ -482,7 +477,7 @@ function merge_variable {
    # case 1a.
    if [[ ! "$c_sym_name" ]] ; then
       if [[ "${p_sym[required]}" ]] ; then
-         raise missing_required "$FQ_NAME"
+         raise missing_required
       else
          return 0
       fi
@@ -494,13 +489,13 @@ function merge_variable {
    # Expecting a variable declaration, child is actually a Section.
    local -n c_type="${c_sym[type]}" 
    if [[ "${c_type[kind]}" == 'SECTION' ]] ; then
-      raise symbol_mismatch "${FQ_NAME}"
+      raise symbol_mismatch
    fi
 
    # case 2b.
    # The type of the child must defer to the type of the parent.
    if ! merge_type "${p_sym[type]}" "${c_sym[type]}" ; then
-      raise symbol_mismatch "${FQ_NAME}"
+      raise symbol_mismatch
    fi
 
    # If we haven't hit any errors, can safely copy over the child's value to the
