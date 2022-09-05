@@ -7,9 +7,9 @@
 #  _DATA_ROOT
 #  _DATA_$n
 
-declare -g RV='_DATA_1'
-
 function conf {
+   declare -g RV='_DATA_1'
+
    for arg in "$@" ; do
       local -n d=$RV
 
