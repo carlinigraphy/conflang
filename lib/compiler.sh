@@ -920,11 +920,11 @@ function compile_env_var {
       raise stomped_env_var "$var_name"
    fi
 
-   if [[ ! "$var_name" ]] ; then
+   local -n var="$var_name"
+   if [[ ! "${var+_}" ]] ; then
       raise missing_env_var "$var_name"
    fi
 
-   local -n var="$var_name"
    declare -g DATA="$var"
 }
 
