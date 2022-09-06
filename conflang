@@ -8,7 +8,7 @@
 ifs="$IFS" ; IFS=$'\n'
 for line in $(declare -p) ; do
    if [[ "$line" =~ ^declare\ -(-|[xraAin]+)\ ([^=]+) ]] ; then
-      ENV_START+=( "${BASH_REMATCH[1]}" )
+      ENV_START+=( "${BASH_REMATCH[2]}" )
    fi
 done
 IFS="$ifs"
@@ -169,17 +169,19 @@ function diff_env {
    ifs="$IFS" ; IFS=$'\n'
    for line in $(declare -p) ; do
       if [[ "$line" =~ ^declare\ -(-|[xraAin]+)\ ([^=]+) ]] ; then
-         ENV_END+=( "${BASH_REMATCH[1]}" )
+         ENV_END+=( "${BASH_REMATCH[2]}" )
       fi
    done
    IFS="$ifs"
 
    readarray -td $'\n' _ENV_DIFF < <(
-      comm -13 <(
-         printf '%s\n' "${ENV_START[@]}") <(printf '%s\n' "${ENV_END[@]}"
-      )
+      comm -13 \
+         <(printf '%s\n' "${ENV_START[@]}" | sort) \
+         <(printf '%s\n' "${ENV_END[@]}"   | sort)
    )
+
    declare -gA ENV_DIFF=(
+      [_ENV_DIFF]='yes'
       [ENV_DIFF]='yes'
       # The `ENV_DIFF` variable itself would not have been included in the dump
       # above. Manually add.
