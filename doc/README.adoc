@@ -32,21 +32,47 @@ Journey over destination and all that.
 == How it look
 First thing anyone wants to see is some example syntax.
 
-.Features snapshot
+
+.Variable declarations
 ----
-# Key value pairs.
+# Basic, untyped key value pairs.
 name : "Marcus";
 age  : 30;
 
+
 # Basic types.
 name (str): "Marcus";
+age  (int): 30;
+
 
 # Complex types.
-names (array:str): [
+name_pieces (array:str): [
    "Marcus",
    "Aurelius",
 ];
+----
 
+
+.Environment variables
+----
+homedir   (path): $HOME;
+configdir (path): $XDG_CONFIG_HOME;
+----
+
+.'`Internal`' variables
+----
+key1: "val1";
+key2: %key1;
+
+
+section1 {
+   key3: "val3";
+}
+key4: %sec1.key3;
+----
+
+.Sections
+----
 # Sections.
 globals {
    scope: "outer";
@@ -55,28 +81,16 @@ globals {
       scope: "inner";
    }
 }
+----
 
-# Environment variables.
-homedir (path): $HOME;
-
-# Internal variables.
-homedir_ref: %homedir;
-
+.Others
+----
 # String interpolation.
-project_dir : '{$HOME}/projects/';
-sub_dir     : '{%project_dir}/sub/';
+project_dir (path): '{$HOME}/projects/';
+sub_dir     (path): '{%project_dir}/sub/';
 
 # Type casting.
-shell_level : $SHLVL -> int;
-
-# Import other files.
-%include './sub-file.conf';
-
-# Enforce constraints on child-config files.
-%constrain [
-   "./sub1.conf",
-   "./sub2.conf",
-];
+shell_level: $SHLVL -> int;
 ----
 
 .Example '`real`' file
@@ -105,13 +119,13 @@ window {
 ----
 
 
-== What it about
+== What it solves
 Configuration files are the backbone of unix systems.
 Most every application/tool uses one.
 
 They have many common problems.
 
-=== Documentation
+=== Poor documentation
 Unless the project maintainer was a benevolent god, thoroughly documenting the file itself, it can be difficult to determine what keys are required or values are expected.
 Is a boolean looking for `true` or `True`, or maybe just anything _truthy_?
 Should integers be in quotes, or standalone?
@@ -135,7 +149,7 @@ Error reporting is often cryptic, or non-existent.
 Programmers don't want to spend their time validating user input.
 Shifting that responsibility to the config file itself allows them to write code.
 
-=== Features and portability
+=== Limited features and limited portability
 Bash config files must typically sacrifice features for portability.
 You don't want to download the entirety of Python3 just to parse a more complex config file for your project.
 Thus limiting you to easily bash-parsable formats.
