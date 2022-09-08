@@ -19,7 +19,6 @@ function setup {
 
 @test "fails with no input" {
    source "$lib_lexer"
-
    run init_scanner
 
    assert_equal  "$status" "${EXIT_STATUS[no_input]}"
@@ -31,11 +30,11 @@ function setup {
    : 'Given an empty input file, should successfully lex, generating only the
       final EOF token when closing the file.'
 
-   declare -a FILES=( "${BATS_TEST_DIRNAME}"/../share/empty.conf )
+   declare -a FILES=( /dev/stdin )
    source "$lib_lexer"
 
    init_scanner
-   scan
+   scan <<< ''
 
    # Should have only an EOF token.
    assert [ ${#TOKENS[@]} -eq 1 ]

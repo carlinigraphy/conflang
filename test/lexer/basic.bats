@@ -15,15 +15,24 @@ function setup {
    : 'While not testing every invalid token, a selection of invalid characters
       should all produce an `ERROR` token, with their value preserved.'
 
-   declare -a FILES=( "${BATS_TEST_DIRNAME}"/data/invalid.conf )
+   # All examples here are easy enough to read from stdin, rather than needing
+   # a dedicated file.
+   declare -a FILES=( /dev/stdin )
 
    init_scanner
-   scan
+   scan <<< '& ^ *'
+   # This may only be done with some form of redirection, a pipeline does not
+   # work. I think it's something to do with how bats is running the tests.
 
    declare -A EXP_0=( [type]="ERROR"  [value]="&" )
    declare -A EXP_1=( [type]="ERROR"  [value]="^" )
    declare -A EXP_2=( [type]="ERROR"  [value]="*" )
    declare -A EXP_3=( [type]="EOF"    [value]=""  )
+
+   # There must actually be tokens generated. If we only iterate the array of
+   # TOKENS (assumingly populated and included from the scanner), we run the
+   # risk of iterating a 0-member array.
+   assert [ ${#TOKENS[@]} -gt 0 ]
 
    for idx in "${!TOKENS[@]}" ; do
       local -- tname="${TOKENS[$idx]}"
@@ -39,10 +48,10 @@ function setup {
 
 
 @test "identify valid symbols" {
-   declare -a FILES=( "${BATS_TEST_DIRNAME}"/data/symbols.conf )
-
+   declare -a FILES=( /dev/stdin )
    init_scanner
-   scan
+
+   scan <<< '., ;: $% ? -> - () [] {}'
 
    declare -A EXP_0=(  [type]="DOT"        [value]="."  )
    declare -A EXP_1=(  [type]="COMMA"      [value]=","  )
@@ -51,8 +60,8 @@ function setup {
    declare -A EXP_4=(  [type]="DOLLAR"     [value]="$"  )
    declare -A EXP_5=(  [type]="PERCENT"    [value]="%"  )
    declare -A EXP_6=(  [type]="QUESTION"   [value]="?"  )
-   declare -A EXP_7=(  [type]="MINUS"      [value]="-"  )
-   declare -A EXP_8=(  [type]="ARROW"      [value]="->" )
+   declare -A EXP_7=(  [type]="ARROW"      [value]="->" )
+   declare -A EXP_8=(  [type]="MINUS"      [value]="-"  )
    declare -A EXP_9=(  [type]="L_PAREN"    [value]="("  )
    declare -A EXP_10=( [type]="R_PAREN"    [value]=")"  )
    declare -A EXP_11=( [type]="L_BRACKET"  [value]="["  )
@@ -60,6 +69,8 @@ function setup {
    declare -A EXP_13=( [type]="L_BRACE"    [value]="{"  )
    declare -A EXP_14=( [type]="R_BRACE"    [value]="}"  )
    declare -A EXP_15=( [type]="EOF"        [value]=""   )
+
+   assert [ ${#TOKENS[@]} -gt 0 ]
 
    for idx in "${!TOKENS[@]}" ; do
       local -- tname="${TOKENS[$idx]}"
@@ -75,10 +86,29 @@ function setup {
 
 
 @test "identify valid literals" {
-   declare -a FILES=( "${BATS_TEST_DIRNAME}"/data/literals.conf )
-
+   declare -a FILES=( /dev/stdin )
    init_scanner
-   scan
+
+   scan << EOF
+      # Keywords.
+      include
+      constrain
+      true
+      false
+
+      # Integers.
+      1
+      100
+      1234567890
+
+      # Literals.
+      ident
+      "string"
+      'path'
+
+      "\""  # String with escaped: "
+      '\''  # Path with escaped: '
+EOF
 
    # Keywords.
    declare -A EXP_0=(  [type]="INCLUDE"     [value]="include"    )
@@ -104,6 +134,8 @@ function setup {
    declare -A EXP_12=( [type]="EOF"         [value]=""           )
 
       
+   assert [ ${#TOKENS[@]} -gt 0 ]
+
    for idx in "${!TOKENS[@]}" ; do
       local -- tname="${TOKENS[$idx]}"
       local -n token="$tname"
@@ -118,12 +150,19 @@ function setup {
 
 
 @test "identify fstring, fpath" {
-   declare -a FILES=(
-      "${BATS_TEST_DIRNAME}/data/interpolation/basic.conf"
-   )
-
+   declare -a FILES=( /dev/stdin )
    init_scanner
-   run scan
+
+   scan << EOF
+      f'an fpath: {\$HERE}.'
+      f"an fstring: {\$HERE}."
+
+      f'{ %internal }'
+      f"{ %internal }"
+
+      f'\{ \' \}'
+      f"\{ \" \}"
+EOF
 
    # fpath.
    declare -A EXP_0=(  [type]='PATH'        [value]='an fpath: '   )
@@ -141,29 +180,30 @@ function setup {
    declare -A EXP_10=( [type]='CONCAT'      [value]=''             )
    declare -A EXP_11=( [type]='STRING'      [value]='.'            )
 
-   # fstring.
-   declare -A EXP_12=( [type]='STRING'      [value]=''             )
+   # fpath.
+   declare -A EXP_12=( [type]='PATH'        [value]=''             )
    declare -A EXP_13=( [type]='CONCAT'      [value]=''             )
    declare -A EXP_14=( [type]='PERCENT'     [value]='%'            )
    declare -A EXP_15=( [type]='IDENTIFIER'  [value]='internal'     )
    declare -A EXP_16=( [type]='CONCAT'      [value]=''             )
-   declare -A EXP_17=( [type]='STRING'      [value]=''             )
+   declare -A EXP_17=( [type]='PATH'        [value]=''             )
 
-   # fpath.
-   declare -A EXP_18=( [type]='PATH'        [value]=''             )
+   # fstring.
+   declare -A EXP_18=( [type]='STRING'      [value]=''             )
    declare -A EXP_19=( [type]='CONCAT'      [value]=''             )
    declare -A EXP_20=( [type]='PERCENT'     [value]='%'            )
    declare -A EXP_21=( [type]='IDENTIFIER'  [value]='internal'     )
    declare -A EXP_22=( [type]='CONCAT'      [value]=''             )
-   declare -A EXP_23=( [type]='PATH'        [value]=''             )
+   declare -A EXP_23=( [type]='STRING'      [value]=''             )
 
    # escaped braces
    declare -A EXP_24=( [type]='PATH'        [value]="{ ' }"        )
    declare -A EXP_25=( [type]='STRING'      [value]='{ " }'        )
 
    # EOF.
-   declare -A EXP_12=( [type]='EOF'         [value]=''             )
+   declare -A EXP_26=( [type]='EOF'         [value]=''             )
 
+   assert [ ${#TOKENS[@]} -gt 0 ]
 
    for idx in "${!TOKENS[@]}" ; do
       local -- tname="${TOKENS[$idx]}"
