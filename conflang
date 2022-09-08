@@ -323,6 +323,12 @@ source "${LIBDIR}"/errors.sh
 declare -g INPUT="$1"
 if [[ -z "$INPUT" ]] ; then
    raise no_input
+elif [[ $INPUT == '-' ]] ; then
+   # TODO: feature
+   # Would be good to actually have some sort of argument parsing just below
+   # the `if __name__`. We've been able to get away with it until now because
+   # there are no flags, and only 1 positional argument.
+   INPUT=/dev/stdin
 fi
 
 # shellcheck source=./lib/debug.sh
