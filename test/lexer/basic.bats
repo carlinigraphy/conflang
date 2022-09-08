@@ -154,8 +154,8 @@ EOF
    init_scanner
 
    scan << EOF
-      f'an fpath: {\$HERE}.'
-      f"an fstring: {\$HERE}."
+      f'before{\$HERE}after'
+      f"before{\$HERE}after"
 
       f'{ %internal }'
       f"{ %internal }"
@@ -165,20 +165,20 @@ EOF
 EOF
 
    # fpath.
-   declare -A EXP_0=(  [type]='PATH'        [value]='an fpath: '   )
+   declare -A EXP_0=(  [type]='PATH'        [value]='before'       )
    declare -A EXP_1=(  [type]='CONCAT'      [value]=''             )
    declare -A EXP_2=(  [type]='DOLLAR'      [value]='$'            )
    declare -A EXP_3=(  [type]='IDENTIFIER'  [value]='HERE'         )
    declare -A EXP_4=(  [type]='CONCAT'      [value]=''             )
-   declare -A EXP_5=(  [type]='PATH'        [value]='.'            )
+   declare -A EXP_5=(  [type]='PATH'        [value]='after'        )
 
    # fstring.
-   declare -A EXP_6=(  [type]='STRING'      [value]='an fstring: ' )
+   declare -A EXP_6=(  [type]='STRING'      [value]='before'       )
    declare -A EXP_7=(  [type]='CONCAT'      [value]=''             )
    declare -A EXP_8=(  [type]='DOLLAR'      [value]='$'            )
    declare -A EXP_9=(  [type]='IDENTIFIER'  [value]='HERE'         )
    declare -A EXP_10=( [type]='CONCAT'      [value]=''             )
-   declare -A EXP_11=( [type]='STRING'      [value]='.'            )
+   declare -A EXP_11=( [type]='STRING'      [value]='after'        )
 
    # fpath.
    declare -A EXP_12=( [type]='PATH'        [value]=''             )

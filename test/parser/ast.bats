@@ -16,10 +16,11 @@ function setup {
 }
 
 @test "variable declaration, empty" {
-   declare -a FILES=(
-      "${BATS_TEST_DIRNAME}/data/ast/declaration-empty.conf"
-   )
-   init_scanner ; scan ; parse
+   local -a FILES=( /dev/stdin )
+   init_scanner
+
+   scan <<< 'key;'
+   parse
 
    local -A EXP=(
       [NODE_1]='identifier'
@@ -40,10 +41,11 @@ function setup {
 
 
 @test "variable declaration, type and value" {
-   declare -a FILES=(
-      "${BATS_TEST_DIRNAME}/data/ast/declaration.conf"
-   )
-   init_scanner ; scan ; parse
+   local -a FILES=( /dev/stdin )
+   init_scanner
+
+   scan <<< 'key (str): "value";'
+   parse
 
    local -A EXP=(
       [NODE_1]='identifier' 
@@ -66,10 +68,11 @@ function setup {
 
 
 @test "declaration w/ boolean" {
-   declare -a FILES=(
-      "${BATS_TEST_DIRNAME}/data/ast/boolean.conf"
-   )
-   init_scanner ; scan ; parse
+   local -a FILES=( /dev/stdin )
+   init_scanner
+
+   scan <<< "_: true;"
+   parse
 
    local -n node='NODE_6'
    assert_equal  "${node[value]}"     'true'
@@ -78,10 +81,11 @@ function setup {
 
 
 @test "declaration w/ integer" {
-   declare -a FILES=(
-      "${BATS_TEST_DIRNAME}/data/ast/integer.conf"
-   )
-   init_scanner ; scan ; parse
+   local -a FILES=( /dev/stdin )
+   init_scanner
+
+   scan <<< '_: 100;'
+   parse
 
    local -n node='NODE_6'
    assert_equal  "${node[value]}"     '100'
@@ -90,10 +94,11 @@ function setup {
 
 
 @test "declaration w/ string" {
-   declare -a FILES=(
-      "${BATS_TEST_DIRNAME}/data/ast/string.conf"
-   )
-   init_scanner ; scan ; parse
+   local -a FILES=( /dev/stdin )
+   init_scanner
+
+   scan <<< '_: "string";'
+   parse
 
    local -n node='NODE_6'
    assert_equal  "${node[value]}"     'string'
@@ -102,10 +107,11 @@ function setup {
 
 
 @test "declaration w/ path" {
-   declare -a FILES=(
-      "${BATS_TEST_DIRNAME}/data/ast/path.conf"
-   )
-   init_scanner ; scan ; parse
+   local -a FILES=( /dev/stdin )
+   init_scanner
+
+   scan <<< "_: 'path';"
+   parse
 
    local -n node='NODE_6'
    assert_equal  "${node[value]}"     'path'
@@ -114,10 +120,11 @@ function setup {
 
 
 @test "declaration w/ fstring" {
-   declare -a FILES=(
-      "${BATS_TEST_DIRNAME}/data/ast/fstring.conf"
-   )
-   init_scanner ; scan ; parse
+   local -a FILES=( /dev/stdin )
+   init_scanner
+
+   scan <<< '_: f"before{}after";'
+   parse
 
    local -n node='NODE_6'
    assert_equal  "${TYPEOF[NODE_6]}"  'string'
@@ -130,10 +137,11 @@ function setup {
 
 
 @test "declaration w/ fpath" {
-   declare -a FILES=(
-      "${BATS_TEST_DIRNAME}/data/ast/fpath.conf"
-   )
-   init_scanner ; scan ; parse
+   local -a FILES=( /dev/stdin )
+   init_scanner
+
+   scan <<< "_: f'before{}after';"
+   parse
 
    local -n node='NODE_6'
    assert_equal  "${TYPEOF[NODE_6]}"  'path'
@@ -146,10 +154,11 @@ function setup {
 
 
 @test "declaration w/ array" {
-   declare -a FILES=(
-      "${BATS_TEST_DIRNAME}/data/ast/array.conf"
-   )
-   init_scanner ; scan ; parse
+   local -a FILES=( /dev/stdin )
+   init_scanner
+
+   scan <<< '_: [];'
+   parse
 
    local -n node='NODE_6'
    assert_equal  "${TYPEOF[NODE_6]}"  'array'
@@ -158,10 +167,11 @@ function setup {
 
 
 @test "declaration w/ unary" {
-   declare -a FILES=(
-      "${BATS_TEST_DIRNAME}/data/ast/unary.conf"
-   )
-   init_scanner ; scan ; parse
+   local -a FILES=( /dev/stdin )
+   init_scanner
+
+   scan <<< '_: -1;'
+   parse
 
    local -n node='NODE_6'
    assert_equal  "${TYPEOF[NODE_6]}"  'unary'
@@ -174,10 +184,11 @@ function setup {
 
 
 @test "declaration w/ internal variable" {
-   declare -a FILES=(
-      "${BATS_TEST_DIRNAME}/data/ast/int_var.conf"
-   )
-   init_scanner ; scan ; parse
+   local -a FILES=( /dev/stdin )
+   init_scanner
+
+   scan <<< '_: %internal;'
+   parse
 
    local -n node='NODE_6'
    assert_equal  "${TYPEOF[NODE_6]}"  'int_var'
@@ -186,10 +197,11 @@ function setup {
 
 
 @test "declaration w/ environment variable" {
-   declare -a FILES=(
-      "${BATS_TEST_DIRNAME}/data/ast/env_var.conf"
-   )
-   init_scanner ; scan ; parse
+   local -a FILES=( /dev/stdin )
+   init_scanner
+
+   scan <<< '_: $environment;'
+   parse
 
    local -n node='NODE_6'
    assert_equal  "${TYPEOF[NODE_6]}"  'env_var'
@@ -198,12 +210,11 @@ function setup {
 
 
 @test "declaration w/ index" {
-   #skip "Apparently broke these when I fixed other expressions in TDOP parser."
+   local -a FILES=( /dev/stdin )
+   init_scanner
 
-   declare -a FILES=(
-      "${BATS_TEST_DIRNAME}/data/ast/index.conf"
-   )
-   init_scanner ; scan ; parse
+   scan <<< '_: ["one"].0;'
+   parse
 
    local -- node_name='NODE_8'
    local -n node="$node_name"
@@ -221,12 +232,11 @@ function setup {
 
 
 @test "declaration w/ typecast" {
-   #skip "Apparently broke these when I fixed other expressions in TDOP parser."
+   local -a FILES=( /dev/stdin )
+   init_scanner
 
-   declare -a FILES=(
-      "${BATS_TEST_DIRNAME}/data/ast/typecast.conf"
-   )
-   init_scanner ; scan ; parse
+   scan <<< '_: "to path" -> path;'
+   parse
 
    local -- node_name='NODE_7'
    local -n node="$node_name"
@@ -240,10 +250,11 @@ function setup {
 
 
 @test "section declaration" {
-   declare -a FILES=(
-      "${BATS_TEST_DIRNAME}/data/ast/section.conf"
-   )
-   init_scanner ; scan ; parse
+   local -a FILES=( /dev/stdin )
+   init_scanner
+
+   scan <<< '_ { }'
+   parse
 
    local -- node_name='NODE_5'
    local -n node="$node_name"

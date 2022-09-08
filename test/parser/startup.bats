@@ -22,7 +22,6 @@ function setup {
    source "$lib_parser"
 
    local -a TOKENS=()
-
    run parse
 
    assert_failure
@@ -52,10 +51,10 @@ function setup {
    source "$lib_lexer"
    source "$lib_parser"
 
-   declare -a FILES=( "${BATS_TEST_DIRNAME}"/../share/empty.conf )
-
+   local -a FILES=( /dev/stdin )
    init_scanner
-   scan
+
+   scan <<< ''
    parse
 }
 
@@ -67,11 +66,11 @@ function setup {
    source "$lib_lexer"
    source "$lib_parser"
 
-   declare -a FILES=( "${BATS_TEST_DIRNAME}"/data/simple.conf )
-
+   local -a FILES=( /dev/stdin )
    init_scanner
-   scan
-   run parse
 
+   scan <<< 'this (str): "that";'
+
+   run parse
    assert_success
 }

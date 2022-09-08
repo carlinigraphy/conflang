@@ -13,10 +13,11 @@ function setup {
 
 
 @test 'empty array' {
-   declare -a FILES=(
-      "${BATS_TEST_DIRNAME}/data/array-empty.conf"
-   )
-   init_scanner ; scan ; parse
+   local -a FILES=( /dev/stdin )
+
+   init_scanner
+   scan <<< '_: [];'
+   parse
 
    local -- node_name='NODE_6'
    local -n node="$node_name"
@@ -27,10 +28,18 @@ function setup {
 
 
 @test 'nested array' {
-   declare -a FILES=(
-      "${BATS_TEST_DIRNAME}/data/array-nested.conf"
-   )
-   init_scanner ; scan ; parse
+   local -a FILES=( /dev/stdin )
+   local input='
+      a1: [
+         [
+            []
+         ]
+      ];
+   '
+
+   init_scanner
+   scan <<< "$input"
+   parse
 
    local -- a1_name='NODE_6'
    local -n a1="$a1_name"
@@ -55,10 +64,15 @@ function setup {
 
 
 @test 'disallow assignment in arrays' {
-   declare -a FILES=(
-      "${BATS_TEST_DIRNAME}/data/array-invalid-assignment.conf"
-   )
-   init_scanner ; scan
+   local -a FILES=( /dev/stdin )
+   local input='
+      _: [
+         key: value;
+      ];
+   '
+
+   init_scanner
+   scan <<< "$input"
 
    run parse
    assert_failure
@@ -66,25 +80,39 @@ function setup {
 
 
 @test 'allow trailing comma' {
-   declare -a FILES=(
-      "${BATS_TEST_DIRNAME}/data/array-trailing-comma.conf"
-   )
-   init_scanner ; scan ; parse
+   local -a FILES=( /dev/stdin )
+   local input="
+      _: [
+         '',
+      ];
+   "
+
+   init_scanner
+   scan <<< "$input"
+   parse
 
    local -- node_name='NODE_6'
-   local -n node="$node_name"
+   local -n items="$node_name"
 
    # There should only be a single item, and no error thrown.
    assert_equal  "${TYPEOF[$node_name]}"  'array'
-   assert_equal  "${#node[@]}"  1
+   assert_equal  "${#items[@]}"  1
 }
 
 
 @test 'nested section' {
-   declare -a FILES=(
-      "${BATS_TEST_DIRNAME}/data/section-nested.conf"
-   )
-   init_scanner ; scan ; parse
+   local -a FILES=( /dev/stdin )
+   local input='
+      s1 {
+         s2 {
+            s3 {}
+         }
+      }
+   '
+
+   init_scanner
+   scan <<< "$input"
+   parse
 
    local -- s1_name='NODE_5'
    local -n s1="$s1_name"
