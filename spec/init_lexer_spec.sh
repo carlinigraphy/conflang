@@ -30,7 +30,9 @@ Describe 'lexer.sh'
    End
 
    It 'runs with empty file'
-      FILES=( test/share/empty.conf )
+      Data ''
+
+      FILES=( /dev/stdin )
       init_scanner
 
       When run scan
