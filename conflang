@@ -13,6 +13,19 @@ for line in $(declare -p) ; do
 done
 IFS="$ifs"
 
+
+function usage {
+cat <<EOF
+usage: $(basename "${BASH_SOURCE[0]}") [option] FILE
+
+options
+   None.
+EOF
+
+exit "$1"
+}
+
+
 function add_file {
    # Serves to both ensure we don't have circular imports, as well as resolving
    # relative paths to their fully qualified path.
@@ -76,7 +89,7 @@ function merge_includes {
       # its corresponding root here.
       INCLUDE_ROOT=( "$ROOT" "${INCLUDE_ROOT[@]}" )
 
-      (( idx++ ))
+      (( ++idx ))
    done
 
    # Iterates bottom-to-top over the %include statements. Appends the items
@@ -280,37 +293,77 @@ function _do_compile {
 }
 
 
-function _main {
-   _do_parse
-   _do_compile
+function _argparse {
+   local -a positional=()
+   local -a invalid=()
+
+   while [[ $# -gt 0 ]] ; do
+      case "$1" in
+         -h | --help)
+               usage 0
+               ;;
+
+         #-*)  if [[ $positional ]] ; then
+         #        echo "flags & keyword args may not follow positional args"
+         #     fi
+
+         *)    positional+=( "$1" )
+               shift
+               ;;
+      esac
+   done
+
+   if [[ ! $positional ]] ; then
+      raise no_input
+   fi
+
+   if [[ "${positional[0]}" == '-' ]] ; then
+      INPUT=/dev/stdin
+   else
+      INPUT="${positional[0]}" 
+   fi
+}
+
+
+function _init_globals {
+   # Declares all the necessary global variables for each run. Wrapping into a
+   # setup() function allows for easier BATS testing.
+
+   # Path to initial file to compile.
+   declare -g INPUT
+
+   # Symbol table holding the name of the SYMTAB_$n, and a nameref to that
+   # symtab.
+   declare -g GLOBALS
+
+   # The root NODE_$n of the parent and child AST trees.
+   declare -g PARENT_ROOT CHILD_ROOT
+
+   # Shouldn't code file names/paths into the generated output. If the user has
+   # the same file *data*, but it's in a different place, we shouldn't have to
+   # re-compile the output.  An array of files allows us to map a static file
+   # INDEX (stored in the output data), to the possibly dynamic path to the
+   # file.
+   declare -ga FILES=()
+   declare -gi FILE_IDX
+
+   # Stores the $ROOT after each `parse()`. The idx of a root node here should
+   # correspond to it's matching INCLUDE_$n from the INCLUDES[] array. Example:
+   #> INCLUDE_ROOT [ NODE_10,    NODE_20    ]
+   #> INCLUDES     [ INCLUDE_01, INCLUDE_02 ]
+   # Meaning...
+   # Take the contents of INCLUDE_ROOT[0].items, and drop them into
+   # INCLUDES[0].target.items.
+   declare -ga INCLUDE_ROOT=()  INCLUDES=()
 }
 
 
 # If sourced, exit. Equiv. to Python's >if __name__ == '__main__'
 # Nothing below this line will run if sourced, only if invoked directly.
-[[ "${BASH_SOURCE[0]}" == "$0" ]] || exit 0
-
-# Symbol table holding the name of the SYMTAB_$n, and a nameref to that symtab.
-declare -g GLOBALS
-
-# The root NODE_$n of the parent and child AST trees.
-declare -g PARENT_ROOT CHILD_ROOT
-
-# Shouldn't code file names/paths into the generated output. If the user has the
-# same file *data*, but it's in a different place, we shouldn't have to
-# re-compile the output.
-# An array of files allows us to map a static file INDEX (stored in the output
-# data), to the possibly dynamic path to the file.
-declare -ga FILES=()
-
-# Stores the $ROOT after each `parse()`. The idx of a root node here should
-# correspond to it's matching INCLUDE_$n from the INCLUDES[] array. Example:
-#> INCLUDE_ROOT [ NODE_10,    NODE_20    ]
-#> INCLUDES     [ INCLUDE_01, INCLUDE_02 ]
-# Meaning...
-# Take the contents of INCLUDE_ROOT[0].items, and drop them into
-# INCLUDES[0].target.items.
-declare -ga INCLUDE_ROOT=()  INCLUDES=()
+if [[ ! "${BASH_SOURCE[0]}" == "$0" ]] ; then
+   # Return is valid at the top level if sourced.
+   return 0
+fi
 
 # shellcheck disable=SC2155,SC2164
 declare -g PROGDIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" ; pwd )
@@ -318,17 +371,6 @@ declare -g LIBDIR="${PROGDIR}/lib"
 
 # shellcheck source=./lib/errors.sh
 source "${LIBDIR}"/errors.sh
-
-declare -g INPUT="$1"
-if [[ -z "$INPUT" ]] ; then
-   raise no_input
-elif [[ $INPUT == '-' ]] ; then
-   # TODO: feature
-   # Would be good to actually have some sort of argument parsing just below
-   # the `if __name__`. We've been able to get away with it until now because
-   # there are no flags, and only 1 positional argument.
-   INPUT=/dev/stdin
-fi
 
 # shellcheck source=./lib/debug.sh
 source "${LIBDIR}"/debug.sh
@@ -355,6 +397,10 @@ source "${LIBDIR}"/api.sh
 #  RV       - result of query
 #
 
-_main
+_init_globals
+_argparse "$@"
+_do_parse
+_do_compile
+
 #conf homedir
 #echo "${RV@Q}"
