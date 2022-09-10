@@ -164,3 +164,20 @@ $fn  "$data"  "$type"  "${params[@]}"
 #>    std.exist -> path;
 #>    usr.module1.module2.util -> path:file  as util;
 #> }
+
+
+# OOOOOH
+# What if we do a little bit of "self-hosting" as it were. Not really, though,
+# but whatever.
+#
+# Each FFI file must contain a .conf spelling out its accepted parameters, and
+# whatnot.
+#
+#> mod: "exist";
+#> params {
+#>    data (str);
+#>    type (array:str);
+#>
+#>    # Flags:
+#>    strict (bool);
+#> }
