@@ -53,7 +53,7 @@ function mk_decl_section {
 
 
 function mk_include {
-   (( INCLUDE_NUM++ ))
+   (( ++INCLUDE_NUM ))
    local   --  iname="INCLUDE_${INCLUDE_NUM}"
    declare -gA $iname
    declare -g  INCLUDE=$iname

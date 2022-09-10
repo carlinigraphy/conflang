@@ -3,8 +3,8 @@
 # All the functions for debugging, or otherwise printing intermediate data as
 # to check things aren't burninatored.
 
-declare -i INDENT_FACTOR=2
-declare -i INDENTATION=0
+declare -gi INDENT_FACTOR=2
+declare -gi INDENTATION=0
 
 #───────────────────────────( pretty print symtab )─────────────────────────────
 function pprint_symtab {

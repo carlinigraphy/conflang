@@ -94,3 +94,72 @@ function setup {
       assert_output --partial "not an expression"
    done
 }
+
+
+@test "raise parse_error on parser statement not ending with semi" {
+   local -a FILES=( /dev/stdin )
+
+   run parse_from_str "%include ''"
+   assert_failure
+   assert_output --partial "Expecting \`;' after parser statement."
+}
+
+
+@test "raise parse_error on invalid parser statement" {
+   local -a FILES=( /dev/stdin )
+
+   run parse_from_str "%invalid"
+   assert_failure
+   assert_output --regexp  '^Parse Error: '
+   assert_output --partial 'invalid is not a parser statement'
+}
+
+
+@test "raise parse_error on include taking a non-path" {
+   local -a FILES=( /dev/stdin )
+
+   run parse_from_str '%include "string";'
+   assert_failure
+   assert_output --regexp  '^Parse Error: '
+   assert_output --partial 'Expecting path after %include'
+}
+
+
+@test "raise parse_error on constrain taking non- array of path" {
+   local -a FILES=( /dev/stdin )
+
+   run parse_from_str "%constrain 'path';"
+   assert_failure
+   assert_output --regexp  '^Parse Error: '
+   assert_output --partial 'to begin array of paths'
+
+   run parse_from_str "%constrain [ \"string\" ];"
+   assert_failure
+   assert_output --regexp  '^Parse Error: '
+   assert_output --partial 'Expecting an array of paths'
+}
+
+
+@test "raise parse_error on multiple constrain statements" {
+   local -a FILES=( /dev/stdin )
+
+   run parse_from_str "
+      %constrain [ 'f1' ];
+      %constrain [ 'f2' ];
+   "
+
+   assert_failure
+   assert_output 'Parse Error: may not specify multiple constrain blocks.'
+}
+
+
+@test "raise parse_error on constrain occuring within a section" {
+   local -a FILES=( /dev/stdin )
+
+   run parse_from_str "
+      _{ %constrain ['f1']; }
+   "
+
+   assert_failure
+   assert_output 'Parse Error: %constrain may not occur in a section.'
+}

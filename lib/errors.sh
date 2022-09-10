@@ -48,7 +48,7 @@ function raise {
 # and .colno properties. Example: typecast nodes, or nested expressions. Must
 # walk to provide the "root" of the expression.
 
-declare -a LOC
+declare -ga LOC
 
 function walk_location {
    declare -g LOC="$1"

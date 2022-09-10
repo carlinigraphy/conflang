@@ -10,7 +10,7 @@
 #    analysis in the next phase), but also need to append the nodes themselves
 #    to the parent section's .items array.
 
-declare -- NODE=
+declare -g NODE=
 
 
 function mk_metatype {
