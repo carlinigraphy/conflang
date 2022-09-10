@@ -99,7 +99,7 @@ function print_syntax_error {
    local -n node="$1"
    local -- msg="$2"
 
-   printf 'Syntax Error: [%d:%d] %q\n' \
+   printf "Syntax Error: [%d:%d] \`%s'\n" \
       "${node[lineno]}" \
       "${node[colno]}"  \
       "${node[value]}"

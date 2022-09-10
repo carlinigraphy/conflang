@@ -290,7 +290,6 @@ function _main {
 # Nothing below this line will run if sourced, only if invoked directly.
 [[ "${BASH_SOURCE[0]}" == "$0" ]] || exit 0
 
-
 # Symbol table holding the name of the SYMTAB_$n, and a nameref to that symtab.
 declare -g GLOBALS
 

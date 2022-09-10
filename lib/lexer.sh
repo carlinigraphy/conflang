@@ -20,8 +20,8 @@ declare -gA KEYWORD=(
 )
 
 function init_scanner {
-   : 'Some variables need to be reset at the start of every run. They hold
-      information that should not be carried from file to file.'
+   # Some variables need to be reset at the start of every run. They hold
+   # information that should not be carried from file to file.
 
    # Reset global vars prior to each run.
    (( FILE_IDX = ${#FILES[@]} - 1 )) ||:
@@ -45,8 +45,8 @@ function init_scanner {
 
 
 function Token {
-   : "Effectively a Class. Creates instances of Token with information for
-      the position in the file, as well as the character type/value."
+   # Effectively a Class. Creates instances of Token with information for
+   # the position in the file, as well as the character type/value.
 
    local type=$1  value=$2
 

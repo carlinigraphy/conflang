@@ -535,15 +535,20 @@ function p_decl_variable {
       node['type']=$NODE
    fi
 
+   # For better error reporting. If the user passes a token that begins an
+   # expression (literally defined in the pratt parsing section as a null
+   # denomination), throw error specifically indicating that they likely
+   # intended to precede with a colon.
+   local expr_str=''
+   for expr in "${!NUD[@]}" ; do
+      expr_str+="${expr_str:+,}${expr}"
+   done
+
    # Expressions.
    if p_match 'COLON' ; then
       p_expression
       node['expr']=$NODE
-   fi
-
-   # TODO: error reporting
-   # Needs line/column number & printout.
-   if p_match 'STRING,INTEGER,BOOLEAN,PATH,L_BRACKET' ; then
+   elif p_match "$expr_str" ; then
       raise parse_error "expecting \`:' before expression."
    fi
 
@@ -592,10 +597,8 @@ declare -gA NUD=(
    [FALSE]='p_boolean'
    [STRING]='p_string'
    [INTEGER]='p_integer'
-   [IDENTIFIER]='p_identifier'
    [DOLLAR]='p_env_var'
    [PERCENT]='p_int_var'
-   [L_PAREN]='p_group'
    [L_BRACKET]='p_array'
 )
 
@@ -674,12 +677,6 @@ function p_expression {
 }
 
 
-function p_group {
-   p_expression
-   p_munch 'R_PAREN' "expecting \`)' after group."
-}
-
-
 function p_unary {
    local -n prev="$1"
    local -- op="${prev[type]}"
@@ -700,16 +697,16 @@ function p_unary {
 
 
 function p_concat {
-   : 'String (and path) interpolation are parsed as a high left-associative
-      infix operator.
-      > first (str): "Marcus";
-      > greet (str): "Hello {%first}.";
-
-      Parses to...
-      > str(value:  "Hello ",
-      >     concat: int_var(value:  first,
-      >                     concat: str(value:  ".",
-      >                                 concat: None)'
+   # String (and path) interpolation are parsed as a high left-associative
+   # infix operator.
+   #> first (str): "Marcus";
+   #> greet (str): "Hello {%first}.";
+   #
+   # Parses to...
+   #> str(value:  "Hello ",
+   #>     concat: int_var(value:  first,
+   #>                     concat: str(value:  ".",
+   #>                                 concat: None)
 
    # We can safely ignore $2. It's the operator, passed in from p_expression().
    # We already know the operator is a CONCAT.
@@ -732,18 +729,18 @@ function p_concat {
 
 
 function p_typecast {
-   : 'Typecasts are a infix operator. The previous lhs is passed in as the
-      1st argument.
-
-      Typecasts should have a low binding power, as they must apply to the
-      entirety of the lhs expression, rather than binding to solely the last
-      component of it.
-
-      Example:
-      > num_times_ten: "{%count}0" -> int;
-
-      Should compile to  ...  ("" + %count + "0") -> int
-      Rather than        ...  ("" + %count +) ("0" -> int)'
+   # Typecasts are a infix operator. The previous lhs is passed in as the
+   # 1st argument.
+   #
+   # Typecasts should have a low binding power, as they must apply to the
+   # entirety of the lhs expression, rather than binding to solely the last
+   # component of it.
+   #
+   # Example:
+   #> num_times_ten: "{%count}0" -> int;
+   #
+   # Should compile to  ...  ("" + %count + "0") -> int
+   # Rather than        ...  ("" + %count +) ("0" -> int)
 
    local lhs="$1"
 

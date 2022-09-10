@@ -49,9 +49,9 @@ function setup {
 
 @test "identify valid symbols" {
    declare -a FILES=( /dev/stdin )
-   init_scanner
 
-   scan <<< '., ;: $% ? -> - () [] {}'
+   init_scanner
+   scan <<< '., ;: $% ? -> - () [] {} #Comment'
 
    declare -A EXP_0=(  [type]="DOT"        [value]="."  )
    declare -A EXP_1=(  [type]="COMMA"      [value]=","  )

@@ -13,7 +13,7 @@ function setup {
 }
 
 
-@test "successful source" {
+@test "successful source, ./lib/parser.sh" {
    source "$lib_parser"
 }
 

@@ -136,17 +136,17 @@ function mk_symbol {
 
 
 function extract_type {
-   : 'Pulls the underlying Type from a meta type declaration in the GLOBALS
-      symbol table. Gotta query  symbol.type.subtype:
-
-      Symbol {
-         Type {
-            kind: "TYPE"
-            subtype: Type {
-               kind: "(ARRAY|INTEGER|...)"
-            }
-         }
-      }'
+   # Pulls the underlying Type from a meta type declaration in the GLOBALS
+   # symbol table. Gotta query  symbol.type.subtype:
+   #
+   #> Symbol {
+   #>    Type {
+   #>       kind: "TYPE"
+   #>       subtype: Type {
+   #>          kind: "(ARRAY|INTEGER|...)"
+   #>       }
+   #>    }
+   #> }
 
    local str_name="$1"
 
@@ -949,9 +949,9 @@ function compile_int_var {
 
 
 function compile_index {
-   : "An 'index' is a combination of...
-         .left   subscriptable expression (section, array)
-         .right  index expression (identifier, integer)"
+   # An 'index' is a combination of...
+   #    .left   subscriptable expression (section, array)
+   #    .right  index expression (identifier, integer)
 
    local -n node="$NODE"
 

@@ -12,7 +12,7 @@ function setup {
 }
 
 
-@test "successful source" {
+@test "successful source, ./lib/lexer.sh" {
    source "$lib_lexer"
 }
 

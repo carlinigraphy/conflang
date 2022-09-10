@@ -17,9 +17,11 @@ function setup {
 
 @test "variable declaration, empty" {
    local -a FILES=( /dev/stdin )
-   init_scanner
 
+   init_scanner
    scan <<< 'key;'
+
+   init_parser
    parse
 
    local -A EXP=(
@@ -42,9 +44,11 @@ function setup {
 
 @test "variable declaration, type and value" {
    local -a FILES=( /dev/stdin )
-   init_scanner
 
+   init_scanner
    scan <<< 'key (str): "value";'
+
+   init_parser
    parse
 
    local -A EXP=(
@@ -67,11 +71,32 @@ function setup {
 }
 
 
+@test "declaration w/ complex type" {
+   local -a FILES=( /dev/stdin )
+
+   init_scanner
+   scan <<< 'key (array:str);'
+
+   init_parser
+   parse
+
+   local -n typedef='NODE_7'
+   local -n t_array="${typedef[kind]}"
+   assert_equal "${t_array[value]}"   'array'
+
+   local -n subtype="${typedef[subtype]}"
+   local -n t_string="${subtype[kind]}"
+   assert_equal "${t_string[value]}"  'str'
+}
+
+
 @test "declaration w/ boolean" {
    local -a FILES=( /dev/stdin )
-   init_scanner
 
+   init_scanner
    scan <<< "_: true;"
+
+   init_parser
    parse
 
    local -n node='NODE_6'
@@ -82,9 +107,11 @@ function setup {
 
 @test "declaration w/ integer" {
    local -a FILES=( /dev/stdin )
-   init_scanner
 
+   init_scanner
    scan <<< '_: 100;'
+
+   init_parser
    parse
 
    local -n node='NODE_6'
@@ -95,9 +122,11 @@ function setup {
 
 @test "declaration w/ string" {
    local -a FILES=( /dev/stdin )
-   init_scanner
 
+   init_scanner
    scan <<< '_: "string";'
+
+   init_parser
    parse
 
    local -n node='NODE_6'
@@ -108,9 +137,11 @@ function setup {
 
 @test "declaration w/ path" {
    local -a FILES=( /dev/stdin )
-   init_scanner
 
+   init_scanner
    scan <<< "_: 'path';"
+
+   init_parser
    parse
 
    local -n node='NODE_6'
@@ -121,9 +152,11 @@ function setup {
 
 @test "declaration w/ fstring" {
    local -a FILES=( /dev/stdin )
-   init_scanner
 
+   init_scanner
    scan <<< '_: f"before{}after";'
+
+   init_parser
    parse
 
    local -n node='NODE_6'
@@ -138,9 +171,11 @@ function setup {
 
 @test "declaration w/ fpath" {
    local -a FILES=( /dev/stdin )
-   init_scanner
 
+   init_scanner
    scan <<< "_: f'before{}after';"
+
+   init_parser
    parse
 
    local -n node='NODE_6'
@@ -155,9 +190,11 @@ function setup {
 
 @test "declaration w/ array" {
    local -a FILES=( /dev/stdin )
-   init_scanner
 
+   init_scanner
    scan <<< '_: [];'
+
+   init_parser
    parse
 
    local -n node='NODE_6'
@@ -168,9 +205,11 @@ function setup {
 
 @test "declaration w/ unary" {
    local -a FILES=( /dev/stdin )
-   init_scanner
 
+   init_scanner
    scan <<< '_: -1;'
+
+   init_parser
    parse
 
    local -n node='NODE_6'
@@ -185,9 +224,11 @@ function setup {
 
 @test "declaration w/ internal variable" {
    local -a FILES=( /dev/stdin )
-   init_scanner
 
+   init_scanner
    scan <<< '_: %internal;'
+
+   init_parser
    parse
 
    local -n node='NODE_6'
@@ -198,9 +239,11 @@ function setup {
 
 @test "declaration w/ environment variable" {
    local -a FILES=( /dev/stdin )
-   init_scanner
 
+   init_scanner
    scan <<< '_: $environment;'
+
+   init_parser
    parse
 
    local -n node='NODE_6'
@@ -211,9 +254,11 @@ function setup {
 
 @test "declaration w/ index" {
    local -a FILES=( /dev/stdin )
-   init_scanner
 
+   init_scanner
    scan <<< '_: ["one"].0;'
+
+   init_parser
    parse
 
    local -- node_name='NODE_8'
@@ -233,9 +278,11 @@ function setup {
 
 @test "declaration w/ typecast" {
    local -a FILES=( /dev/stdin )
-   init_scanner
 
+   init_scanner
    scan <<< '_: "to path" -> path;'
+
+   init_parser
    parse
 
    local -- node_name='NODE_7'
@@ -251,9 +298,11 @@ function setup {
 
 @test "section declaration" {
    local -a FILES=( /dev/stdin )
-   init_scanner
 
+   init_scanner
    scan <<< '_ { }'
+
+   init_parser
    parse
 
    local -- node_name='NODE_5'

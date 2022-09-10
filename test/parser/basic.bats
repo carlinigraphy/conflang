@@ -17,6 +17,8 @@ function setup {
 
    init_scanner
    scan <<< '_: [];'
+
+   init_parser
    parse
 
    local -- node_name='NODE_6'
@@ -39,6 +41,8 @@ function setup {
 
    init_scanner
    scan <<< "$input"
+
+   init_parser
    parse
 
    local -- a1_name='NODE_6'
@@ -74,6 +78,7 @@ function setup {
    init_scanner
    scan <<< "$input"
 
+   init_parser
    run parse
    assert_failure
 }
@@ -89,6 +94,8 @@ function setup {
 
    init_scanner
    scan <<< "$input"
+
+   init_parser
    parse
 
    local -- node_name='NODE_6'
@@ -112,6 +119,8 @@ function setup {
 
    init_scanner
    scan <<< "$input"
+
+   init_parser
    parse
 
    local -- s1_name='NODE_5'
