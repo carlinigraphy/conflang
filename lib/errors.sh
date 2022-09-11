@@ -87,11 +87,11 @@ function print_no_input {
 }
 
 function print_missing_file {
-   printf 'File Error: missing source file %s.\n'  "$1"
+   printf 'File Error: missing or unreadable source file %s.\n'  "$1"
 }
 
 function print_circular_import {
-   printf 'Import Error: cannot source %q, circular import.\n'  "$1"
+   printf 'Import Error: cannot source %s, circular import.\n'  "$1"
 }
 
 #──────────────────────────────( syntax errors )────────────────────────────────

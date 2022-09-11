@@ -4,6 +4,7 @@
 #  `shellcheck -i SC2128 -i SC2053 ...`
 # ...just to make sure we're not shadowing unintended errors.
 
+check-sourced=true
 external-sources=true
 
 disable=SC1003

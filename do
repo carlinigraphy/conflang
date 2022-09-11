@@ -11,7 +11,6 @@ cat <<EOF
 commands
    test        Run \`BATS\` tests
    cov         Run \`BATS\` tests with \`kcov\` coverage
-   res         View result of \`kcov\` in browser
    check       Run \`shellcheck\`
    wc          Lines of bash
    wc-tests    Lines of BATS

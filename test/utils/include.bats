@@ -6,8 +6,12 @@ function setup {
    load '/usr/lib/bats-support/load.bash'
 
    export LIBDIR="${BATS_TEST_DIRNAME}/../../lib"
-   export conflang="${LIBDIR}/../conflang"
 
+   # These have functions that are directly invoked:
+   source "${LIBDIR}/../conflang"      # init_globals()
+   source "${LIBDIR}/utils.sh"         # add_file(), merge_includes()
+
+   # These are more strictly library code. Nothing called directly.
    source "${LIBDIR}/lexer.sh"
    source "${LIBDIR}/parser.sh"
    source "${LIBDIR}/errors.sh"
@@ -35,18 +39,40 @@ function setup {
 }
 
 
-@test "successful source, ./conflang" {
-   source "$conflang"
+@test "add_file() fails on unreadable file" {
+   init_globals
+
+   local f="${BATS_FILE_TMPDIR}"/UNREADABLE
+   touch   "$f"
+   chmod 0 "$f"
+
+   run add_file "$f"
+   assert_failure
+   assert_output --regexp  '^File Error: '
+   assert_output --partial "missing or unreadable source file ${f}."
+}
+
+
+@test "add_file() fails on nonexistent file" {
+   # We can be very confident this file will not exist beforehand, as we have
+   # control over the environment in which the tests are run. The new file is
+   # created in a temporary directory only used by tests in this file itself.
+   init_globals
+
+   local f="${BATS_FILE_TMPDIR}"/DOESNT_EXIT
+
+   run add_file "$f"
+   assert_failure
+   assert_output --regexp  '^File Error: '
+   assert_output --partial "missing or unreadable source file ${f}."
 }
 
 
 @test "include absolute path to file from root" {
-   source "$conflang"
-
    echo "%include '${PARENT_F2}';" > "$PARENT_F1"
    echo '_{}'                      > "$PARENT_F2"
 
-   _init_globals
+   init_globals
    add_file "$PARENT_F1"
 
    _parse
@@ -79,12 +105,10 @@ function setup {
 
 
 @test "include relative path to file, same dir" {
-   source "$conflang"
-
    echo "%include '$(basename ${PARENT_F2})';" > "$PARENT_F1"
    echo '_{}' > "$PARENT_F2"
 
-   _init_globals
+   init_globals
    add_file "$PARENT_F1"
 
    _parse
@@ -121,14 +145,12 @@ function setup {
 
 
 @test "include relative path to file, dir down" {
-   source "$conflang"
-
    # Relative path to the child file, through the child directory.
    local rela_child="./${CHILD_D##*/}/${CHILD_F1##*/}"
    echo "%include '${rela_child}';" > "$PARENT_F1"
    echo '_{}' > "$CHILD_F1"
 
-   _init_globals
+   init_globals
    add_file "$PARENT_F1"
 
    _parse
@@ -161,13 +183,11 @@ function setup {
 
 
 @test "include relative path to file, dir up" {
-   source "$conflang"
-
    # Relative path to the child file, through the child directory.
    echo "%include '../${PARENT_F1##*/}';" > "$CHILD_F1"
    echo 'key;' > "$PARENT_F1"
 
-   _init_globals
+   init_globals
    add_file "$CHILD_F1"
 
    _parse
@@ -222,12 +242,10 @@ function setup {
 
 
 @test "include from section" {
-   source "$conflang"
-
    echo "_{ %include '${CHILD_F1}'; }" > "$PARENT_F1"
    echo 'key;' > "$CHILD_F1"
 
-   _init_globals
+   init_globals
    add_file "$PARENT_F1"
 
    _parse
@@ -287,13 +305,11 @@ function setup {
 
 
 @test "include from subsection" {
-   source "$conflang"
-
    # Relative path to the child file, through the child directory.
    echo "_{ _{ %include '$CHILD_F1'; }}" > "$PARENT_F1"
    echo 'key;' > "$CHILD_F1"
 
-   _init_globals
+   init_globals
    add_file "$PARENT_F1"
 
    _parse
@@ -353,25 +369,4 @@ function setup {
    # The actual declaration node should be the same NODE_$n. All of the above
    # was really for us to just end up here.
    assert_equal "$decl_p"  "$decl_c"
-}
-
-
-@test "raise parse_error if constrain occurs in a sub-file" {
-   # Ideally I would've liked to have included this with the rest of the
-   # exceptions, however I wanted to test in a real-world situation with
-   # multiple files, rather than simply changing the .files prop.
-
-   source "$conflang"
-
-   _init_globals
-   add_file "$PARENT_F1"
-
-   echo "%include '${PARENT_F2}';"  > "$PARENT_F1"
-   echo "%constrain [ '' ];"        > "$PARENT_F2"
-
-   _parse
-   run merge_includes
-
-   assert_failure
-   assert_output 'Parse Error: %constrain may not occur in a sub-file.'
 }
