@@ -63,14 +63,14 @@ function init_globals {
    # setup() function allows for easier BATS testing.
 
    # Path to initial file to compile.
-   declare -g INPUT
+   declare -g INPUT=
 
    # Symbol table holding the name of the SYMTAB_$n, and a nameref to that
    # symtab.
-   declare -g GLOBALS
+   declare -g GLOBALS=
 
    # The root NODE_$n of the parent and child AST trees.
-   declare -g PARENT_ROOT CHILD_ROOT
+   declare -g PARENT_ROOT= CHILD_ROOT=
 
    # Shouldn't code file names/paths into the generated output. If the user has
    # the same file *data*, but it's in a different place, we shouldn't have to
@@ -78,7 +78,7 @@ function init_globals {
    # INDEX (stored in the output data), to the possibly dynamic path to the
    # file.
    declare -ga FILES=()
-   declare -gi FILE_IDX
+   declare -gi FILE_IDX=
 
    # Stores the $ROOT after each `parse()`. The idx of a root node here should
    # correspond to it's matching INCLUDE_$n from the INCLUDES[] array. Example:
