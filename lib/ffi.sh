@@ -67,10 +67,73 @@
 # some sort of dotfile that marks it as a module containing function-dirs. Maybe
 # need a .exports file that declares which sub-file is valid?
 
+
+1. Initial compilation of conflang -> Bash
+   - compile functions
+2. Enforce validation on Bash (runs in VM)
+3. Run actual shit.
+
+
+backup (array:path): [
+   $HOME -> path,
+   /usr/bin/...
+] {
+   exist          < path
+   readable       < path:(file, directory)
+   is_dir         < any
+}
+
+
+# user.conf
+homedir: /usr/bin/barf {
+   exist
+   is_dir
+   is_readable
+   is_writable
+}
+
+inline = {
+   'homedir' = '/usr/bin/barf'
+}
+
+
+source <(
+   declare -f foo-{test,declare} | awk '...'
+)
+
+
+
 #--- Example @programmer file
-# exist/
+# /usr/lib/exist/
+#  +-- exist.conf
 #  +-- exist-test.sh
 #  `-- exist-directive.sh
+
+# parent
+#%use 'std.exist' as exist;
+#
+#
+#FunctionSymbol(
+#   fn_name:   $HASH
+#   author:
+#   version:
+#
+#   takes: [
+#      Type('array', subtype: None),
+#      Type('array', subtype: Type('file', subtype: None))
+#      Type('array', subtype: Type('dir', subtype: None))
+#   ]
+#)
+#
+#
+## exist.conf
+#{
+#   takes: [
+#      'path',
+#      'path:file',
+#      'path:dir'
+#   ]
+#}
 
 function exist-test {
    #params:  <data:str> <type:indexed array>
