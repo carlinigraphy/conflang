@@ -72,48 +72,74 @@
 #  +-- exist-test.sh
 #  `-- exist-directive.sh
 
-function exist-test {
-   #params:  <data:str> <type:indexed array>
-   # `data`
-   #     * the input upon which a test is performed
-   #     * always supplied as a string, while the actual type is declared in the
-   #       second parameter
-   # `type`
-   #     * passed in as the name of an indexed array containing the type (and
-   #       potentially subtype(s)).
-   #     * must declare a nameref to the 2nd paramater to access these values:
-   #       > local -n type="$2"
-   
-   local -- data="$1"
-   local -n type="$2"
-   
-   if [[ "${type[0]}" != 'path' ]] ; then
-      raise invalid_type "exist() expects a (path), received (${type[0]})."
-   fi
-
-   [[ -e "${data}" ]]
-}
-
-
-function exist-directive {
-   local -- data="$1" ; shift
-   local -n type="$1" ; shift
-   local -a params=( "$@" )
-   
-   if [[ "${type[0]}" != 'path' ]] ; then
-      raise invalid_type "exist() expects a (path), received (${type[0]})."
-   fi
-
-   case "${type[1]}" in
-      'dir')   mkdir -p "$data" ;;
-      *)       touch "$data"    ;;
-      # In this case, if the subtype is a file (or unspecified), we're assuming
-      # the user wants to create a file. Maybe this could be modified based upon
-      # a config flag/variable. `--strict-mode` or something.
-   esac
-}
-
-
+# parent
+#%use 'std.exist' as exist;
+#
+#
+#FunctionSymbol(
+#   fn_name:   $HASH
+#   author:
+#   version:
+#
+#   takes: [
+#      Type('array', subtype: None),
+#      Type('array', subtype: Type('file', subtype: None))
+#      Type('array', subtype: Type('dir', subtype: None))
+#   ]
+#)
+#
+#
+## exist.conf
+#{
+#   takes: [
+#      'path',
+#      'path:file',
+#      'path:dir'
+#   ]
+#}
+#
+#function exist-test {
+#   #params:  <data:str> <type:indexed array>
+#   # `data`
+#   #     * the input upon which a test is performed
+#   #     * always supplied as a string, while the actual type is declared in the
+#   #       second parameter
+#   # `type`
+#   #     * passed in as the name of an indexed array containing the type (and
+#   #       potentially subtype(s)).
+#   #     * must declare a nameref to the 2nd paramater to access these values:
+#   #       > local -n type="$2"
+#   
+#   local -- data="$1"
+#   local -n type="$2"
+#   
+#   if [[ "${type[0]}" != 'path' ]] ; then
+#      raise invalid_type "exist() expects a (path), received (${type[0]})."
+#   fi
+#
+#   [[ -e "${data}" ]]
+#}
+#
+#
+#function exist-directive {
+#   local -- data="$1" ; shift
+#   local -n type="$1" ; shift
+#   local -a params=( "$@" )
+#   
+#   if [[ "${type[0]}" != 'path' ]] ; then
+#      raise invalid_type "exist() expects a (path), received (${type[0]})."
+#   fi
+#
+#   case "${type[1]}" in
+#      'dir')   mkdir -p "$data" ;;
+#      *)       touch "$data"    ;;
+#      # In this case, if the subtype is a file (or unspecified), we're assuming
+#      # the user wants to create a file. Maybe this could be modified based upon
+#      # a config flag/variable. `--strict-mode` or something.
+#   esac
+#}
+#
+#
 # Perhaps we'd want to allow passing in additional arguments (or more aptly
 # flags) to tests/directives, to modify behavior. Example, `exist` can take a
 # "strict" param, that requires exact type:subtype.
@@ -130,32 +156,29 @@ function exist-directive {
 
 
 #--- Example @compiler parse of file
-
-mod="exist"
-
-hash=$( md5sum "${mod}"-test.sh )
-hash="_${hash%% *}"
-
-source <(
-   source "${mod}"-test.sh
-
-   declare -f "${mod}"-test.sh | awk "
-      sub(/^${mod}-test \(\)/, \"$hash ()\");
-      print;
-   "
-)
+#
+#mod="exist"
+#
+#hash=$( md5sum "${mod}"-test.sh )
+#hash="_${hash%% *}"
+#
+#source <(
+#   source "${mod}"-test.sh
+#
+#   declare -f "${mod}"-test.sh | awk "
+#      sub(/^${mod}-test \(\)/, \"$hash ()\");
+#      print;
+#   "
+#)
 
 # Some pseudocode here, I don't feel like drafting out all the namerefs for the
 # Type nodes.
-SYMTAB["$mod"]=#Symbol(Type: 'FUNCTION', node: "$hash")
+#SYMTAB["$mod"]=#Symbol(Type: 'FUNCTION', node: "$hash")
 
 # Here we re-use the .node property to instead refer to the function's name.
 # Would then invoke via:
-declare -n fn="${symbol[node]}"
-$fn  "$data"  "$type"  "${params[@]}"
-
-# ^-- To reduce confusion, we may instead want to not re-use .node. Instead
-# make a .code or .func property.
+#declare -n fn="${symbol[node]}"
+#$fn  "$data"  "$type"  "${params[@]}"
 
 
 #--- more THINKIES:
@@ -176,38 +199,56 @@ $fn  "$data"  "$type"  "${params[@]}"
 # Each FFI file must contain a .conf spelling out its accepted parameters, and
 # whatnot.
 #
-#> name  (str): "exist";
-#> takes (array:type): [
-#>    path,
-#> ];
+#> mod: "exist";
 #> params {
-#>    strict (bool): false;
+#>    data (str);
+#>    type (array:str);
+#>
+#>    # Flags:
+#>    strict (bool);
 #> }
 
 
-# I'm still not 100% on how these should be imported. Definitely as some sort
-# of parser directive. We've already established those. Good to build off the
-# existing framework.
-#
-# (Sidebar: as I think more on it, maybe it does not make
-# the most sense that internal variables and parser directives are both
-# prefixed with `%'. Hmm.)
-#
-#> %use 'path/to/module' as mod;
-#
-# Relative paths are checked in order of
-#  1. Script's directory
-#  2. System directory
-#
-# Example, if the user has a directory called ./std/exist/, and the 'system'
-# does as well, the user's would take precedence if they called:
-#> %use 'std/exist';
-#
-# All module names are loaded as the "full path" to their executable. In the
-# example above, it would enter the symbol table as 'std.exist'. The `as`
-# keyword would put it in as something else.
-#
-# There shall be only one `use` keyword, despite both tests & directives. It
-# will load both (if found). If neither is found, throw a File Error. If the
-# user attempts to call the test form, but there is only a directive present,
-# throw a Name Error.
+#-------------------------------------------------------------------------------
+# For now very much just slamming out something really rough. Fuck it, we'll do
+# it live!
+
+function ffi {
+   local package_location="$1"
+   local exe="${package_location##*/}"
+
+   if [[ ! -f "$package_location" ]] ; then
+      echo "Package [$package_location] not found."
+      exit 1
+   fi
+
+   local header="${package_location}/${exe}.conf"
+   if [[ ! -f "$header" ]] ; then
+      echo "Package [$package_location] missing header file."
+      exit 1
+   fi
+
+   # We need to compile the .conf "header" file containing package information,
+   # version, but most importantly, the function signature of the test/directive
+   # fn's.
+   # Need to make sure the user does not specify any parser directives in
+   # the header files. May only contain "base" features. Maybe this can be
+   # done instead with a global flag we pass to the parser? I dunno.
+   add_file "$header"
+
+   _parse
+   local root="$ROOT"
+
+   do_compile
+
+   # SIDEBAR: but as I'm thinking about it, the diff_env function is going to
+   # be missing some stuff. Any nodes created in the compiler. TYPE_'s,
+   # DATA_'s, SYMTAB_'s and whatnot. It won't be perfect, but it should
+   # hopefully catch a good amount of tomfoolery.
+   #
+   # Hmm. Still don't love how we're doing the env diff. Really just need to
+   # make sure that if a user calls an environment variable, we reference its
+   # initial declaration as defined by the first dump. Wonder if we want to just
+   # copy the initial env into a var? I like this. Need to explore that later.
+   #> while FS= read -r -d '' line ; do echo "[${line}]" ; done < <(env --null)
+}
