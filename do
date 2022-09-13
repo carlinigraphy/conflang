@@ -77,6 +77,7 @@ case "$1" in
 
    'edit')  order=(
                "${PROGDIR}"/conflang
+               "${PROGDIR}"/lib/utils.sh
                "${PROGDIR}"/lib/{lexer,parser,compiler}.sh
                "${PROGDIR}"/lib/{errors,debug,ffi}.sh
             )

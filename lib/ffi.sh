@@ -154,6 +154,9 @@ SYMTAB["$mod"]=#Symbol(Type: 'FUNCTION', node: "$hash")
 declare -n fn="${symbol[node]}"
 $fn  "$data"  "$type"  "${params[@]}"
 
+# ^-- To reduce confusion, we may instead want to not re-use .node. Instead
+# make a .code or .func property.
+
 
 #--- more THINKIES:
 # I feel like the above would potentially incur a decent runtime cost. We want
@@ -173,11 +176,38 @@ $fn  "$data"  "$type"  "${params[@]}"
 # Each FFI file must contain a .conf spelling out its accepted parameters, and
 # whatnot.
 #
-#> mod: "exist";
+#> name  (str): "exist";
+#> takes (array:type): [
+#>    path,
+#> ];
 #> params {
-#>    data (str);
-#>    type (array:str);
-#>
-#>    # Flags:
-#>    strict (bool);
+#>    strict (bool): false;
 #> }
+
+
+# I'm still not 100% on how these should be imported. Definitely as some sort
+# of parser directive. We've already established those. Good to build off the
+# existing framework.
+#
+# (Sidebar: as I think more on it, maybe it does not make
+# the most sense that internal variables and parser directives are both
+# prefixed with `%'. Hmm.)
+#
+#> %use 'path/to/module' as mod;
+#
+# Relative paths are checked in order of
+#  1. Script's directory
+#  2. System directory
+#
+# Example, if the user has a directory called ./std/exist/, and the 'system'
+# does as well, the user's would take precedence if they called:
+#> %use 'std/exist';
+#
+# All module names are loaded as the "full path" to their executable. In the
+# example above, it would enter the symbol table as 'std.exist'. The `as`
+# keyword would put it in as something else.
+#
+# There shall be only one `use` keyword, despite both tests & directives. It
+# will load both (if found). If neither is found, throw a File Error. If the
+# user attempts to call the test form, but there is only a directive present,
+# throw a Name Error.

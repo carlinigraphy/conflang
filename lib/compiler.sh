@@ -569,6 +569,7 @@ function type_equality {
    fi
 
    if [[ ${t1[subtype]} ]] ; then
+      echo "t1[subtype]=${t1[subtype]}  t2[subtype]=${t2[subtype]}"
       type_equality "${t1[subtype]}" "${t2[subtype]}" 
       return $?
    fi
@@ -616,14 +617,14 @@ function semantics_decl_variable {
 
    # Sets target type. The type of the expression should match the type of
    # the typedef in the symbol table.
-   local -n symtab="$SYMTAB"
-   local -n symbol="${symtab[${name[value]}]}"
-   local -- target="${symbol[type]}"
+   walk_semantics "${node[type]}"
+   local target="$TYPE"
 
    # Sets TYPE
    walk_semantics "${node[expr]}"
+   local actual="$TYPE"
 
-   if ! type_equality  "$target"  "$TYPE" ; then
+   if ! type_equality  "$target"  "$actual" ; then
       raise type_error "${node[expr]}"
    fi
 
@@ -644,7 +645,8 @@ function semantics_typedef {
       type[subtype]=$TYPE
    fi
 
-   declare -g NODE=$save
+   declare -g TYPE="$tname"
+   declare -g NODE="$save"
 }
 
 
@@ -683,7 +685,8 @@ function semantics_array {
 
    # Top-level array.
    extract_type 'array'
-   local array_name=$TYPE
+   local -- array_name=$TYPE
+   local -n array="$array_name"
 
    # The user *can* have an array of differing types, but not if the type is
    # declared with a subtype. E.g, `array:str`.
@@ -693,25 +696,19 @@ function semantics_array {
       walk_semantics "$item"
       local -n type=$TYPE
       local -- kind="${type[kind]}"
-      types_found[$kind]=''
+
+      array['subtype']="$TYPE"
+      # For now we assume the array will have matching types throughout. If it
+      # does, we don't have touch this. If we're wrong, we append each found
+      # distinct type to `types_found[]`. If >1, set the subtype to ANY instead.
+
+      types_found[$kind]='yes'
    done
 
-   local type_string=''
-   for type in "${!types_found[@]}" ; do
-      type_string+="${type_string:+|}${type_string}"
-   done
-
-   if [[ $type_string ]] ; then
-      # TODO: probably created a 'hidden' type called MIXED. Would allow more
-      # more elegantly handling this problem.
-      #
-      # Cannot use `extract_type` here, as there's the chance for a mixed-type
-      # array.
-      mk_type
-      local -- subtype_name=$TYPE
-      local -n subtype=$TYPE
-      subtype['kind']="$type_string"
-      type['subtype']="$subtype_name"
+   if [[ ${#types_found[@]} -gt 1 ]] ; then
+      # Maybe bad case. User has a mixed-type array. Give `any` type.
+      extract_type 'any'
+      array['subtype']="$TYPE"
    fi
 
    declare -g TYPE=$array_name
