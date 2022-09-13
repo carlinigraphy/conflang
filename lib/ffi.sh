@@ -217,38 +217,103 @@ function ffi {
    local package_location="$1"
    local exe="${package_location##*/}"
 
-   if [[ ! -f "$package_location" ]] ; then
+   if [[ ! -d "$package_location" ]] ; then
       echo "Package [$package_location] not found."
       exit 1
    fi
 
-   local header="${package_location}/${exe}.conf"
-   if [[ ! -f "$header" ]] ; then
-      echo "Package [$package_location] missing header file."
-      exit 1
-   fi
+   #local header="${package_location}/${exe}.conf"
+   #if [[ ! -f "$header" ]] ; then
+   #   echo "Package [$package_location] missing header file."
+   #   exit 1
+   #fi
+   ## We need to compile the .conf "header" file containing package information,
+   ## version, but most importantly, the function signature of the test/directive
+   ## fn's.
+   ## Need to make sure the user does not specify any parser directives in
+   ## the header files. May only contain "base" features. Maybe this can be
+   ## done instead with a global flag we pass to the parser? I dunno.
+   #add_file "$header"
+   #_parse
+   #local root="$ROOT"
+   #do_compile
+   #conf author    ; local -- author="$RV"
+   #conf version   ; local -n version="$RV"
+   #conf signature ; local -n signature="$RV"
 
-   # We need to compile the .conf "header" file containing package information,
-   # version, but most importantly, the function signature of the test/directive
-   # fn's.
-   # Need to make sure the user does not specify any parser directives in
-   # the header files. May only contain "base" features. Maybe this can be
-   # done instead with a global flag we pass to the parser? I dunno.
-   add_file "$header"
+   # Unset successful package import flag. It is set at the end of the `source`
+   # below, the only way to determine we haden't hit an error and returned
+   # early.
+   unset PACKAGE_IMPORT_SUCCESS
+   unset FN_T FN_D
 
-   _parse
-   local root="$ROOT"
+   source <(
+      # It's not ideal, but anything in this block may have no unintended output
+      # to stdout. Everything must be redirected to /dev/null or stderr if
+      # necessary.
+      test_file="${package_location}/${exe}"-test.sh
+      directive_file="${package_location}/${exe}"-directive.sh
 
-   do_compile
+      source "$test_file" "$directive_file" 2>/dev/null
 
-   # SIDEBAR: but as I'm thinking about it, the diff_env function is going to
-   # be missing some stuff. Any nodes created in the compiler. TYPE_'s,
-   # DATA_'s, SYMTAB_'s and whatnot. It won't be perfect, but it should
-   # hopefully catch a good amount of tomfoolery.
-   #
-   # Hmm. Still don't love how we're doing the env diff. Really just need to
-   # make sure that if a user calls an environment variable, we reference its
-   # initial declaration as defined by the first dump. Wonder if we want to just
-   # copy the initial env into a var? I like this. Need to explore that later.
-   #> while FS= read -r -d '' line ; do echo "[${line}]" ; done < <(env --null)
+      if [[ -e "$test_file" ]] ; then
+         hash_t=$( md5sum "$test_file" )
+         hash_t="_${hash_t%% *}"
+      fi
+
+      if [[ -e "$directive_file" ]] ; then
+         hash_d=$( md5sum "$directive_file" )
+         hash_d="_${hash_t%% *}"
+      fi
+
+      # Surprisingly enough this is actually faster than using awk. I belive
+      # because we still need the subshell, but it avoids a pipeline AND awk,
+      # keeps more in native bash. Likewise `echo` profiles a little faster
+      # than `printf` does.
+      fn=$( declare -f hello-test )
+      echo "${fn/hello-test/$hash_t}"
+
+      fn=$( declare -f hello-directive )
+      echo "${fn/hello-directive/$hash_d}"
+
+      declare -g FN_T="$hash_t"  FN_D="$hash_d"
+      declare -p FN_T            FN_D
+   )
+
+   $FN_T
 }
+
+ffi "$@"
+
+
+
+
+# TODO:
+# Running list of things that will be necessary for this to work:
+#  - [ ]. Types as a valid expression
+#           - Requires changing how subscription works, everything will need to
+#             shift to bracket syntax
+#           - Honestly this is a better approach that we should've shifted to
+#             some time ago
+#           - Allows the user to supply a .conf file with their module that
+#             states permissible types
+#  - [ ]. Compiling a type expression returns the name of the compiled TYPE_$n
+#         node.
+#           - May be useful in situations such as this one in which using a
+#             type as value should return the TYPE to the programmer
+#           - There may also be situations useful for end users for this
+#             behavior
+#           - Takes us one step closer to being able to call functions from the
+#             global scope. Maybe internal references don't need to use '%'
+#             afterall, save it for parser statements
+
+# SIDEBAR: but as I'm thinking about it, the diff_env function is going to
+# be missing some stuff. Any nodes created in the compiler. TYPE_'s,
+# DATA_'s, SYMTAB_'s and whatnot. It won't be perfect, but it should
+# hopefully catch a good amount of tomfoolery.
+#
+# Hmm. Still don't love how we're doing the env diff. Really just need to
+# make sure that if a user calls an environment variable, we reference its
+# initial declaration as defined by the first dump. Wonder if we want to just
+# copy the initial env into a var? I like this. Need to explore that later.
+#> while FS= read -r -d '' line ; do echo "[${line}]" ; done < <(env --null)
