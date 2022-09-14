@@ -49,6 +49,7 @@ function populate_globals {
 
    local -A primitive=(
       [any]='ANY'
+      [fn]='FUNCTION'
       [int]='INTEGER'
       [str]='STRING'
       [bool]='BOOLEAN'
@@ -173,6 +174,56 @@ function copy_type {
 }
 
 
+function create_ffi_symbol {
+   local -n path="$1"
+   local -- file_idx="${path[file]}"
+   local -- dir="${FILES[$file_idx]%/*}"
+
+   local loc="${dir}/${path[value]}"
+   local exe="${loc##*/}"
+
+   if [[ ! -d "$loc" ]] ; then
+      echo "Package [$loc] not found."
+      exit 1
+   fi
+
+   test_file="${loc}/${exe}"-test.sh
+   directive_file="${loc}/${exe}"-directive.sh
+
+   if [[ -e "$test_file" ]] ; then
+      source "$test_file" || {
+         raise source_failure  "$test_file"
+      }
+      hash_t=$( md5sum "$test_file" )
+      hash_t="_${hash_t%% *}"
+   fi
+
+   if [[ -e "$directive_file" ]] ; then
+      source "$directive_file" || {
+         raise source_failure  "$directive_file"
+      }
+      hash_d=$( md5sum "$directive_file" )
+      hash_d="_${hash_t%% *}"
+   fi
+
+   fn=$( declare -f hello-test )
+   eval "${fn/hello-test/$hash_t}"
+
+   fn=$( declare -f hello-directive )
+   eval "${fn/hello-directive/$hash_d}"
+
+   mk_symbol
+   local -- symbol_name="$SYMBOL"
+   local -n symbol="$symbol_name"
+
+   extract_type 'fn'
+   symbol['type']="$TYPE"
+   symbol['test']="$hash_t"
+   symbol['directive']="$hash_d"
+   symbol['signature']=
+}
+
+
 function walk_symtab {
    declare -g NODE="$1"
    symtab_"${TYPEOF[$NODE]}"
@@ -243,6 +294,26 @@ function symtab_decl_section {
    # Restore saved refs to the parent SYMTAB, and current NODE.
    declare -g NODE=$node_name
    declare -g SYMTAB=$symtab_name
+}
+
+
+function symtab_use {
+   local -n node="$NODE"
+   local -- path_name="${node[path]}"
+   local -n path="$path_name"
+
+   if [[ ${node['name']} ]] ; then
+      local symbol_name="${node[name]}"
+   else
+      # If no `as...` provided, default to the package name itself. Example:
+      # 'std/math' -> `math`,  'project/lib/add' -> `add`.
+      local symbol_name="${path[value]##*/}"
+   fi
+
+   # We want to actually pass the NODE_$n of the path, so we can pull the
+   # NODE.file. Easier referencing the intended path.
+   create_ffi_symbol "$path_name"
+   GLOBALS[$symbol_name]="$SYMBOL"
 }
 
 

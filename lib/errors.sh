@@ -28,13 +28,14 @@ declare -gA EXIT_STATUS=(
    [circular_import]=9
    [name_error]=10
    [missing_file]=11
-   [missing_env_var]=12
-   [stomped_env_var]=13
-   [missing_int_var]=14
-   [invalid_interpolation_char]=15
-   [unescaped_interpolation_brace]=16
-   [munch_error]=17
-   [missing_required]=18
+   [source_failure]=12
+   [missing_env_var]=13
+   [stomped_env_var]=14
+   [missing_int_var]=15
+   [invalid_interpolation_char]=16
+   [unescaped_interpolation_brace]=17
+   [munch_error]=18
+   [missing_required]=19
 )
 
 function raise {
@@ -92,6 +93,10 @@ function print_missing_file {
 
 function print_circular_import {
    printf 'Import Error: cannot source %s, circular import.\n'  "$1"
+}
+
+function print_source_failure {
+   printf 'File Error: failed to source user-defined function %s.\n'  "$1"
 }
 
 #──────────────────────────────( syntax errors )────────────────────────────────

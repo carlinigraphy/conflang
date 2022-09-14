@@ -10,11 +10,13 @@
 declare -gi TOKEN_NUM=0
 
 declare -gA KEYWORD=(
+   ['as']=true
    ['true']=true
    ['false']=true
    ['and']=true
    ['or']=true
    ['not']=true
+   ['use']=true
    ['include']=true
    ['constrain']=true
 )

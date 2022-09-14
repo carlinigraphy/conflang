@@ -66,6 +66,20 @@ function mk_include {
 }
 
 
+function mk_use {
+   (( ++NODE_NUM ))
+   local   --  nname="NODE_${NODE_NUM}"
+   declare -gA $nname
+   declare -g  NODE=$nname
+   local   -n  node=$nname
+
+   node['path']=       # the 'path' to the module
+   node['name']=       # identifier, if using `as $ident;`
+
+   TYPEOF[$nname]='use'
+}
+
+
 function mk_decl_variable {
    (( ++NODE_NUM ))
    local   --  nname="NODE_${NODE_NUM}"
@@ -403,10 +417,9 @@ function p_statement {
 
 function p_parser_statement {
    # Saved node referencing the parent Section.
-   if p_match 'INCLUDE' ; then
-      p_include
-   elif p_match 'CONSTRAIN' ; then
-      p_constrain
+   if   p_match 'INCLUDE'   ; then p_include
+   elif p_match 'CONSTRAIN' ; then p_constrain
+   elif p_match 'USE'       ; then p_use
    else
       raise parse_error "${CURRENT[value]} is not a parser statement."
    fi
@@ -472,6 +485,35 @@ function p_constrain {
    # Section declarations loop & append $NODEs to their .items. `include`/
    # `constrain` directives are technically children of a section, but they do
    # not live past the parser.
+}
+
+
+function p_use {
+   local -n section_ptr=$SECTION
+   local -n name=${section_ptr[name]}
+
+   if [[ ${name[value]} != '%inline' ]] ; then
+      raise parse_error '%use may not occur in a section.'
+   fi
+
+   mk_use
+   local -- save="$NODE"
+   local -n use="$NODE"
+
+   p_path "$CURRENT_NAME"
+   p_munch 'PATH' "expecting a module path."
+   local path="$NODE"
+
+   if p_match 'AS' ; then
+      p_identifier "$CURRENT_NAME"
+      p_munch 'IDENTIFIER'
+      local name="$NODE"
+   fi
+
+   use['path']="$path"
+   use['name']="$name"
+
+   declare -g NODE="$save"
 }
 
 
