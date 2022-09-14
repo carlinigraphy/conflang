@@ -10,46 +10,26 @@ function ffi {
       exit 1
    fi
 
-   # Unset successful package import flag. It is set at the end of the `source`
-   # below, the only way to determine we haden't hit an error and returned
-   # early.
-   unset PACKAGE_IMPORT_SUCCESS
-   unset FN_T FN_D
+   test_file="${package_location}/${exe}"-test.sh
+   directive_file="${package_location}/${exe}"-directive.sh
 
-   source <(
-      # It's not ideal, but anything in this block may have no unintended output
-      # to stdout. Everything must be redirected to /dev/null or stderr if
-      # necessary.
-      test_file="${package_location}/${exe}"-test.sh
-      directive_file="${package_location}/${exe}"-directive.sh
+   source "$test_file" "$directive_file" 2>/dev/null
 
-      source "$test_file" "$directive_file" 2>/dev/null
+   if [[ -e "$test_file" ]] ; then
+      hash_t=$( md5sum "$test_file" )
+      hash_t="_${hash_t%% *}"
+   fi
 
-      if [[ -e "$test_file" ]] ; then
-         hash_t=$( md5sum "$test_file" )
-         hash_t="_${hash_t%% *}"
-      fi
+   if [[ -e "$directive_file" ]] ; then
+      hash_d=$( md5sum "$directive_file" )
+      hash_d="_${hash_t%% *}"
+   fi
 
-      if [[ -e "$directive_file" ]] ; then
-         hash_d=$( md5sum "$directive_file" )
-         hash_d="_${hash_t%% *}"
-      fi
+   fn=$( declare -f hello-test )
+   eval "${fn/hello-test/$hash_t}"
 
-      # Surprisingly enough this is actually faster than using awk. I belive
-      # because we still need the subshell, but it avoids a pipeline AND awk,
-      # keeps more in native bash. Likewise `echo` profiles a little faster
-      # than `printf` does.
-      fn=$( declare -f hello-test )
-      echo "${fn/hello-test/$hash_t}"
-
-      fn=$( declare -f hello-directive )
-      echo "${fn/hello-directive/$hash_d}"
-
-      declare -g FN_T="$hash_t"  FN_D="$hash_d"
-      declare -p FN_T            FN_D
-   )
-
-   mk_fn_symbol "$package_location" "$FN_T" "$FN_D"
+   fn=$( declare -f hello-directive )
+   eval "${fn/hello-directive/$hash_d}"
 }
 
 
@@ -67,7 +47,6 @@ function mk_fn_symbol {
 
 
 ffi "$@"
-
 
 
 
