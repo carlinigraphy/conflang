@@ -46,6 +46,15 @@ function walk_pprint {
 }
 
 
+function pprint_use {
+   local -n node="$NODE"
+   local -n path="${node[path]}"
+
+   printf "%$(( INDENTATION * INDENT_FACTOR ))s" ''
+   printf '%%use '\''%s'\'' as %s;\n'  "${path[value]}"  "${node[name]}"
+}
+
+
 function pprint_decl_section {
    local -- symtab_name="$SYMTAB"
    local -n symtab="$symtab_name"

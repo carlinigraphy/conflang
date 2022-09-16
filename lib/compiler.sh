@@ -176,6 +176,8 @@ function copy_type {
 
 function create_ffi_symbol {
    local -n path="$1"
+   local -- fn_name="$2"
+
    local -- file_idx="${path[file]}"
    local -- dir="${FILES[$file_idx]%/*}"
 
@@ -217,6 +219,7 @@ function create_ffi_symbol {
    local -n symbol="$symbol_name"
 
    extract_type 'fn'
+   symbol['name']="$fn_name"
    symbol['type']="$TYPE"
    symbol['test']="$hash_t"
    symbol['directive']="$hash_d"
@@ -308,11 +311,15 @@ function symtab_use {
       # If no `as...` provided, default to the package name itself. Example:
       # 'std/math' -> `math`,  'project/lib/add' -> `add`.
       local symbol_name="${path[value]##*/}"
+
+      # In order to reference in the symbol table from the NODE_$n, we need
+      # the name it's in there as.
+      node['name']="$symbol_name"
    fi
 
    # We want to actually pass the NODE_$n of the path, so we can pull the
    # NODE.file. Easier referencing the intended path.
-   create_ffi_symbol "$path_name"
+   create_ffi_symbol "$path_name"  "$symbol_name"
    GLOBALS[$symbol_name]="$SYMBOL"
 }
 
@@ -655,6 +662,15 @@ function walk_semantics {
 }
 
 
+function semantics_use {
+   local -n node="$NODE"
+   local -- name="${node[name]}"
+
+   local -n symbol="${GLOBALS[$name]}"
+   declare -g TYPE="${symbol[type]}"
+}
+
+
 function semantics_decl_section {
    local -- symtab_name="$SYMTAB"
    local -n symtab="$symtab_name"
@@ -842,6 +858,10 @@ function walk_compiler {
 }
 
 
+# Nothing to do with the %use statement itself here.
+function compile_use { :; }
+
+
 function compile_decl_section {
    local -- symtab_name="$SYMTAB"
    local -n symtab="$symtab_name"
@@ -866,7 +886,12 @@ function compile_decl_section {
    local -n items="${node[items]}" 
    for nname in "${items[@]}"; do
       walk_compiler "$nname"
-      data[$KEY]="$DATA"
+
+      # %use statements do not have a KEY, skip. I guess this would also be the
+      # case for any future non-data statements.
+      if [[ $KEY ]] ; then
+         data[$KEY]="$DATA"
+      fi
    done
 
    declare -g KEY="$key"
