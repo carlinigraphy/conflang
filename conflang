@@ -1,17 +1,15 @@
 #!/bin/bash
 
-# Current environment's variables. By diffing with the later dump of
-# variables, we can determine which were defined here, and what was pre-
-# existing from the environment. If the user tries to reference an
-# environment variable that we've stomped on, we can accurately report that
-# here.
-ifs="$IFS" ; IFS=$'\n'
-for line in $(declare -p) ; do
-   if [[ "$line" =~ ^declare\ -(-|[xraAin]+)\ ([^=]+) ]] ; then
-      ENV_START+=( "${BASH_REMATCH[2]}" )
-   fi
-done
-IFS="$ifs"
+# Current environment's variables. When the user queries an env var (e.g., PATH)
+# we need to make sure it isn't something that's been stomped on by a variable
+# declared within this script itself. By returning the value of SNAPSHOT[$var],
+# we're guaranteed to never have stomped a value.
+declare -gA SNAPSHOT=()
+while IFS= read -r -d '' line ; do
+   key="${line%%=*}"
+   val="${line#*=}"
+   SNAPSHOT["$key"]="$val"
+done < <(env --null)
 
 
 function usage {
@@ -102,14 +100,11 @@ fi
 declare -g PROGDIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" ; pwd )
 declare -g LIBDIR="${PROGDIR}/lib"
 
-# shellcheck source=./lib/utils.sh
-source "${LIBDIR}"/utils.sh
-
 # shellcheck source=./lib/errors.sh
 source "${LIBDIR}"/errors.sh
 
-# shellcheck source=./lib/debug.sh
-source "${LIBDIR}"/debug.sh
+# shellcheck source=./lib/utils.sh
+source "${LIBDIR}"/utils.sh
 
 # shellcheck source=./lib/lexer.sh
 source "${LIBDIR}"/lexer.sh
@@ -119,6 +114,9 @@ source "${LIBDIR}"/parser.sh
 # Exports:
 #  TOKENS[]
 #  TOKEN_$n
+
+# shellcheck source=./lib/pre-compile.sh
+source "${LIBDIR}"/pre-compile.sh
 
 # shellcheck source=./lib/compiler.sh
 source "${LIBDIR}"/compiler.sh
@@ -132,6 +130,9 @@ source "${LIBDIR}"/api.sh
 #  conf()   - query data
 #  RV       - result of query
 #
+
+# shellcheck source=./lib/debug.sh        ##DEBUG
+source "${LIBDIR}"/debug.sh               ##DEBUG
 
 init_globals
 argparse "$@"

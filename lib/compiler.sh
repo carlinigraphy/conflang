@@ -193,6 +193,8 @@ function create_ffi_symbol {
    directive_file="${loc}/${exe}"-directive.sh
 
    if [[ -e "$test_file" ]] ; then
+      # Ignore non-source file.
+      # shellcheck disable=SC1090
       source "$test_file" || {
          raise source_failure  "$test_file"
       }
@@ -201,6 +203,8 @@ function create_ffi_symbol {
    fi
 
    if [[ -e "$directive_file" ]] ; then
+      # Ignore non-source file.
+      # shellcheck disable=SC1090
       source "$directive_file" || {
          raise source_failure  "$directive_file"
       }
@@ -1009,16 +1013,12 @@ function compile_env_var {
    local -n node=$NODE
    local -- var_name="${node[value]}" 
 
-   if [[ "${ENV_DIFF[$var_name]}" ]] ; then
-      raise stomped_env_var "$var_name"
-   fi
-
-   local -n var="$var_name"
-   if [[ ! "${var+_}" ]] ; then
+   local -- val="${SNAPSHOT[$var_name]}"
+   if [[ ! "${val+_}" ]] ; then
       raise missing_env_var "$var_name"
    fi
 
-   declare -g DATA="$var"
+   declare -g DATA="$val"
 }
 
 

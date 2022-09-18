@@ -30,12 +30,11 @@ declare -gA EXIT_STATUS=(
    [missing_file]=11
    [source_failure]=12
    [missing_env_var]=13
-   [stomped_env_var]=14
-   [missing_int_var]=15
-   [invalid_interpolation_char]=16
-   [unescaped_interpolation_brace]=17
-   [munch_error]=18
-   [missing_required]=19
+   [missing_int_var]=14
+   [invalid_interpolation_char]=15
+   [unescaped_interpolation_brace]=16
+   [munch_error]=17
+   [missing_required]=18
 )
 
 function raise {
@@ -179,10 +178,6 @@ function print_name_error {
 
 function print_missing_env_var {
    printf "Name Error: env variable \`%s' is not defined.\n"  "$1"
-}
-
-function print_stomped_env_var {
-   printf "Name Error: env variable \`%s' stomped by program variable.\n"  "$1"
 }
 
 function print_missing_int_var {

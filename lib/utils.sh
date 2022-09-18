@@ -147,42 +147,6 @@ function _parse {
 }
 
 
-function diff_env {
-   # Second dump of all the declared variables. By diffing with the last dump
-   # of variables, we can determine which were defined here, and what was pre-
-   # existing from the environment. If the user tries to reference an
-   # environment variable that we've stomped on, we can accurately report that
-   # here.
-   ifs="$IFS" ; IFS=$'\n'
-   for line in $(declare -p) ; do
-      if [[ "$line" =~ ^declare\ -(-|[xraAin]+)\ ([^=]+) ]] ; then
-         ENV_END+=( "${BASH_REMATCH[2]}" )
-      fi
-   done
-   IFS="$ifs"
-
-   readarray -td $'\n' _ENV_DIFF < <(
-      comm -13 \
-         <(printf '%s\n' "${ENV_START[@]}" | sort) \
-         <(printf '%s\n' "${ENV_END[@]}"   | sort)
-   )
-
-   declare -gA ENV_DIFF=(
-      [_ENV_DIFF]='yes'
-      [ENV_DIFF]='yes'
-      # The `ENV_DIFF` variable itself would not have been included in the dump
-      # above. Manually add.
-   )
-
-   # Throw variables from indexed array into associative array. Allows us to
-   # more easily see if the user attempts to reference an environment variable,
-   # but we've stomped on it. Oopsies.
-   for d in "${_ENV_DIFF[@]}" ; do
-      ENV_DIFF[$d]='yes'
-   done
-}
-
-
 function do_parse {
    # Parse the top-level `base' file.
    add_file "$INPUT"
@@ -256,10 +220,6 @@ function do_compile {
 
    # Re-point $GLOBALS at the root of the symbol table.
    declare -gn GLOBALS="${parent_symtab}"
-
-   # Dump all variables in the environment. Diff against the `get_first_env` for
-   # only what was defined in this script itself.
-   diff_env
 
    walk_semantics "$PARENT_ROOT"
    walk_compiler  "$PARENT_ROOT"
