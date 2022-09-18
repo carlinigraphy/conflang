@@ -29,9 +29,7 @@ function setup {
    local -A filter=(
       [mk_array]='yes'
       [mk_boolean]='yes'
-      [mk_context_block]='yes'
-      [mk_context_directive]='yes'
-      [mk_context_test]='yes'
+      [mk_use]='yes'
       [mk_decl_section]='yes'
       [mk_decl_variable]='yes'
       [mk_index]='yes'
@@ -87,9 +85,7 @@ function setup {
       # Parser functions intentionally without a prefix.
       [mk_array]='yes'
       [mk_boolean]='yes'
-      [mk_context_block]='yes'
-      [mk_context_directive]='yes'
-      [mk_context_test]='yes'
+      [mk_use]='yes'
       [mk_decl_section]='yes'
       [mk_decl_variable]='yes'
       [mk_index]='yes'
