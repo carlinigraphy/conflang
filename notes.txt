@@ -1,0 +1,46 @@
+$conflang
+   - $ENV
+     - really only need to make a snapshot of the initial environment
+     - no longer can have stomped env vars, as we look them up from the
+       snapshot
+       > while IFS= read -r -d '' line ; do
+       >    key="${line%%=*}"
+       >    val="${line#*=}"
+       >    SNAPSHOT[$key]="$val"
+       > done < <(env --null)
+
+$parser
+   - %constrain
+      - what do they do? what's the priority?
+      - do they need to be an array? or can it just be a pointer to a
+        %constrain node
+      - "new" CONSTRAIN_$n:
+        [paths]=CONSTRAIN_PATHS -> [p1, p2, p3]
+        [root]=$NODE
+
+$pre-compiler
+   - %use
+     - append to global USES[]
+     - after parsing all files, build symbol table
+   - symtab
+     1) add built-ins to GLOBALS table
+     2) add USES[] to GLOBALS
+
+$compiler
+   - 
+
+--------------------------------------------------------------------------------
+# Pseudocode "documentation".
+
+global constrain, includes[]
+
+fn main():
+   root = parse($1)
+   while includes > 0:
+      root += parse(includes.pop())
+
+   if constrain:
+      child = parse(constrain)
+      while includes > 0:
+         child += parse(includes.pop())
+      root = merge(root, child)
