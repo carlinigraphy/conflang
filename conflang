@@ -116,7 +116,7 @@ source "${LIBDIR}"/parser.sh
 #  TOKEN_$n
 
 # shellcheck source=./lib/pre-compile.sh
-source "${LIBDIR}"/pre-compile.sh
+source "${LIBDIR}"/semantics.sh
 
 # shellcheck source=./lib/compiler.sh
 source "${LIBDIR}"/compiler.sh

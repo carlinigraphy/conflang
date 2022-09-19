@@ -95,39 +95,6 @@ function merge_includes {
 }
 
 
-function identify_constraint_file {
-   [[ ${#CONSTRAINTS[@]} -eq 0 ]] && return 0
-
-   # Constrain statements are restricted to only occuring at the top-level
-   # parent file. They may not be present in a sub-file, or in a sub-section.
-   # We may alwayscompare them relatively to the path of the initial $INPUT
-   # file, AKA ${FILES[0]}.
-
-   local -- fq_path
-   for file in "${CONSTRAINTS[@]}" ; do
-      case "$file" in
-         /*)   fq_path="${file}"            ;;
-         ~*)   fq_path="${file/\~/${HOME}}" ;;
-         *)    fq_path=$( realpath -m "${FILES[0]%/*}/${file}" -q ) ;;
-      esac
-   done
-
-   if [[ ! -f "$fq_path" ]] ; then
-      raise missing_file "$fq_path"
-   fi
-
-   for f in "${FILES[@]}" ; do
-      if [[ "$f" == "$fq_path" ]] ; then
-         raise parse_error "\`$f' may not be both a %constrain and %include"  
-      fi
-   done
-
-   if [[ $fq_path ]] ; then
-      FILES+=( "$fq_path" )
-   fi
-}
-
-
 function _parse {
    # Some elements of the scanner/parser need to be reset before every run.
    # Vars that hold file-specific information.
@@ -156,10 +123,6 @@ function do_parse {
 
    merge_includes
    # Merge all (potentially nested) `%include` statements from the parent file.
-
-   # Reset INCLUDE_ROOT[] and INCLUDES[] before parsing the constrain'd
-   # file(s).
-   declare -ga INCLUDE_ROOT=()  INCLUDES=()
 
    local _f0=${#FILES[@]}
    identify_constraint_file 

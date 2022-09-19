@@ -1,46 +1,40 @@
-$conflang
-   - $ENV
-     - really only need to make a snapshot of the initial environment
-     - no longer can have stomped env vars, as we look them up from the
-       snapshot
-       > while IFS= read -r -d '' line ; do
-       >    key="${line%%=*}"
-       >    val="${line#*=}"
-       >    SNAPSHOT[$key]="$val"
-       > done < <(env --null)
+Nuked the old version of this, I think I have a better writeup in my paper
+notes anyway. Will type that up here shortly.
 
-$parser
-   - %constrain
-      - what do they do? what's the priority?
-      - do they need to be an array? or can it just be a pointer to a
-        %constrain node
-      - "new" CONSTRAIN_$n:
-        [paths]=CONSTRAIN_PATHS -> [p1, p2, p3]
-        [root]=$NODE
+At its core, conflang does this:
 
-$pre-compiler
-   - %use
-     - append to global USES[]
-     - after parsing all files, build symbol table
-   - symtab
-     1) add built-ins to GLOBALS table
-     2) add USES[] to GLOBALS
+> #[pseudocode]
+> fn main(src):
+>    ast = parse(src)
+>    while includes > 0:
+>       ast += parse(includes.pop())
+>
+>    child = None
+>    if constrain:
+>       child = parse(src)
+>       while includes > 0:
+>          child += parse(includes.pop())
+>
+>    parent_symtab = mk_symtab(ast)
+>    child_symtab  = mk_symtab(child)
+>
+>    ast, symtab = merge(parent_symtab, child_symtab)
+>    semantics(ast, symtab)
+>    compile(ast)
 
-$compiler
-   - 
 
---------------------------------------------------------------------------------
-# Pseudocode "documentation".
-
-global constrain, includes[]
-
-fn main():
-   root = parse($1)
-   while includes > 0:
-      root += parse(includes.pop())
-
-   if constrain:
-      child = parse(constrain)
-      while includes > 0:
-         child += parse(includes.pop())
-      root = merge(root, child)
+From here, need to
+   1. Change how constrain works
+      - The result of an `identify_constraint_file` should be appending a single
+        file to FILES[]. The precedence should operate top -> bottom, in which
+        the highest prec is on the bottom. The function will iterate and return
+        the last file found. Example: ['found', 'found', 'not found'] would
+        return the file at index 1.
+      - There must be at least one constrain file found (if there is a constrain
+        statement), else a parse error is thrown.
+   2. Change where %use statements are "compiled"
+      - Realistically, %use statements aren't "compiled". They're kinda just
+        entered into the symbol table under a new name. Example, 'std/math' may
+        go into the symtab as ['math']=Symbol(['fn']='_aabbcc').
+      - These should be parsed and entered into the symtab just after the built-
+        in symbols (int, str, bool, type, etc.).
