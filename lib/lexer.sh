@@ -34,10 +34,8 @@ function init_scanner {
    fi
 
    declare -g   CURRENT=''  PEEK=''
-
    declare -ga  CHARRAY=()
    declare -ga  TOKENS=()
-
    declare -gA  FREEZE CURSOR=(
       [offset]=-1
       [lineno]=1

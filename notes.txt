@@ -38,3 +38,21 @@ From here, need to
         go into the symtab as ['math']=Symbol(['fn']='_aabbcc').
       - These should be parsed and entered into the symtab just after the built-
         in symbols (int, str, bool, type, etc.).
+
+Running list of things that will be necessary for this to work:
+ - [ ]. Types as a valid expression
+          - Requires changing how subscription works, everything will need to
+            shift to bracket syntax
+          - Honestly this is a better approach that we should've shifted to
+            some time ago
+          - Allows the user to supply a .conf file with their module that
+            states permissible types
+ - [ ]. Compiling a type expression returns the name of the compiled TYPE_$n
+        node.
+          - May be useful in situations such as this one in which using a
+            type as value should return the TYPE to the programmer
+          - There may also be situations useful for end users for this
+            behavior
+          - Takes us one step closer to being able to call functions from the
+            global scope. Maybe internal references don't need to use '%'
+            afterall, save it for parser statements

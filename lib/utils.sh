@@ -47,11 +47,7 @@ function add_file {
 
 function merge_includes {
    # Parse all `%include` files.
-   # For some reason a standard for loop won't let me modify the loop itself
-   # while iterating through it. Options are either a while loop, or a C-style
-   # for loop.
-   local -i idx
-   while [[ idx -lt ${#INCLUDES[@]} ]] ; do
+   for (( idx=0; idx<${#INCLUDES[@]}; ++idx )) ; do
       local -n node=${INCLUDES[idx]}
       insert_node_path="${node[path]}"
 
@@ -62,8 +58,6 @@ function merge_includes {
       # statement.  Allows us to iter the INCLUDES backwards, and match $idx to
       # its corresponding root here.
       INCLUDE_ROOT=( "$ROOT" "${INCLUDE_ROOT[@]}" )
-
-      (( ++idx ))
    done
 
    # Iterates bottom-to-top over the %include statements. Appends the items
@@ -95,6 +89,46 @@ function merge_includes {
 }
 
 
+function identify_constraint_file {
+   # Reset INCLUDE_ROOT[] and INCLUDES[] before parsing the constrain'd
+   # file(s).
+   declare -ga INCLUDE_ROOT=()  INCLUDES=()
+
+   # Constraint files are sorted in order of precedence. The last found file
+   # takes the highest precedence. If no file exists, throw an error.
+   local last_found
+
+   # Constrain statements are restricted to only occuring at the top-level
+   # parent file. They may not be present in a sub-file, or in a sub-section.
+   # We may always compare them relatively to the path of the initial $INPUT
+   # file, AKA ${FILES[0]}.
+   local fq_path
+   for file in "${CONSTRAINTS[@]}" ; do
+      case "$file" in
+         /*)   fq_path="${file}"            ;;
+         ~*)   fq_path="${file/\~/${HOME}}" ;;
+         *)    fq_path=$( realpath -m "${FILES[0]%/*}/${file}" -q ) ;;
+      esac
+
+      if [[ -e "$fq_path" ]] ; then
+         last_found="$fq_path"
+      fi
+   done
+
+   for f in "${FILES[@]}" ; do
+      if [[ "$f" == "$last_found" ]] ; then
+         raise parse_error "\`$f' may not be both a %constrain and %include"  
+      fi
+   done
+
+   if [[ ! $last_found ]] ; then
+      raise missing_constraint
+   else
+      FILES+=( "$fq_path" )
+   fi
+}
+
+
 function _parse {
    # Some elements of the scanner/parser need to be reset before every run.
    # Vars that hold file-specific information.
@@ -120,27 +154,16 @@ function do_parse {
 
    _parse
    declare -g PARENT_ROOT=$ROOT
-
    merge_includes
    # Merge all (potentially nested) `%include` statements from the parent file.
 
-   local _f0=${#FILES[@]}
-   identify_constraint_file 
-   local _f1=${#FILES[@]}
+   if [[ $CONSTRAINTS ]] ; then
+      identify_constraint_file 
 
-   # This is a little nonsense, but it saves us from creating another global
-   # var to track if we've hit a valid child file. `identify_constraint_file()`
-   # adds the file to the global FILES[] array. Thus, if array is not of the
-   # same len, we added a file. Don't want to parse an additional time if it's
-   # not needed.
-   if [[ $_f0 -ne $_f1 ]] ; then
-      # Now parse all the sub-files we're imposing constraints upon.
       _parse
       declare -g CHILD_ROOT=$ROOT
 
       merge_includes
-      # Merge all (potentially nested) `%include` statements from the child
-      # file.
    fi
 
    # Restore top-level root node.

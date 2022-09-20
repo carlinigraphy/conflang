@@ -9,6 +9,7 @@
 #═════════════════════════════════╡ AST NODES ╞═════════════════════════════════
 declare -gi  NODE_NUM=0
 declare -gi  INCLUDE_NUM=0
+declare -gi  USE_NUM=0
 
 # `include` & `constrain` directives are handled by the parser. They don't
 # create NODES_$n's.
@@ -67,7 +68,7 @@ function mk_include {
 
 
 function mk_use {
-   (( ++NODE_NUM ))
+   (( ++USE_NUM ))
    local   --  nname="NODE_${NODE_NUM}"
    declare -gA $nname
    declare -g  NODE=$nname
@@ -470,7 +471,7 @@ function p_constrain {
    # from within it? Rearpb making it a special case. Or maybe just straight
    # up call `p_expression`. Hmm.
    p_munch 'L_BRACKET' "expecting \`[' to begin array of paths."
-   while ! p_check 'R_BRACKET' ; do
+   until p_check 'R_BRACKET' ; do
       # When used outside the `p_expression()` function, need to explicitly
       # pass in a refernce to the current token.
       p_path "$CURRENT_NAME"
@@ -478,6 +479,9 @@ function p_constrain {
 
       local -n path=$NODE
       CONSTRAINTS+=( "${path[value]}" )
+
+      p_check 'R_BRACKET' && break
+      p_munch 'COMMA' "array elements must be separated by \`,'."
    done
 
    p_munch 'R_BRACKET' "expecting \`]' after constrain block."

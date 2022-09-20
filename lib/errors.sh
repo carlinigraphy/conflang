@@ -28,13 +28,14 @@ declare -gA EXIT_STATUS=(
    [circular_import]=9
    [name_error]=10
    [missing_file]=11
-   [source_failure]=12
-   [missing_env_var]=13
-   [missing_int_var]=14
-   [invalid_interpolation_char]=15
-   [unescaped_interpolation_brace]=16
-   [munch_error]=17
-   [missing_required]=18
+   [missing_constraint]=12
+   [source_failure]=13
+   [missing_env_var]=14
+   [missing_int_var]=15
+   [invalid_interpolation_char]=16
+   [unescaped_interpolation_brace]=17
+   [munch_error]=18
+   [missing_required]=19
 )
 
 function raise {
@@ -88,6 +89,10 @@ function print_no_input {
 
 function print_missing_file {
    printf 'File Error: missing or unreadable source file %s.\n'  "$1"
+}
+
+function print_missing_constraint {
+   printf 'File Error: no file matches %%constrain list.\n'
 }
 
 function print_circular_import {

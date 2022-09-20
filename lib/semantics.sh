@@ -1,41 +1,5 @@
 #!/bin/bash
 
-function identify_constraint_file {
-   [[ ${#CONSTRAINTS[@]} -eq 0 ]] && return 0
-
-   # Reset INCLUDE_ROOT[] and INCLUDES[] before parsing the constrain'd
-   # file(s).
-   declare -ga INCLUDE_ROOT=()  INCLUDES=()
-
-   # Constrain statements are restricted to only occuring at the top-level
-   # parent file. They may not be present in a sub-file, or in a sub-section.
-   # We may always compare them relatively to the path of the initial $INPUT
-   # file, AKA ${FILES[0]}.
-   local -- fq_path
-   for file in "${CONSTRAINTS[@]}" ; do
-      case "$file" in
-         /*)   fq_path="${file}"            ;;
-         ~*)   fq_path="${file/\~/${HOME}}" ;;
-         *)    fq_path=$( realpath -m "${FILES[0]%/*}/${file}" -q ) ;;
-      esac
-   done
-
-   if [[ ! -f "$fq_path" ]] ; then
-      raise missing_file "$fq_path"
-   fi
-
-   for f in "${FILES[@]}" ; do
-      if [[ "$f" == "$fq_path" ]] ; then
-         raise parse_error "\`$f' may not be both a %constrain and %include"  
-      fi
-   done
-
-   if [[ $fq_path ]] ; then
-      FILES+=( "$fq_path" )
-   fi
-}
-
-
 function mk_metatype {
    local name="$1"
    local kind="$2"
@@ -201,12 +165,12 @@ function create_ffi_symbol {
    local -n path="$1"
    local -- fn_name="$2"
 
-   local -- file_idx="${path[file]}"
-   local -- dir="${FILES[$file_idx]%/*}"
+   local file_idx="${path[file]}"
+   local dir="${FILES[$file_idx]%/*}"
 
-   local loc="${dir}/${path[value]}"
-   local exe="${loc##*/}"
-
+   local loc="${dir}/${path[value]}"      # Full path to the .sh file itself
+   local exe="${loc##*/}"                 # The `basename`, also the prefix of
+                                          # the -test/directive function names
    if [[ ! -d "$loc" ]] ; then
       echo "Package [$loc] not found."
       exit 1
@@ -235,11 +199,11 @@ function create_ffi_symbol {
       hash_d="_${hash_t%% *}"
    fi
 
-   fn=$( declare -f hello-test )
-   eval "${fn/hello-test/$hash_t}"
+   fn=$( declare -f ${exe}-test )
+   eval "${fn/${exe}-test/$hash_t}"
 
-   fn=$( declare -f hello-directive )
-   eval "${fn/hello-directive/$hash_d}"
+   fn=$( declare -f ${exe}-directive )
+   eval "${fn/${exe}-directive/$hash_d}"
 
    mk_symbol
    local -- symbol_name="$SYMBOL"
@@ -324,30 +288,6 @@ function symtab_decl_section {
    # Restore saved refs to the parent SYMTAB, and current NODE.
    declare -g NODE=$node_name
    declare -g SYMTAB=$symtab_name
-}
-
-
-function symtab_use {
-   local -n node="$NODE"
-   local -- path_name="${node[path]}"
-   local -n path="$path_name"
-
-   if [[ ${node['name']} ]] ; then
-      local symbol_name="${node[name]}"
-   else
-      # If no `as...` provided, default to the package name itself. Example:
-      # 'std/math' -> `math`,  'project/lib/add' -> `add`.
-      local symbol_name="${path[value]##*/}"
-
-      # In order to reference in the symbol table from the NODE_$n, we need
-      # the name it's in there as.
-      node['name']="$symbol_name"
-   fi
-
-   # We want to actually pass the NODE_$n of the path, so we can pull the
-   # NODE.file. Easier referencing the intended path.
-   create_ffi_symbol "$path_name"  "$symbol_name"
-   GLOBALS[$symbol_name]="$SYMBOL"
 }
 
 
@@ -686,15 +626,6 @@ function type_equality {
 function walk_semantics {
    declare -g NODE="$1"
    semantics_${TYPEOF[$NODE]}
-}
-
-
-function semantics_use {
-   local -n node="$NODE"
-   local -- name="${node[name]}"
-
-   local -n symbol="${GLOBALS[$name]}"
-   declare -g TYPE="${symbol[type]}"
 }
 
 

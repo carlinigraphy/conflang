@@ -43,10 +43,6 @@ function walk_compiler {
 }
 
 
-# Nothing to do with the %use statement itself here.
-function compile_use { :; }
-
-
 function compile_decl_section {
    local -- symtab_name="$SYMTAB"
    local -n symtab="$symtab_name"
