@@ -1,0 +1,13 @@
+alpha.$n ->
+   robustly retrieve keys from sections
+   semantic analysis
+   BATS tests for lexer, parser, and data compiler
+
+beta.$n ->
+   get ffi working
+   work on VM
+   BATS integration tests
+
+v.1.0 ->
+   integration tests done
+   all core functionality is there, and works
