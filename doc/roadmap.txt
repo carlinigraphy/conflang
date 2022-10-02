@@ -8,6 +8,6 @@ beta.$n ->
    work on VM
    BATS integration tests
 
-v.1.0 ->
+v.0 ->
    integration tests done
    all core functionality is there, and works

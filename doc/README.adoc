@@ -243,3 +243,29 @@ required {
    }
 }
 ----
+
+== How it do
+
+At its core, conflang does this:
+
+[source]
+----
+#[pseudocode]
+fn main(src):
+   ast = parse(src)
+   while includes > 0:
+      ast += parse(includes.pop())
+
+   child = None
+   if constrain:
+      child = parse(src)
+      while includes > 0:
+         child += parse(includes.pop())
+
+   parent_symtab = mk_symtab(ast)
+   child_symtab  = mk_symtab(child)
+
+   ast, symtab = merge(parent_symtab, child_symtab)
+   semantics(ast, symtab)
+   compile(ast)
+----
