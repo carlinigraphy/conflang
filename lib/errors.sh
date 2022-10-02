@@ -36,6 +36,8 @@ declare -gA EXIT_STATUS=(
    [unescaped_interpolation_brace]=17
    [munch_error]=18
    [missing_required]=19
+   [too_many_arguments]=20
+   [invalid_positional_arguments]=21
 )
 
 function raise {
@@ -196,4 +198,22 @@ function print_missing_required {
    done
 
    printf "Key Error: \`${fq_name}' required in parent, missing in child.\n"
+}
+
+#───────────────────────────────( misc. errors)───────────────────────────────
+function print_invalid_positional_arguments {
+   local arguments=( "$@" )
+   local arguments=( "${arguments[@]:1:${#arguments[@]}-1}" )
+
+   printf 'Argument Error: Invalid positional arguments '
+   printf '[%s]'  "${arguments[@]}"
+   printf '\n'
+}
+
+
+function print_argument_order_error {
+   local argument="$1"
+   local message="$2"
+
+   printf "Argument Error: \`%s', %s"  "${argument}"  "${message,}"
 }

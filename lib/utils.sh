@@ -209,5 +209,4 @@ function do_compile {
 
    walk_semantics "$PARENT_ROOT"
    walk_compiler  "$PARENT_ROOT"
-   walk_pprint    "$PARENT_ROOT"
 }

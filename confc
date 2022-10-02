@@ -24,44 +24,15 @@ exit "$1"
 }
 
 
-function argparse {
-   local -a positional=()
-   local -a invalid=()
-
-   while [[ $# -gt 0 ]] ; do
-      case "$1" in
-         -h | --help)
-               usage 0
-               ;;
-
-         #-*)  if [[ $positional ]] ; then
-         #        echo "flags & keyword args may not follow positional args"
-         #     fi
-
-         *)    positional+=( "$1" )
-               shift
-               ;;
-      esac
-   done
-
-   if [[ ! $positional ]] ; then
-      raise no_input
-   fi
-
-   if [[ "${positional[0]}" == '-' ]] ; then
-      INPUT=/dev/stdin
-   else
-      INPUT="${positional[0]}" 
-   fi
-}
-
-
 function init_globals {
    # Declares all the necessary global variables for each run. Wrapping into a
    # setup() function allows for easier BATS testing.
 
    # Path to initial file to compile.
    declare -g INPUT=
+
+   # Compiled output tree file location. Defaults to stdout.
+   declare -g DATA_OUT=/dev/stdout
 
    # Symbol table holding the name of the SYMTAB_$n, and a nameref to that
    # symtab.
@@ -89,6 +60,42 @@ function init_globals {
 }
 
 
+function argparse {
+   local -a positional=()
+   local -a invalid=()
+
+   while [[ $# -gt 0 ]] ; do
+      case "$1" in
+         -h | --help)
+               usage 0
+               ;;
+
+         -o | --out)
+               shift
+               DATA_OUT="$1"
+               shift
+               ;;
+
+         *)    positional+=( "$1" )
+               shift
+               ;;
+      esac
+   done
+
+   if [[ ! $positional ]] ; then
+      raise no_input
+   elif [[ ${#positional[@]} -gt 1 ]] ; then
+      raise invalid_positional_arguments "${positional[@]}"
+   fi
+
+   if [[ "${positional[0]}" == '-' ]] ; then
+      INPUT=/dev/stdin
+   else
+      INPUT="${positional[0]}" 
+   fi
+}
+
+
 # If sourced, exit. Equiv. to Python's >if __name__ == '__main__'
 # Nothing below this line will run if sourced, only if invoked directly.
 if [[ ! "${BASH_SOURCE[0]}" == "$0" ]] ; then
@@ -111,33 +118,16 @@ source "${LIBDIR}"/lexer.sh
 
 # shellcheck source=./lib/parser.sh
 source "${LIBDIR}"/parser.sh
-# Exports:
-#  TOKENS[]
-#  TOKEN_$n
 
 # shellcheck source=./lib/pre-compile.sh
 source "${LIBDIR}"/semantics.sh
 
 # shellcheck source=./lib/compiler.sh
 source "${LIBDIR}"/compiler.sh
-# Exports (USER ACCESSIBLE):
-#  _DATA_ROOT
-#  _DATA_*
-
-# shellcheck source=./lib/api.sh
-source "${LIBDIR}"/api.sh
-# Exports (USER ACCESSIBLE):
-#  conf()   - query data
-#  RV       - result of query
-#
-
-# shellcheck source=./lib/debug.sh        ##DEBUG
-source "${LIBDIR}"/debug.sh               ##DEBUG
 
 init_globals
 argparse "$@"
 do_parse
 do_compile
 
-#conf homedir
-#echo "${RV@Q}"
+declare -p ${!_DATA_*} > "$DATA_OUT"

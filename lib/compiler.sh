@@ -10,12 +10,10 @@
 #    analysis in the next phase), but also need to append the nodes themselves
 #    to the parent section's .items array.
 
-
 # TODO: documentation
-#  ┌── thinks I'm trying to assign a var, rather than declare empty variables.
-# shellcheck disable=SC1007
-declare -- KEY= DATA=
-declare -i DATA_NUM=0
+declare -g  KEY=
+declare -g  DATA=
+declare -gi DATA_NUM=0
 
 function mk_compile_dict {
    (( DATA_NUM++ ))
