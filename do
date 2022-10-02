@@ -49,7 +49,7 @@ case "$1" in
    'check') shift ; args=( "$@" )
             if [[ ! "$args" ]] ; then
                args=(
-                  "${PROGDIR}"/conflang
+                  "${PROGDIR}"/bin/confc
                   "${PROGDIR}"/lib/*.sh
                )
             fi
@@ -58,7 +58,7 @@ case "$1" in
 
 
    'wc')    files=(
-               "${PROGDIR}"/conflang
+               "${PROGDIR}"/bin/*
                "${PROGDIR}"/lib/*
             )
             exec wc -l "${files[@]}"
@@ -76,7 +76,7 @@ case "$1" in
 
 
    'edit')  order=(
-               "${PROGDIR}"/conflang
+               "${PROGDIR}"/bin/confc
                "${PROGDIR}"/lib/utils.sh
                "${PROGDIR}"/lib/{lexer,parser,semantics,compiler}.sh
                "${PROGDIR}"/lib/{errors,debug,ffi}.sh
