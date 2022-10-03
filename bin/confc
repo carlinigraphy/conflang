@@ -17,7 +17,11 @@ cat <<EOF
 usage: $(basename "${BASH_SOURCE[0]}") [option] FILE
 
 options
-   None.
+   -h | --help    show this message and exit
+   -o | --out     file for compiled output
+
+Unless --out is specified, compilation result is dumped to stdout.
+
 EOF
 
 exit "$1"
