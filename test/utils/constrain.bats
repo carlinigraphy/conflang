@@ -8,7 +8,7 @@ function setup {
    export LIBDIR="${BATS_TEST_DIRNAME}/../../lib"
 
    # These have functions that are directly invoked:
-   source "${LIBDIR}/../conflang"      # init_globals()
+   source "${LIBDIR}/../bin/confc"     # init_globals()
    source "${LIBDIR}/utils.sh"         # add_file(), merge_includes()
 
    # These are more strictly library code. Nothing called directly.
