@@ -1,0 +1,12 @@
+compiler
+   - generates empty associative array for empty section
+   - generates empty indexed array for empty array
+   - generates list of lists
+   - generates nested sections
+   - resolves internal variables
+   - resolves environment variables
+   - resolves regular values
+   - resolves unary expressions
+   - resolves unary expressions w/ typecast from internal variable
+         > number (int): -($SHLVL -> int);
+         > number (int): f"-{$SHLVL}" -> int;
