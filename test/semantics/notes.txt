@@ -24,6 +24,8 @@ semantic analysis
    - basic types match (int, str, path, etc.)
    - complex types match (array of strings, array of arrays of strings)
    - typecasts supercede expression type
+     > number (int): f"-{$SHLVL}" -> int;
+     > number (int): -($SHLVL -> int);
    - internal variable types match
    disallows
       - unary negation for any operator but '-'

@@ -1,12 +1,17 @@
 compiler
-   - generates empty associative array for empty section
-   - generates empty indexed array for empty array
-   - generates list of lists
-   - generates nested sections
-   - resolves internal variables
-   - resolves environment variables
-   - resolves regular values
-   - resolves unary expressions
-   - resolves unary expressions w/ typecast from internal variable
-         > number (int): -($SHLVL -> int);
-         > number (int): f"-{$SHLVL}" -> int;
+   - [x] generates empty associative array for empty section
+   - [x] generates empty indexed array for empty array
+   - [x] generates list of lists
+   - [x] generates nested sections
+   - [ ] resolves internal variables
+         - running into some real trouble with this one
+         - probably should be the impetus to rework how internal vars are
+           handled
+         - dip the `%`, upon the top-level index node we reset the SYMTAB
+           pointer to the global scope, descend each time we hit an identifier
+   - [x] resolves environment variables
+   - [x] resolves regular values
+   - [x] resolves unary expressions
+   - [ ] resolves %includes successfully
+   - [ ] resolves %constrain successfully
+         - including overflow keys from child -> parent
