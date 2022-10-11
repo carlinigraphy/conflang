@@ -73,7 +73,7 @@ function Token {
    t['file']="${FILE_IDX}"
 
    TOKENS+=( "$tname" )
-   (( TOKEN_NUM++ )) ||:
+   (( ++TOKEN_NUM ))
 }
 
                                      

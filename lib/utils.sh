@@ -4,6 +4,42 @@
 # and compiler. Allows re-entering the parser for each included file, and
 # concatenating (not literally, but in spirt) %include files.
 
+function init_globals {
+   # Declares all the necessary global variables for each run. Wrapping into a
+   # setup() function allows for easier BATS testing.
+
+   # Path to initial file to compile.
+   declare -g INPUT=
+
+   # Compiled output tree file location. Defaults to stdout.
+   declare -g DATA_OUT=/dev/stdout
+
+   # Symbol table holding the name of the SYMTAB_$n, and a nameref to that
+   # symtab.
+   declare -g GLOBALS=
+
+   # The root NODE_$n of the parent and child AST trees.
+   declare -g PARENT_ROOT= CHILD_ROOT=
+
+   # Shouldn't code file names/paths into the generated output. If the user has
+   # the same file *data*, but it's in a different place, we shouldn't have to
+   # re-compile the output.  An array of files allows us to map a static file
+   # INDEX (stored in the output data), to the possibly dynamic path to the
+   # file.
+   declare -ga FILES=()
+   declare -gi FILE_IDX=
+
+   # Stores the $ROOT after each `parse()`. The idx of a root node here should
+   # correspond to it's matching INCLUDE_$n from the INCLUDES[] array. Example:
+   #> INCLUDE_ROOT [ NODE_10,    NODE_20    ]
+   #> INCLUDES     [ INCLUDE_01, INCLUDE_02 ]
+   # Meaning...
+   # Take the contents of INCLUDE_ROOT[0].items, and drop them into
+   # INCLUDES[0].target.items.
+   declare -ga INCLUDE_ROOT=()  INCLUDES=()
+}
+
+
 function add_file {
    # Serves to both ensure we don't have circular imports, as well as resolving
    # relative paths to their fully qualified path.

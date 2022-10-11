@@ -16,7 +16,7 @@ declare -g  DATA=
 declare -gi DATA_NUM=0
 
 function mk_compile_dict {
-   (( DATA_NUM++ ))
+   (( ++DATA_NUM ))
    local   --  dname="_DATA_${DATA_NUM}"
    declare -gA $dname
    declare -g  DATA=$dname
@@ -26,7 +26,7 @@ function mk_compile_dict {
 
 
 function mk_compile_array {
-   (( DATA_NUM++ ))
+   (( ++DATA_NUM ))
    local   --  dname="_DATA_${DATA_NUM}"
    declare -ga $dname
    declare -g  DATA=$dname

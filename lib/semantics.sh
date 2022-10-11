@@ -67,7 +67,7 @@ declare -- SYMTAB=
 declare -i SYMTAB_NUM=0
 
 function mk_symtab {
-   (( SYMTAB_NUM++ ))
+   (( ++SYMTAB_NUM ))
    # A symtab maps the string identifier names to a Symbol, containing Type
    # information, as well as references to the current node, and nested (?)
    # symtabs.
@@ -84,7 +84,7 @@ declare -- TYPE=
 declare -i TYPE_NUM=${TYPE_NUM:-0}
 
 function mk_type {
-   (( TYPE_NUM++ ))
+   (( ++TYPE_NUM ))
    local   --  tname="TYPE_${TYPE_NUM}"
    declare -gA $tname
    declare -g  TYPE=$tname
@@ -101,7 +101,7 @@ declare -- SYMBOL=
 declare -i SYMBOL_NUM=${TYPE_NUM:-0}
 
 function mk_symbol {
-   (( SYMBOL_NUM++ ))
+   (( ++SYMBOL_NUM ))
    local   --  sname="SYMBOL_${SYMBOL_NUM}"
    declare -gA $sname
    declare -g  SYMBOL=$sname
