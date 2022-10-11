@@ -188,12 +188,11 @@ function compile_env_var {
    local -n node=$NODE
    local -- var_name="${node[value]}" 
 
-   local -- val="${SNAPSHOT[$var_name]}"
-   if [[ ! "${val+_}" ]] ; then
+   if [[ ! "${SNAPSHOT[$var_name]+_}" ]] ; then
       raise missing_env_var "$var_name"
    fi
 
-   declare -g DATA="$val"
+   declare -g DATA="${SNAPSHOT[$var_name]}"
 }
 
 
