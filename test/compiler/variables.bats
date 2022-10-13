@@ -8,11 +8,11 @@ function setup {
    export LIBDIR="${BATS_TEST_DIRNAME}/../../lib"
    source "${LIBDIR}/../bin/confc"
    source "${LIBDIR}/errors.sh"
+   source "${LIBDIR}/utils.sh"
    source "${LIBDIR}/lexer.sh"
    source "${LIBDIR}/parser.sh"
    source "${LIBDIR}/semantics.sh"
    source "${LIBDIR}/compiler.sh"
-   source "${LIBDIR}/utils.sh"
 }
 
 

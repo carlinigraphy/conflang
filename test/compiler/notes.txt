@@ -12,6 +12,3 @@ compiler
    - [x] resolves environment variables
    - [x] resolves regular values
    - [x] resolves unary expressions
-   - [ ] resolves %includes successfully
-   - [ ] resolves %constrain successfully
-         - including overflow keys from child -> parent
