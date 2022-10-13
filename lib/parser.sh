@@ -664,24 +664,6 @@ function p_expression {
    while :; do
       op_type=${CURRENT[type]}
 
-      #───────────────────────────( postfix )───────────────────────────────────
-      #lbp=${postfix_binding_power[$op_type]:-0}
-      #(( rbp = (lbp == 0 ? 0 : lbp+1) )) ||:
-
-      #if [[ $lbp -ge $min_bp ]] ; then
-      #   fn="${RID[${CURRENT[type]}]}"
-
-      #   if [[ ! $fn ]] ; then
-      #      raise parse_error "not a postfix expression: ${CURRENT[type],,}."
-      #   fi
-
-      #   $fn "$lhs" "$rbp"
-      #   lhs="$NODE"
-
-      #   continue
-      #fi
-
-      #────────────────────────────( infix )────────────────────────────────────
       lbp=${infix_binding_power[$op_type]:-0}
       (( rbp = (lbp == 0 ? 0 : lbp+1) )) ||:
 
