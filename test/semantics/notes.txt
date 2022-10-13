@@ -1,32 +1,32 @@
 symbol table creation
-   - create expected types
-   - create expected types w/ subtypes
-   - create ANY type if not specified
+   - [x] create expected types
+   - [x] create ANY type if not specified
+   - [ ] create expected types w/ subtypes
 
 merge trees
    allows.
-      - set value if not exists
-      - declare type that exactly matches parent
-      - re-set value if exists
-      - introduce new variables to parent
-      - missing key that isn't required
-      - missing section that isn't required
+      - [ ] declare type that exactly matches parent
+      - [ ] set value if not exists
+      - [ ] overwrite parent expression if provided by child
+      - [ ] overflow keys from child to parent
+      - [ ] missing key that isn't required
+      - [ ] missing section that isn't required
    disallows.
-      - redefine type
-      - declare section as variable
-      - declare variable as section
-      - undeclared required
-         - key
-         - required section due to required key
-         - nested required sections
+      - [ ] redefine type
+      - [ ] declare section as variable
+      - [ ] declare variable as section
+      - [ ] undeclared required
+         - [ ] key
+         - [ ] required section due to required key
+         - [ ] nested required sections
 
 semantic analysis
-   - basic types match (int, str, path, etc.)
-   - complex types match (array of strings, array of arrays of strings)
-   - typecasts supercede expression type
-     > number (int): f"-{$SHLVL}" -> int;
-     > number (int): -($SHLVL -> int);
-   - internal variable types match
-   disallows
-      - unary negation for any operator but '-'
-      - unary negation for any expression but integers
+   allows.
+      - [ ] basic types match (int, str, path, etc.)
+      - [ ] complex types match (array of strings, array of arrays of strings)
+      - [ ] typecasts supercede expression type
+            > number (int): f"-{$SHLVL}" -> int;
+            > number (int): -($SHLVL -> int);
+      - [ ] internal variable types match
+   disallows.
+      - [ ] unary negation for any expression but integers
