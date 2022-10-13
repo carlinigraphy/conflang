@@ -353,19 +353,18 @@ function symtab_typedef {
 
    walk_symtab "${node[kind]}"
    local -- tname=$TYPE
+   local -n type=$TYPE
 
-   # CURRENT:
-   # The check if we're allowed to subtype is based on the TYPE above, not on
-   # whatever is attached to the node.
+   if [[ "${node[subtype]}" ]] ; then
+      # See ./doc/truth.sh for an explanation on the test below. Tests if the
+      # type either has a populated .subtype field, or the field is SET, but
+      # empty.
+      if [[ ! "${type[subtype]+_}" ]] ; then
+         raise type_error       \
+            "${node[subtype]}"  \
+            "primitive types are not subscriptable."
+      fi
 
-   # See ./doc/truth.sh for an explanation on the test below. Tests if the
-   # type either has a populated .subtype field, or the field is SET, but
-   # empty.
-   if [[ ! "${node[subtype]+_}" ]] ; then
-      raise type_error       \
-         "${node[subtype]}"  \
-         "primitive types are not subscriptable."
-   elif [[ "${node[subtype]}" ]] ; then
       walk_symtab "${node[subtype]}"
       type['subtype']=$TYPE
    fi
