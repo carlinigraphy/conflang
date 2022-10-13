@@ -492,33 +492,33 @@ function p_constrain {
 }
 
 
-function p_use {
-   local -n section_ptr=$SECTION
-   local -n name=${section_ptr[name]}
-
-   if [[ ${name[value]} != '%inline' ]] ; then
-      raise parse_error '%use may not occur in a section.'
-   fi
-
-   mk_use
-   local -- save="$NODE"
-   local -n use="$NODE"
-
-   p_path "$CURRENT_NAME"
-   p_munch 'PATH' "expecting a module path."
-   local path="$NODE"
-
-   if p_match 'AS' ; then
-      p_identifier "$CURRENT_NAME"
-      p_munch 'IDENTIFIER'
-      local name="$NODE"
-   fi
-
-   use['path']="$path"
-   use['name']="$name"
-
-   declare -g NODE="$save"
-}
+#function p_use {
+#   local -n section_ptr=$SECTION
+#   local -n name=${section_ptr[name]}
+#
+#   if [[ ${name[value]} != '%inline' ]] ; then
+#      raise parse_error '%use may not occur in a section.'
+#   fi
+#
+#   mk_use
+#   local -- save="$NODE"
+#   local -n use="$NODE"
+#
+#   p_path "$CURRENT_NAME"
+#   p_munch 'PATH' "expecting a module path."
+#   local path="$NODE"
+#
+#   if p_match 'AS' ; then
+#      p_identifier "$CURRENT_NAME"
+#      p_munch 'IDENTIFIER'
+#      local name="$NODE"
+#   fi
+#
+#   use['path']="$path"
+#   use['name']="$name"
+#
+#   declare -g NODE="$save"
+#}
 
 
 function p_declaration {
@@ -646,6 +646,7 @@ declare -gA NUD=(
    [DOLLAR]='p_env_var'
    [PERCENT]='p_int_var'
    [L_BRACKET]='p_array'
+   [IDENTIFIER]='p_identifier'
 )
 
 
