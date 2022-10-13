@@ -134,6 +134,7 @@ function scan {
          ':')  Token      'COLON' "$CURRENT"  ; continue ;;
          '$')  Token     'DOLLAR' "$CURRENT"  ; continue ;;
          '%')  Token    'PERCENT' "$CURRENT"  ; continue ;;
+         '>')  Token    'GREATER' "$CURRENT"  ; continue ;;
          '?')  Token   'QUESTION' "$CURRENT"  ; continue ;;
 
          '(')  Token    'L_PAREN' "$CURRENT"  ; continue ;;
@@ -321,11 +322,10 @@ function l_interpolation {
       FREEZE['lineno']=${CURSOR['lineno']}
       FREEZE['colno']=${CURSOR['colno']}
 
-      # Symbols.
-      case $CURRENT in
-         '$')  Token  'DOLLAR' "$CURRENT"  ; continue ;;
-         '%')  Token 'PERCENT' "$CURRENT"  ; continue ;;
-      esac
+      if [[ $CURRENT == '$' ]] ; then
+         Token  'DOLLAR'  "$CURRENT"
+         continue
+      fi
 
       # Identifiers.
       if [[ $CURRENT =~ [[:alpha:]_] ]] ; then

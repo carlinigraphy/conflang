@@ -196,25 +196,6 @@ function compile_env_var {
 }
 
 
-function compile_int_var {
-   local -n node="$NODE"
-   local -- var="${node[value]}"
-
-   # Internal vars are absolute paths, always beginning at the root of the
-   # symbol table.
-   local -n inline="${GLOBALS[%inline]}"
-   local -n symtab="${inline[symtab]}"
-
-   local symbol_name="${symtab[$var]}"
-   if [[ ! "$symbol_name" ]] ; then
-      raise missing_int_var "$var"
-   fi
-
-   local -n symbol="$symbol_name"
-   walk_compiler "${symbol[node]}"
-}
-
-
 function compile_index {
    # An 'index' is a combination of...
    #    .left   subscriptable expression (section, array)

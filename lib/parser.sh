@@ -272,25 +272,6 @@ function mk_env_var {
 }
 
 
-function mk_int_var {
-   (( ++NODE_NUM ))
-   local   -- nname="NODE_${NODE_NUM}"
-   declare -gA $nname
-   declare -g  NODE=$nname
-   local   -n  node=$nname
-
-   # Copied over, so we can ditch the raw tokens after the parser.
-   node['value']=
-   node['offset']=
-   node['lineno']=
-   node['colno']=
-   node['file']=
-
-   # shellcheck disable=SC2034
-   TYPEOF[$nname]='int_var'
-}
-
-
 #═══════════════════════════════════╡ utils ╞═══════════════════════════════════
 function init_parser {
    declare -gi IDX=0
@@ -644,7 +625,6 @@ declare -gA NUD=(
    [STRING]='p_string'
    [INTEGER]='p_integer'
    [DOLLAR]='p_env_var'
-   [PERCENT]='p_int_var'
    [L_BRACKET]='p_array'
    [IDENTIFIER]='p_identifier'
 )
@@ -652,12 +632,12 @@ declare -gA NUD=(
 
 declare -gA infix_binding_power=(
    [ARROW]='3'
-   [DOT]=5
+   [GREATER]=5
    [CONCAT]=7
 )
 declare -gA LED=(
    [ARROW]='p_typecast'
-   [DOT]='p_index'
+   [GREATER]='p_index'
    [CONCAT]='p_concat'
 )
 
@@ -747,13 +727,13 @@ function p_concat {
    # String (and path) interpolation are parsed as a high left-associative
    # infix operator.
    #> first (str): "Marcus";
-   #> greet (str): "Hello {%first}.";
+   #> greet (str): "Hello {first}.";
    #
    # Parses to...
    #> str(value:  "Hello ",
-   #>     concat: int_var(value:  first,
-   #>                     concat: str(value:  ".",
-   #>                                 concat: None)
+   #>     concat: ident(value:  first,
+   #>                   concat: str(value:  ".",
+   #>                               concat: None)
 
    # We can safely ignore $2. It's the operator, passed in from p_expression().
    # We already know the operator is a CONCAT.
@@ -806,7 +786,7 @@ function p_typecast {
 
 function p_index {
    # We can safely ignore $2. It's the operator, passed in from p_expression().
-   # We already know the operator is a CONCAT.
+   # We already know the operator is a GREATER.
    local lhs="$1"  _=$2  rbp="$3"
 
    mk_index
@@ -844,20 +824,6 @@ function p_env_var {
    p_advance # past DOLLAR.
 
    mk_env_var
-   local -n node=$NODE
-   node['value']=${token[value]}
-   node['offset']=${token[offset]}
-   node['lineno']=${token[lineno]}
-   node['colno']=${token[colno]}
-   node['file']=${token[file]}
-}
-
-
-function p_int_var {
-   local -n token="$CURRENT_NAME"
-   p_advance # past PERCENT.
-
-   mk_int_var
    local -n node=$NODE
    node['value']=${token[value]}
    node['offset']=${token[offset]}
