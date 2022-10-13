@@ -40,10 +40,10 @@ function populate_globals {
       [int]='INTEGER'
       [str]='STRING'
       [bool]='BOOLEAN'
+      [path]='PATH'
    )
 
    local -A complex=(
-      [path]='PATH'
       [array]='ARRAY'
    )
 
@@ -131,7 +131,7 @@ function extract_type {
    #>    Type {
    #>       kind: "TYPE"
    #>       subtype: Type {
-   #>          kind: "(ARRAY|INTEGER|...)"
+   #>          kind: (ARRAY|INTEGER|...)
    #>       }
    #>    }
    #> }
@@ -155,67 +155,71 @@ function copy_type {
    if [[ "${t0['subtype']}" ]] ; then
       copy_type "${t0['subtype']}" 
       t1['subtype']="$TYPE"
+   elif [[ "${t0['subtype']+_}" ]] ; then
+      # In the case of complex types, if there is a subtype property, but it has
+      # not been defined.
+      t1['subtype']=''
    fi
 
    declare -g TYPE="$t1_name"
 }
 
 
-function create_ffi_symbol {
-   local -n path="$1"
-   local -- fn_name="$2"
-
-   local file_idx="${path[file]}"
-   local dir="${FILES[$file_idx]%/*}"
-
-   local loc="${dir}/${path[value]}"      # Full path to the .sh file itself
-   local exe="${loc##*/}"                 # The `basename`, also the prefix of
-                                          # the -test/directive function names
-   if [[ ! -d "$loc" ]] ; then
-      echo "Package [$loc] not found."
-      exit 1
-   fi
-
-   test_file="${loc}/${exe}"-test.sh
-   directive_file="${loc}/${exe}"-directive.sh
-
-   if [[ -e "$test_file" ]] ; then
-      #  ┌── ignore non-source file.
-      # shellcheck disable=SC1090
-      source "$test_file" || {
-         raise source_failure  "$test_file"
-      }
-      hash_t=$( md5sum "$test_file" )
-      hash_t="_${hash_t%% *}"
-   fi
-
-   if [[ -e "$directive_file" ]] ; then
-      #  ┌── ignore non-source file.
-      # shellcheck disable=SC1090
-      source "$directive_file" || {
-         raise source_failure  "$directive_file"
-      }
-      hash_d=$( md5sum "$directive_file" )
-      hash_d="_${hash_t%% *}"
-   fi
-
-   fn=$( declare -f ${exe}-test )
-   eval "${fn/${exe}-test/$hash_t}"
-
-   fn=$( declare -f ${exe}-directive )
-   eval "${fn/${exe}-directive/$hash_d}"
-
-   mk_symbol
-   local -- symbol_name="$SYMBOL"
-   local -n symbol="$symbol_name"
-
-   extract_type 'fn'
-   symbol['name']="$fn_name"
-   symbol['type']="$TYPE"
-   symbol['test']="$hash_t"
-   symbol['directive']="$hash_d"
-   symbol['signature']=
-}
+#function create_ffi_symbol {
+#   local -n path="$1"
+#   local -- fn_name="$2"
+#
+#   local file_idx="${path[file]}"
+#   local dir="${FILES[$file_idx]%/*}"
+#
+#   local loc="${dir}/${path[value]}"      # Full path to the .sh file itself
+#   local exe="${loc##*/}"                 # The `basename`, also the prefix of
+#                                          # the -test/directive function names
+#   if [[ ! -d "$loc" ]] ; then
+#      echo "Package [$loc] not found."
+#      exit 1
+#   fi
+#
+#   test_file="${loc}/${exe}"-test.sh
+#   directive_file="${loc}/${exe}"-directive.sh
+#
+#   if [[ -e "$test_file" ]] ; then
+#      #  ┌── ignore non-source file.
+#      # shellcheck disable=SC1090
+#      source "$test_file" || {
+#         raise source_failure  "$test_file"
+#      }
+#      hash_t=$( md5sum "$test_file" )
+#      hash_t="_${hash_t%% *}"
+#   fi
+#
+#   if [[ -e "$directive_file" ]] ; then
+#      #  ┌── ignore non-source file.
+#      # shellcheck disable=SC1090
+#      source "$directive_file" || {
+#         raise source_failure  "$directive_file"
+#      }
+#      hash_d=$( md5sum "$directive_file" )
+#      hash_d="_${hash_t%% *}"
+#   fi
+#
+#   fn=$( declare -f ${exe}-test )
+#   eval "${fn/${exe}-test/$hash_t}"
+#
+#   fn=$( declare -f ${exe}-directive )
+#   eval "${fn/${exe}-directive/$hash_d}"
+#
+#   mk_symbol
+#   local -- symbol_name="$SYMBOL"
+#   local -n symbol="$symbol_name"
+#
+#   extract_type 'fn'
+#   symbol['name']="$fn_name"
+#   symbol['type']="$TYPE"
+#   symbol['test']="$hash_t"
+#   symbol['directive']="$hash_d"
+#   symbol['signature']=
+#}
 
 
 function walk_symtab {
@@ -350,22 +354,18 @@ function symtab_typedef {
    walk_symtab "${node[kind]}"
    local -- tname=$TYPE
 
-   if [[ ${node['subtype']} ]] ; then
-      # A subtype is only valid if the parent type has a .subtype property.
-      # Primitive types are created with this unset. Complex types it is set,
-      # but empty.
+   # CURRENT:
+   # The check if we're allowed to subtype is based on the TYPE above, not on
+   # whatever is attached to the node.
 
-      # See ./doc/truth.sh for an explanation on the test below. Tests if the
-      # type either has a populated .subtype field, or the field is SET, but
-      # empty.
-      if [[ ! "${node['subtype']+_}" ]] && \
-         [[ ! "${node['subtype']}"   ]]
-      then
-         raise type_error        \
-            "${node[subtype]}"   \
-            "primitive types are not subscriptable."
-      fi
-
+   # See ./doc/truth.sh for an explanation on the test below. Tests if the
+   # type either has a populated .subtype field, or the field is SET, but
+   # empty.
+   if [[ ! "${node[subtype]+_}" ]] ; then
+      raise type_error       \
+         "${node[subtype]}"  \
+         "primitive types are not subscriptable."
+   elif [[ "${node[subtype]}" ]] ; then
       walk_symtab "${node[subtype]}"
       type['subtype']=$TYPE
    fi
@@ -712,7 +712,7 @@ function semantics_unary {
    local -- type="$TYPE"
 
    if [[ ${node[op]} == 'MINUS' ]] ; then
-      if ! type_equality  '_INTEGER'  "$type" ; then
+      if ! type_equality  'INTEGER'  "$type" ; then
          raise type_error "${node[right]}" "unary minus only supports integers."
       fi
    else
@@ -770,9 +770,6 @@ function semantics_identifier {
 }
 
 
-# Paths aren't yet complex types, but they will be in the future. For now, we
-# can copy a base Type('PATH'). They will eventually have a :file, :dir, and
-# perhaps others (:fifo, :symlink, etc.).
 function semantics_path {
    extract_type 'path'
 }
