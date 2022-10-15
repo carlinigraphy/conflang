@@ -700,6 +700,13 @@ function semantics_typecast {
 }
 
 
+## TODO: Only the LEFT element of an index may be an identifier. You may apply
+#        a selector to a reference, but not a reference to an expression or
+#        another reference.
+#function semantics_index {
+#}
+
+
 function semantics_unary {
    local -- save=$NODE
    local -n node=$save
