@@ -38,12 +38,27 @@ declare -gA EXIT_STATUS=(
    [missing_required]=19
    [too_many_arguments]=20
    [invalid_positional_arguments]=21
+   [idiot_programmer]=255
 )
 
 function raise {
-   local type="$1" ; shift
+   local -- type="$1" ; shift
+   local -a args=( "$@" )
+
+   status="${EXIT_STATUS[$type]}"
+   if [[ ! $status ]] ; then
+      status=255
+      type='idiot_programmer'
+      args=( "$type" "${args[@]}" )
+   fi
+
    print_"${type}" "$@" 1>&2
-   exit "${EXIT_STATUS[$type]}"
+   exit "$status"
+}
+
+function print_idiot_programmer {
+   local type="$1"
+   printf 'Idiot Programmer Error: no such error [%s]'  "$type"
 }
 
 #────────────────────────────( find expr location )─────────────────────────────

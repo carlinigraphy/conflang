@@ -3,7 +3,9 @@
 
 function setup { load '/usr/lib/bats-assert/load.bash'
    load '/usr/lib/bats-support/load.bash'
-   source "${BATS_TEST_DIRNAME}"/../lib/errors.sh
+
+   export LIBDIR="${BATS_TEST_DIRNAME}/../lib"
+   source "${LIBDIR}"/errors.sh
 }
 
 
@@ -16,4 +18,11 @@ function setup { load '/usr/lib/bats-assert/load.bash'
    done
 
    assert_equal "$expected" "${#codes[@]}"
+}
+
+
+@test "only raises error types that exist" {
+   while read -r ename ; do
+      assert [ ${EXIT_STATUS[$ename]} ]
+   done < <(grep --no-filename -Po '(?<=raise )[[:alpha:]_]+' "${LIBDIR}"/*.sh)
 }

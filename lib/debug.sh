@@ -227,16 +227,11 @@ function pprint_env_var {
    local -n node=$NODE
    local -- var_name="${node[value]}" 
 
-   if [[ "${ENV_DIFF[$var_name]}" ]] ; then
-      raise stomped_env_var "$var_name"
-   fi
-
-   if [[ ! "$var_name" ]] ; then
+   if [[ ! "${SNAPSHOT[$var_name]+_}" ]] ; then
       raise missing_env_var "$var_name"
    fi
 
-   local -n var="$var_name"
-   printf '%s' "$var"
+   printf '%s' "${SNAPSHOT[$var_name]}"
 }
 
 
