@@ -1,0 +1,178 @@
+Think I need to make another more intermediate IR.
+:: source -> tokens -> AST -> IR -> bash
+
+AST      Information for semantic analysis, cursor information
+
+IR       Should be a nearly-finished tree, though with terminal sentinel nodes
+         instead of raw values. Perhaps also additional meta-information.
+----
+
+An array like:
+   [ "one", "two" ]
+
+Compiles to:
+   declare -a _IR_1=(
+      _IR_2
+      _IR_3
+   )
+   declare -- _IR_2="one"
+   declare -- _IR_3="two"
+
+Hmm, IR nodes should contain...
+   [symtab]    :: symbol table name this node belongs to
+   [node]      :: reference back to the AST node name
+   [name]      :: for convenience, node.name.value (needed? helpful?)
+
+...but maybe only for expressions. Not sections or variable declarations.
+
+
+Maybe instead compiles to:
+   declare -a _IR_1=(
+      _IR_2
+      _IR_3
+   )
+   declare -A _IR_2=(
+      [symtab]=_SYMTAB_2
+      [node]=_NODE_2
+      [value]="one"
+   )
+   declare -A _IR_3=(
+      [symtab]=_SYMTAB_2
+      [node]=_NODE_3
+      [value]="two"
+   )
+
+
+This doesn't actually solve for the original problem of deferred compilation of
+something like:
+   item  : array> 1;
+   array : ["one", "two"];
+
+In the above case, we cannot determine the reference to `item` until determining
+the reference of `array`, and compiling what it points to.
+
+
+Build a dependency graph, and compile in order? I don't know how to do this,
+even not in bash. Imagine there would be a much greater degree of complexity
+here.
+
+
+Hmm, I think only a tree is possible. As one variable may not be assigned to
+multiple values, we must have a tree. Ultimately all variables must resolve to a
+"raw" expression.
+
+
+Building a tree, and assigning each node a "depth" allows us to defer references
+until their prerequisites have been compiled. Should be able to then assign each
+AST_NODE to a pass of the reference compiler.
+
+Revisiting:
+   item1: array> 0;
+   array: [ "one", "two" ]
+
+Pass1 compiles to:
+   declare -a _IR_1=_IR_2     # item1 = unary...
+   declare -a _IR_2=''        # unary [UNRESOLVED]
+
+   declare -a _IR_3=(
+      _IR_4
+      _IR_5
+   )
+   declare -- _IR_6="one"
+   declare -- _IR_7="two"
+
+   REF_MAP=(
+      [_NODE_2]=_IR_2
+   )
+
+Pass2 compiles to:
+   declare -a _IR_1=_IR_2
+   declare -a _IR_2=_IR_4     <--  "${_IR_3[0]}"
+   ...
+   REF_MAP=()
+
+
+To do this...
+   item1: array> 0;
+   array: [ "one", "two" ]
+
+...must become...
+   # Has a reference. Everything after the reference must be of a greater depth,
+   # and the "container" that holds in (in this case the unary expression) is on
+   # the same level.
+   _NODE_1=(
+      [depth]=0
+      [value]='item1'
+   )
+   _NODE_2=(  # unary
+      [depth]=1
+      [left]='_NODE_3'
+      [right]='_NODE_4'
+   )
+   _NODE_3=(
+      [depth]=1
+      [value]='array'
+   )
+   _NODE_4=(
+      [depth]=2
+      [value]=0
+   )
+
+   # Building the array. Only leaf nodes here, no references.
+   _NODE_5=(
+      [depth]=0
+      [value]='array'
+      [items]='_NODE_6'
+   )
+   _NODE_6=(
+      _NODE_7
+      _NODE_8
+   )
+   _NODE_7=(
+      [depth]=0
+      [value]='one'
+   )
+   _NODE_8=(
+      [depth]=0
+      [value]='two'
+   )
+
+
+e: "three"
+f: e
+array: ["one", "two", e];
+c: array> 1;
+b: c
+d: c
+a: b
+
+depth:
+
+  0                                          (e: "three")
+                                             /  \
+  1                 (array: ["one", "two", e])(f: e)
+                       |
+  2              (c: array> 0)
+                /   \
+  3       (d: c) (b: c)
+                  |
+  4           (a: b)
+
+
+
+Or more simplified:
+
+         e
+       /   \
+    array   f
+      |
+      c
+     / \
+    d   b
+        |
+        a
+
+
+So, now we know what we're *trying* to achieve. I guess that's good enough for
+one night. Tomorrow we can start reasoning about the steps required to *get*
+there.
