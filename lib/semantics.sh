@@ -637,7 +637,7 @@ function semantics_decl_section {
    local -n name="${node[name]}"
 
    # Set symtab to point to the newly descended scope.
-   local   -n symbol="${symtab[${name[value]}]}"
+   local -n symbol="${symtab[${name[value]}]}"
    SYMTAB="${symbol[symtab]}"
 
    local -n items="${node[items]}" 
