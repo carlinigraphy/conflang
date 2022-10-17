@@ -176,3 +176,283 @@ Or more simplified:
 So, now we know what we're *trying* to achieve. I guess that's good enough for
 one night. Tomorrow we can start reasoning about the steps required to *get*
 there.
+
+
+Can we assume any expressions must be a 0-depth? Depends if we allow references
+in arrays. If not, and they may only contain raw values, then all value leaf
+nodes must be 0.
+
+Sections and variable declarations are always 0. We can create the skeleton
+itself, it is only the expressions of variable declarations that have ambiguity
+in their compilation order.
+
+Assuming:
+   S1 {
+      a: c;
+      b: c;
+      c: "this"
+   }
+
+Results in the skeleton:
+   _SK_0=(
+      [_SK_1]=''
+      [_SK_2]=''
+      [_SK_3]='_SK_4'
+   )
+   _SK_4='this'
+
+
+We can then make a map parallel to the AST/SYMTAB that associates the AST_NODE
+with the _SK_$n node.
+
+Will additionally need a map for the depth of each AST node. While compiling,
+hitting a node of greater depth causes us to create the _SK_$n node but set as
+empty. Should try to make this idempotent, and using as few tests as possible.
+
+Maybe it would honestly be faster to intitially just create the skeleton with
+zero values. We then just check depth.
+   if (( $DEPTH > ${DEPTH_MAP[$NODE]} )) ; then
+      continue
+   fi
+
+Assuming:
+   S1 {
+      a: c;
+      b: c;
+      c: "this"
+   }
+
+Results in pass1
+   _SK_0=(
+      [_SK_1]=''
+      [_SK_2]=''
+      [_SK_3]=''
+   )
+
+Results in pass2
+   _SK_0=(
+      [_SK_1]=''
+      [_SK_2]=''
+      [_SK_3]='_SK_4'
+   )
+   _SK_4="this"
+
+Results in pass3
+   _SK_0=(
+      [_SK_1]='_SK_3'
+      [_SK_2]='_SK_3'
+      [_SK_3]='_SK_4'
+   )
+   _SK_4="this"
+
+Which compiles to...
+   _D_0=(
+      [_D_1]='_D_4'
+      [_D_2]='_D_4'
+      [_D_3]='this'
+   )
+
+UH OH! Hmm. I may need to think this through more. Clearly we can't just resolve
+all the references by 1 level, because then refs are going to point to the
+now-deleted terminal nodes.
+
+
+Either way it feels like there's an edge case. Either it's an edge case where I
+need to handle the terminal raw expr, or it's an edge case where I need to
+handle the reference. Gotta come up with a general solution that fits for both
+of them.
+
+
+Gotta work through the problem above a little more.
+
+
+Assuming:
+   S1 {
+      a: c;
+      b: c> 0;
+      c: [[1, 2], 3];
+   }
+
+Results in pass1
+   _SK_0=(
+      [_SK_1]=''
+      [_SK_2]=''
+      [_SK_3]=''
+   )
+
+Results in pass2
+   _SK_0=(
+      [_SK_1]=''
+      [_SK_2]=''
+      [_SK_3]='_SK_4'
+   )
+   _SK_4=(
+      _SK_5       # [1, 2]
+      _SK_6       # 3
+   )
+   _SK_5=(
+      _SK_7       # 1
+      _SK_8       # 2
+   )
+   _SK_6='3'
+   _SK_7='1'
+   _SK_8='2'
+
+Results in pass3
+   _SK_0=(
+      [_SK_1]='_SK_4'      map.get('c') ->  _SK_4
+      [_SK_2]='_SK_5'      map.get('c') ->  _SK_4 -> [0] -> _SK_5
+      [_SK_3]='_SK_4'
+   )
+   _SK_4=(
+      _SK_5       # [1, 2]
+      _SK_6       # 3
+   )                       
+   _SK_5=(                 
+      _SK_7       # 1
+      _SK_8       # 2
+   )
+   _SK_6='3'
+   _SK_7='1'
+   _SK_8='2'
+
+Which compiles to...
+   _D_0=(
+      [_D_1]='_D_4'
+      [_D_2]='_D_5'
+      [_D_3]='_D_4'
+   )
+   _D_4=(
+      _D_5
+      3
+   )                       
+   _D_5=(                 
+      1
+      2
+   )
+
+
+Maybe make helper function(s) for the below.
+   function ref_is_open {
+      local -n node="${NODE}"
+      local -n _name="${node[name]}"
+      local -- name="${_name[value]}"
+
+      local -n symtab="${SYMTAB}"
+      local -n symbol="${symtab[name]}"
+      local -n target_node="${symbol[node]}"
+      
+      # Return if there is an open ref for this node that still must be
+      resolved.
+      [[ "${REF_MAP[$target_node]}" ]]
+   }
+
+   function at_depth {
+      local depth="${DEPTH_MAP[$NODE]}"
+      [[ $depth -eq $DEPTH ]]
+   }
+
+Can test if refs should be resolved at this level like so:
+   ref_is_open || return;
+   at_depth    || return;
+
+Expressions that may have dependencies (e.g., an array with a ref as a member)
+can be assessed with just:
+   at_depth || return;
+
+Huh so it seems like to get it to work, we need to have the references point not
+to the variable, but to point to the expression. Which I believe is what I
+actually tried in a4860532c23d or so. Getting back to the problem that didn't
+work above again.
+
+Assuming:            #          AST NODES
+   S1 {              #  S1's expr  ::  AST1 (section)
+      a: c;          #  a's  expr  ::  AST2 (identifier, value: 'c')
+      b: c> 0;       #  b's  expr  ::  AST3 (index, left: 'c', right: 0)
+      c: [1, 2];     #  c's  expr  ::  AST4 (array, items: [AST5, AST6])
+   }
+
+Pass 0.
+Create a skeleton with every node in the symbol table. Expressions are left
+empty and compiled next. Can honestly probably fill in "raw" expressions in this
+phase as well.
+   SK0=(
+      [SK1]=''
+      [SK2]=''
+      [SK3]=''
+   )
+
+Pass 1.
+   SK0=(             #    EXPR_MAP{}
+      [SK1]=''       #  
+      [SK2]=''       #  
+      [SK3]='SK4'    #
+   )                 #
+   SK4=(             #   AST4  ->  SK4
+      SK5            #
+      SK6            #
+   )                 #
+   SK5=1             #   AST5  ->  SK5
+   SK6=2             #   AST6  ->  SK6
+
+Pass 2.
+   SK0=(
+      [SK1]='SK4'    #  symtab['c'] -> AST4 -> EXPR_MAP['AST4'] -> SK4
+      [SK2]='SK5'    #  symtab['c'] -> AST4 -> EXPR_MAP['AST4'] -> SK4 -> [0]
+      [SK3]='SK4'
+   )
+   SK4=(
+      SK5
+      SK6
+   )
+   SK5=1
+   SK6=2
+
+Shit, same problem with leaf expressions. The reference needs to resolve twice
+to the value itself, instead of the name of the value. This is **not** the case
+with arrays/sections though. Bah.
+
+Maybe if we try again without the intermediate variable for terminal exprs?
+
+Assuming:            #          AST NODES
+   S1 {              #  S1's expr  ::  AST1 (section)
+      a: c;          #  a's  expr  ::  AST2 (identifier, value: 'c')
+      b: c> 0;       #  b's  expr  ::  AST3 (index, left: 'c', right: 0)
+      c: [1, 2];     #  c's  expr  ::  AST4 (array, items: [AST5, AST6])
+   }
+
+Pass 0.
+Create a skeleton with every node in the symbol table. Expressions are left
+empty and compiled next. Can honestly probably fill in "raw" expressions in this
+phase as well.
+   SK0=(
+      [SK1]=''
+      [SK2]=''
+      [SK3]=''
+   )
+
+Pass 1.
+   SK0=(             #    EXPR_MAP{}
+      [SK1]=''       #  
+      [SK2]=''       #  
+      [SK3]='SK4'    #
+   )                 #
+   SK4=(             #   AST4  ->  SK4
+      1              #   AST5  ->  '1'
+      2              #   AST6  ->  '2'
+   )                 #
+
+Pass 2.
+   SK0=(
+      [SK1]='SK4'    #  symtab['c'] -> AST4 -> EXPR_MAP['AST4'] -> SK4
+      [SK2]='1'      #  symtab['c'] -> AST4 -> EXPR_MAP['AST4'] -> SK4 -> [0]
+      [SK3]='SK4'
+   )
+   SK4=(
+      1
+      2
+   )
+
+
+Huh. Seems the approach I was going with originally does work... don't need the
+IR at all, but I do need some way of first generating the dependency tree.
