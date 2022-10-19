@@ -456,3 +456,275 @@ Pass 2.
 
 Huh. Seems the approach I was going with originally does work... don't need the
 IR at all, but I do need some way of first generating the dependency tree.
+
+
+Okay.
+
+
+Now just need to figure out how to build the dependency graph. Every single
+expression AST node needs to be tagged with its depth. Barf, gotta think through
+what something being a dependency **means**.
+
+1) This is only something that we have to consider with references. If there's no
+   references, there are no dependencies.
+
+2) If we hit a reference, it is dependent upon the expressions downstream of the
+   var to which it points.
+
+Examples:
+   a: "one";   #> AST_1
+   b: a;       #> AST_2
+
+`b` is dependent upon `a`'s expression. Or more accurately... AST_2 is dependent
+upon AST_1, and everything downstream of it.
+
+Maybe try adding a ref to the NODE itself?
+   AST_2=(
+      [type]='identifier'
+      [value]='a'
+      ...
+      [depth]=                   # To be added after/while constructing the tree
+      [depends]='DEP_AST_2'      # Pointer to the dependencies of this expr.
+   )
+   DEP_AST_2=(
+      AST_1
+   )
+
+
+Walk the tree bottom to top. Hitting the raw leaf expressions will always be
+depth 0. Anything terminating in a [int, str, bool, path].
+
+
+Bah. Needs to think through more.
+
+
+So what cases are things "downstream"?
+   a: [1, 2];
+   b: a;
+   c: b> 0;
+   # c deps [b]
+   # b deps [a]
+   
+   a: [1, 2];
+   b: a> c;
+   c: 0;
+   # b deps [a, c]
+
+   a: [1, 2];
+   b: a> c;
+   c: d;
+   d: 0
+   # b deps [a, c]
+   # c deps [d]
+
+
+"Dependencies" are really just>  "does this variable declaration contain
+references to other expressions? they are dependencies."
+
+Walk the tree, upon hitting a variable declaration, store the dependency KEY.
+E.g., what is dependent upon any potential references in its expr. For the
+above...
+   parsing `a`, reset DEPS[], find no refs in expr, continue
+         DEPS+=( 'AST_1_DEPS' )
+         AST_1_DEPS=( "${DEPS[@]}" )
+   parsing `b`, reset DEPS[], find both `a` and `c`, resolve & push to $DEPS[]
+         DEPS+=( 'AST_2_DEPS' )
+         AST_2_DEPS=( "${DEPS[@]}" )
+   parsing `c`, reset DEPS[], find `d`, resolve & push to $DEPS[]
+         DEPS+=( 'AST_3_DEPS' )
+         AST_3_DEPS=( "${DEPS[@]}" )
+
+Then iterate over all of the nodes that have dependencies. I believe this will
+pretty much just be variable declarations, and sections? (Gotta think about
+sections too). Both of these are in the symbol table. Do we just add all this
+information to the symbol table...? Iterate the symtab, and output a new
+re-orderd AST?
+
+(Sidebar: I don't think I need to take sections into account at all. We can
+build all the sections at any time. They're part of the "skeleton". Can't be
+impacted by another expression.)
+
+Hmm. For each of the symbol:deps[] arrays, need to count how many chains of
+pointers there are. E.g..
+
+   a: [1, 2];          a   d
+   b: a> c;            |  /
+   c: d;               | c
+   d: 0                |/
+                       b
+
+   a: []
+   b: [a, c]
+   c: [d]
+   d: []
+
+   ---
+
+   a: []               :: 0
+   b: [
+         a -> []       :: 1
+         c -> d -> []  :: 2
+      ]
+   c: d -> []          :: 1
+   d: []               :: 0
+
+   b must resolve after its deps, so it gets max(b.deps).
+
+   ---
+   # What about something that has multiple tier 2 deps?
+
+               a   d   f      0
+               |   |   |
+               |   |   e      1
+               |   | /
+               \   c          2
+                \ /
+                 b            3
+
+   a: []
+   b: [a, c]
+   c: [d, e]
+   d: []
+   e: [f]
+   f: []
+
+   ---
+   # Ugh, really not sure how to write this in bash. Maybe try to draft out
+   # something in python first, and then translate to bash? This is written very
+   # bash-y, to make the transition easier. Works though.
+
+   a = []           # 0
+   b = ['a', 'c']   #    3
+   c = ['d', 'e']   #   2
+   d = []           # 0
+   e = ['f']        #  1
+   f = []           # 0
+   
+   def get_depth(node, level=0):
+      if len(node) == 0:
+         return level
+
+      levels = []
+      for n in node:
+         levels.append(get_depth(eval(n), level+1))
+
+      max = levels[0]
+      for i in levels:
+         if i > max:
+               max = i
+
+      return max
+
+   ---
+   # Put unordered nodes into ordered level of depth.
+
+   unordered=()
+   ordered=()
+
+   (( i=0 ))
+   
+   while (( ${#unordered[@]} > 0 )) ; do
+      for idx in "${!unordered[@]}" ; do
+         num=${unordered[$idx]}
+         if (( num == i )) ; then
+            unset 'unordered[$idx]'
+            ordered+=( $num )
+         fi
+      done
+      (( ++i ))
+   done
+
+
+With this figured out, should be able to do 2 passes, irrespective of the number
+of dependent expressions.
+
+Pass 1:  create the "skeleton", EXPR_MAP, and dependency tree
+   Create an associative arracy for each section. All child variables have a key
+   and empty function declared to hold their expression. All child sections have
+   a key and corresponding associative array.
+
+   ---
+   # Input.
+                              #  Node name for the EXPRESSIONS
+   S0 {                       #  AST1
+      one: 1;                 #  AST2
+      two; S0> S1> three;     #  AST3
+
+      S1 {                    #  AST4
+         three: 3;            #  AST5
+      }
+   } 
+
+   ---
+   # Skeleton of the config, only keys & sections filled in.
+
+   declare -A ROOT=(
+      [S0]=D1
+   )
+   declare -A D1=(
+      [one]=D2
+      [two]=D3
+      [S1]=D4
+   )
+   declare -- D2=
+   declare -- D3=
+   declare -A D4=(
+      [three]=D5
+   )
+   declare -- D5=
+
+   ---
+   # Expr map.
+   declare -a EXPR_MAP=(
+      [AST1]=D1
+      [AST2]=D2
+      [AST3]=D3
+      [AST4]=D4
+      [AST5]=D5
+   )
+
+   ---
+   # Dependency tree.
+   AST1_DEP=()                      # 0
+   AST2_DEP=()                      # 0
+   AST3_DEP=( AST1  AST4  AST5 )    #  1
+   AST4_DEP=()                      # 0
+   AST5_DEP=()                      # 0
+
+   PARSE_ORDER=(
+      AST1                          # 0
+      AST2                          # 0
+      AST4                          # 0
+      AST5                          # 0
+      AST3                          #  1
+   )
+
+Pass 2:  parse in order, compile the expression and assign to its corresponding
+EXPR node.
+   for src in "${PARSE_ORDER[@]}" ; do
+      dst="${EXPR_MAP[$src]}"
+      compile  "$src"  "$dst"
+   done
+
+Can re-use pretty much the entire existing compiler, just split into two. The
+compilation of section/variable declarations is pass 1, in which we only need to
+walk expressions to find identifiers, and add things to the EXPR_MAP. All the
+expression compiling stuff can largely stay almost exactly the same, except
+pointing to the newly passed in $dst to drop the data, rather than the global
+$DATA pointer.
+
+May help if we actually just set a global pointer for the destination. Will
+potentially need to unset & recreate the variable. In case it was created as
+`--`, and should be `-a` or `-A`. Not positive how that works.
+
+Looks like you can remap a raw `declare FOO` declaration.
+
+Global pointer will effectively tell it what name to use for the top level
+variable.
+
+Hmm, not sure if this will work. If you need to make a complex expr, array of
+arrays, I don't know how it could only have the top level item use the global
+var, but everything else create new expressions. Hmm.
+
+Maybe just have walk_compiler1 call _walk_compiler1. The first one sets the
+initial global variable, the second is what is called during compilation?
