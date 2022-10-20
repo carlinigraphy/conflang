@@ -9,6 +9,7 @@ cat <<EOF
 ./do COMMAND
 
 commands
+   run         Runs \`confc\`
    test        Run \`BATS\` tests
    cov         Run \`BATS\` tests with \`kcov\` coverage
    check       Run \`shellcheck\`
@@ -23,6 +24,9 @@ exit "$1"
 
 
 case "$1" in
+   'run')   shift ; exec "${PROGDIR}"/bin/confc "$@"
+            ;;
+
    'test')  shift ; args=( "$@" )
             if [[ ! "$args" ]] ; then
                args=( "${PROGDIR}"/test )
