@@ -309,3 +309,97 @@ function compile_expr_identifier {
    # Also needed in the expression map, in case one reference points to another.
    EXPR_MAP[$NODE]=''
 }
+
+#─────────────────────────────( skeleton to data )──────────────────────────────
+# Need to walk the resulting skelly-tree, and convert to a data-tree. Really
+# it's just reducing all the intermediate/placeholder nodes with their actual
+# values.
+#
+#> S {
+#>    key;
+#>    key2: [1, 2];
+#> }
+#
+#
+#> declare -A _ROOT=(
+#>    [S]=SKELLY_1
+#> )
+#> declare -A SKELLY_1=(
+#>    [key]=SKELLY_2
+#>    [key2]=SKELLY_3
+#> )
+#> declare -- SKELLY_2=
+#> declare -a SKELLY_3=(
+#>    SKELLY_4
+#>    SKELLY_5
+#> )
+#> declare -- SKELLY_4=1
+#> declare -- SKELLY_5=2
+#
+#
+#> declare -A _ROOT=(
+#>    [S]=DATA_1
+#> )
+#> declare -A DATA_1=(
+#>    [key]=''
+#>    [key2]=DATA_2
+#> )
+#> declare -a DATA_2=( 1 2 )
+#
+# For this we may actually need a SKELLY_TYPE{} map.
+#> SKELLY_TYPE = {
+#>    _ROOT    : '-gA'
+#>    SKELLY_1 : '-gA'
+#>    SKELLY_2 : '-g'
+#>    SKELLY_3 : '-ga'
+#>    SKELLY_4 : '-g'
+#>    SKELLY_5 : '-g'
+#> }
+#
+# Can then easily create the new data nodes.
+#> declare -gA _DATA_ROOT=()
+#> declare -gn src=_ROOT
+#> declare -gn dst=_DATA_ROOT
+#> 
+#> for key in "${src[@]}" ; do
+#>    val="${src[$key]}"
+#>    type="${SKELLY_TYPE[$val]}"
+#> 
+#>    (( ++DATA_NUM ))
+#>    declare DATA="_DATA_${DATA_NUM}"
+#>    declare $type "_DATA_${DATA_NUM}"
+#> 
+#>    # Hmmmmmm.
+#> done
+#
+#
+# May honestly just instead want to "move" the values in by one. Replace the
+# pointer to the leaf node with the value of the leaf node itself. Though this
+# still does leave a ton of dangling unused variables. Could go through and
+# unset them based on the map. Anything that only has a value, rather than a
+# pointer, can be unset?
+#
+# Nah, probably a better idea to try to walk the tree and create a parallel one.
+# Wonder if it would be quicker in this case to use some `exec` tomfoolery?
+# Probably not. Should just walk the trees like a normal boy.
+#
+# Should draft out a min product of what that looks like.
+#
+#
+# Thought more about this, think I actually can just "fold" around the
+# placeholder skelly.
+#
+#> function fold {
+#>    local -n src="$1"
+#> 
+#>    for key in "${src[@]}" ; do
+#>       local skelly="${src[$key]}"
+#> 
+#>       if [[ "${SKELLY_TYPE[$key]}" == '-A' ]] ; then
+#>          fold "$skelly"
+#>       else
+#>          local -n val="${skelly[$key]}"
+#>          src[$key]="$val"
+#>       fi
+#>    done
+#> }
