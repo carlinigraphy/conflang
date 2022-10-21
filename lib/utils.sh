@@ -14,9 +14,12 @@ function init_globals {
    # Compiled output tree file location. Defaults to stdout.
    declare -g DATA_OUT=/dev/stdout
 
-   # Symbol table holding the name of the SYMTAB_$n, and a nameref to that
-   # symtab.
+   # Nameref to the outermost symbol table, holding typedefs, imported
+   # functions, and the implicit `%inline` section.
    declare -g GLOBALS=
+
+   # Pointer (non-ref) to the %inline symbol table.
+   declare -g INLINE=
 
    # The root NODE_$n of the parent and child AST trees.
    declare -g PARENT_ROOT= CHILD_ROOT=
@@ -242,7 +245,11 @@ function do_compile {
 
    # Re-point $GLOBALS at the root of the symbol table.
    declare -gn GLOBALS="${parent_symtab}"
+   
+   # Point $INLINE to the implicit %inline table
+   local -n _symbol="${GLOBALS[%inline]}"
+   declare -g INLINE="${_symbol[symtab]}"
 
    walk_semantics "$PARENT_ROOT"
    walk_compiler  "$PARENT_ROOT"
-}
+} 

@@ -119,7 +119,6 @@ function mk_symbol {
    # Variable declaration symbols are `required' if its NODE has no expression.
    # A Section is considered to be `required' if *any* of its children are
    # required. This is only needed when enforcing constraints upon a child file.
-
 }
 
 
@@ -311,7 +310,7 @@ function symtab_decl_variable {
    # a child tree into the parent's. Any identifiers that are present in a
    # child's symtab but not a parents are directly appended into the parent's
    # tree. The only way that's possible is with a reference to the node itself.
-   symbol[node]=$node_name
+   symbol['node']=$node_name
 
    # Get string value of identifier node.
    local -- identifier_node=${node[name]}

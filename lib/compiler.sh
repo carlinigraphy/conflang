@@ -10,6 +10,25 @@
 #    analysis in the next phase), but also need to append the nodes themselves
 #    to the parent section's .items array.
 
+# Abstract away all the stuff below.
+function walk_compiler {
+   walk_ref_compiler "$1"
+
+   dependency_to_map
+   dependency_sort
+
+   for ast_node in "${ORDERED_DEPS[@]}" ; do
+      declare -g SYMTAB="${GLOBALS[%inline]}"
+
+      local dst="${EXPR_MAP[$ast_node]}"
+      _walk_expr_compiler  "$ast_node"  "$dst"
+   done
+
+   # Fold around all the temporary SKELLY nodes. Leaves only data.
+   undead_yoga '_SKELLY_1'
+}
+
+
 #─────────────────────────( make skeleton, log refs )───────────────────────────
 # 1. Builds the "skeleton" of the tree.
 #    a. Associative array node for all sections
@@ -20,17 +39,23 @@
 declare -g  SKELLY=
 declare -gi SKELLY_NUM=0
 
-declare -g  DEP=
-declare -ga DEPENDENCIES=()
+declare -gA EXPR_MAP=()
+# Mapping from NODE_$n -> _SKELLY_$n
+
+declare -g  DEPENDENCY=
 declare -ga UNORDERED_DEPS=()
+declare -gA DEPS_MAP=()
+declare -ga ORDERED_DEPS=()
 # ^-- This is where dependencies go during the reference phase of the compiler.
 # Each variable declaration also creates an array to hold everything it depends
-# upon. Before the 2nd phase, they're sorted into DEPENDENCIES[].
+# upon. Before the 2nd phase, they're sorted into ORDERED_DEPS[].
+#
+# Order is DEPEND -> UNORDERED_DEPS[] -> DEPS_MAP{} -> ORDERED_DEPS[]
 
-function mk_dep {
+function mk_dependency {
    local dep="DEP_${1}"
    declare -ga "$dep"
-   declare -g  DEP="$dep"
+   declare -g  DEPENDENCY="$dep"
    UNORDERED_DEPS+=( "$dep" )
 }
 
@@ -40,6 +65,10 @@ function mk_compile_dict {
    local skelly="_SKELLY_${SKELLY_NUM}"
    declare -gA "$skelly"
    declare -g  SKELLY="$skelly"
+
+   # Without a value, this isn't glob matched by a ${!_SKELLY_*}
+   local -n _s="$skelly"
+   _s=()
 }
 
 
@@ -50,6 +79,10 @@ function mk_skelly {
    local skelly="_SKELLY_${SKELLY_NUM}"
    declare -g "$skelly"
    declare -g SKELLY="$skelly"
+
+   # Without a value, this isn't glob matched by a ${!_SKELLY_*}
+   local -n _s="$skelly"
+   _s=''
 }
 
 
@@ -63,22 +96,22 @@ function compile_ref_decl_section {
    # Save reference to current NODE. Restored at the end.
    local -- save=$NODE
    local -n node=$save
-   local -n name="${node[name]}"
 
    # Create data dictionary object.
    mk_compile_dict
-   local -- skelly=$SKELLY
-   local -n skeleton=$SKELLY
+   local -- sname="$SKELLY"
+   local -n skelly="$sname"
 
    local -n items="${node[items]}" 
-   for var_decl in "${items[@]}"; do
+   for decl_name in "${items[@]}"; do
+      local -n var_decl="$decl_name"
       local -n _name="${var_decl[name]}"
       local -- name="${_name[value]}"
 
       # Variable declarations will create a placeholder skelly, whilst sections
       # will generate an associate array with sub-skellies.
-      walk_ref_compiler
-      data[name]="$SKELLY"
+      walk_ref_compiler "$decl_name"
+      skelly[$name]="$SKELLY"
    done
 
    # Add mapping from _NODE_$n -> _SKELLY_$n.
@@ -90,24 +123,26 @@ function compile_ref_decl_section {
 
 
 function compile_ref_decl_variable {
-   local -- symtab="$SYMTAB"
-   local -- save=$NODE
-   local -n node=$save
+   local -- save="$NODE"
+   local -n node="$save"
 
    # Create skeleton node to be inserted into the parent section, and add
    # mapping from the AST node to the output skeleton node.
    mk_skelly
-   EXPR_MAP["$save_node"]="$SKELLY"
+   EXPR_MAP["$save"]="$SKELLY"
 
    # Create global "${SKELLY}_DEPS" array holding all the dependencies we run
    # into downstream.
-   mk_dep "$save"
+   mk_dependency "$save"
 
+   # TODO: Need to think this through a little more. Don't know if I love the
+   # concept of having a "global" scope that's distinct from the `%inline`
+   # scope.
+   declare -g SYMTAB="$INLINE"
    if [[ -n ${node[expr]} ]] ; then
       walk_ref_compiler "${node[expr]}"
    fi
 
-   declare -g SYMTAB="$symtab"
    declare -g NODE="$save"
 }
 
@@ -143,20 +178,22 @@ function compile_ref_identifier {
    local -- symtab="$SYMTAB"
    local -- save="$NODE"
 
-   # Add self as dependency.
-   local -n dep="$DEP"
-   dep+=( "$save" )
-
    # Get identifier name.
    local -n node="$NODE"
-   local -- _name="${node[name]}"
-   local -n name="${_name[value]}"
+   local -- name="${node[value]}"
    
    # Descend to new symbol table.
    local -n symtab="${SYMTAB}"
    local -n symbol="${symtab[$name]}"
-   local -n new_scope="${symbol[symtab]}"
-   declare -g SYMTAB="$new_scope"
+
+   if [[ "${symbol[symtab]}" ]] ; then
+      local -n new_scope="${symbol[symtab]}"
+      declare -g SYMTAB="$new_scope"
+   fi
+
+   # Add self as dependency.
+   local -n dep="$DEPENDENCY"
+   dep+=( "${symbol[node]}" )
 }
 
 
@@ -167,26 +204,127 @@ function compile_ref_path    { :; }
 function compile_ref_env_var { :; }
 
 
-#───────────────────────────( evaluate expressions )────────────────────────────
-# Now we can largely evaluate linearly over the ordered
-
-# THINKIES:
-# I think we're going to need to have the skeleton nodes always point to the
-# data node. Don't repurpose them, or assign actual expressions to them. They
-# only serve as a useless sentinel that allows us to globally reference them.
-# Probably should rename them to "middle management". They don't deserve to be
-# my skelly army.
+#────────────────────────────( order dependencies )─────────────────────────────
+declare -gi DEPTH=0
 
 
-function mk_compile_array {
-   (( ++SKELLY_NUM ))
-   local   --  dname="_SKELLY_${SKELLY_NUM}"
-   declare -ga $dname
-   declare -g  SKELLY=$dname
+function dependency_to_map {
+   for dep_node in "${UNORDERED_DEPS[@]}" ; do
+      dependency_depth "$dep_node"
+
+      local -- ast_node="${dep_node/DEP_/}"
+      DEPS_MAP[$ast_node]="$DEPTH"
+   done
 }
 
 
-function walk_expr_compiler { :; }
+function dependency_depth {
+   local -n node="$1"
+   local -i level="${2:-0}"
+
+   # When we've reached the end of a dependency chain, return the accumulated
+   # depth level.
+   if ! (( ${#node[@]} )) ; then
+      DEPTH="$level" ; return
+   fi
+
+   (( ++level ))
+
+   local -a sub_levels=()
+   for ast_node in "${node[@]}" ; do
+      dependency_depth "DEP_${ast_node}"  "$level"
+      sub_levels+=( "$DEPTH" )
+   done
+
+   local -i max="${sub_levels[0]}"
+   for n in "${sub_levels[@]}" ; do
+      (( max = (n > max)? n : max ))
+   done
+
+   declare -g DEPTH="$max"
+}
+
+
+function dependency_sort {
+   local -i  i=0  depth=0
+
+   while (( ${#DEPS_MAP[@]} )) ; do
+      for ast_node in "${!DEPS_MAP[@]}" ; do
+         depth="${DEPS_MAP[$ast_node]}"
+         if (( depth == i )) ; then
+            unset 'DEPS_MAP[$ast_node]'
+            ORDERED_DEPS+=( "$ast_node" )
+         fi
+      done
+      (( ++i ))
+   done
+}
+
+
+#───────────────────────────( evaluate expressions )────────────────────────────
+declare -g  DATA=
+declare -gi DATA_NUM=0
+
+
+function mk_compile_array {
+   (( ++DATA_NUM ))
+   local   --  dname="_DATA_${DATA_NUM}"
+   declare -ga $dname
+   declare -g  DATA=$dname
+
+   # Without a value, this isn't glob matched by a ${!_SKELLY_*}
+   local -n _d="$dname"
+   _d=()
+}
+
+
+# This is the function that's actually called to initiate the expression
+# evaluation. To simplify things, all compilation steps are wrapped by the
+# `walk_compiler` function.
+function _walk_expr_compiler {
+   local -- src="$1"
+   local -n dst="$2"
+
+   # XXX: Gotta come up with a better way of doing this. Currently need to
+   #      reset the symbol table between each time we're calling this phase of
+   #      the compiler, as indices leaves us in an inner scope.
+   declare -g SYMTAB="$INLINE"
+
+   walk_expr_compiler "$src"
+   dst="$DATA"
+}
+
+
+function walk_expr_compiler {
+   declare -g NODE="$1"
+   compile_expr_"${TYPEOF[$NODE]}"
+}
+
+
+function compile_expr_decl_section {
+   # Save reference to current NODE. Restored at the end.
+   local -- save=$NODE
+   local -n node=$save
+
+   local -n items="${node[items]}" 
+   for var_decl in "${items[@]}"; do
+      walk_expr_compiler "$var_decl"
+   done
+
+   declare -g NODE="$save"
+}
+
+
+function compile_expr_decl_variable {
+   local -- save=$NODE
+   local -n node=$save
+
+   if [[ -n ${node[expr]} ]] ; then
+      walk_expr_compiler "${node[expr]}"
+   fi
+
+   declare -g NODE="$save"
+}
 
 
 function compile_expr_typecast {
@@ -199,17 +337,15 @@ function compile_expr_index {
    # An 'index' is a combination of...
    #    .left   subscriptable expression (section, array)
    #    .right  index expression (identifier, integer)
-
    local -n node="$NODE"
 
    walk_expr_compiler "${node[left]}" 
-   local -n left="$SKELLY"
+   local -n left="$DATA"
 
    walk_expr_compiler "${node[right]}"
-   local -- right="$SKELLY"
+   local -- right="$DATA"
 
-   SKELLY="${left[$right]}"
-   EXPR_MAP["$NODE"]="$SKELLY"
+   declare -g DATA="${left[$right]}"
 }
 
 
@@ -218,43 +354,37 @@ function compile_expr_unary {
    local -n node=$save
 
    walk_expr_compiler "${node[right]}"
-   local -i rhs=$SKELLY
-
-   declare -g NODE=$save
-   EXPR_MAP["$NODE"]="$SKELLY"
+   (( DATA = DATA * -1 ))
 }
 
 
 function compile_expr_array {
-   local -- save=$NODE
-   local -n node=$save
+   local -- save="$NODE"
+   local -n node="$save"
 
    mk_compile_array
-   local -- dname=$SKELLY
-   local -n data=$SKELLY
+   local -- array_name="$DATA"
+   local -n array="$DATA"
 
-   for nname in "${node[@]}"; do
-      walk_expr_compiler "$nname"
-      data+=( "$SKELLY" )
+   for ast_node in "${node[@]}"; do
+      walk_expr_compiler "$ast_node"
+      array+=( "$DATA" )
    done
 
-   declare -g SKELLY=$dname
-   declare -g NODE=$save
-   EXPR_MAP["$NODE"]="$SKELLY"
+   declare -g DATA="$array_name"
+   declare -g NODE="$save"
 }
 
 
 function compile_expr_boolean {
    local -n node=$NODE
-   declare -g SKELLY="${node[value]}"
-   EXPR_MAP["$NODE"]="$SKELLY"
+   declare -g DATA="${node[value]}"
 }
 
 
 function compile_expr_integer {
    local -n node=$NODE
-   declare -g SKELLY="${node[value]}"
-   EXPR_MAP["$NODE"]="$SKELLY"
+   declare -g DATA="${node[value]}"
 }
 
 
@@ -264,12 +394,11 @@ function compile_expr_string {
 
    while [[ "${node[concat]}" ]] ; do
       walk_expr_compiler "${node[concat]}"
-      string+="$SKELLY"
+      string+="$DATA"
       local -n node="${node[concat]}"
    done
 
-   declare -g SKELLY="$string"
-   EXPR_MAP["$NODE"]="$SKELLY"
+   declare -g DATA="$string"
 }
 
 
@@ -279,12 +408,11 @@ function compile_expr_path {
 
    while [[ "${node[concat]}" ]] ; do
       walk_expr_compiler "${node[concat]}"
-      path+="$SKELLY"
+      path+="$DATA"
       local -n node="${node[concat]}"
    done
 
-   declare -g SKELLY="$path"
-   EXPR_MAP["$NODE"]="$SKELLY"
+   declare -g DATA="$path"
 }
 
 
@@ -296,110 +424,54 @@ function compile_expr_env_var {
       raise missing_env_var "$var_name"
    fi
 
-   declare -g SKELLY="${SNAPSHOT[$var_name]}"
-   EXPR_MAP["$NODE"]="$SKELLY"
+   declare -g DATA="${SNAPSHOT[$var_name]}"
 }
 
 
 function compile_expr_identifier {
-   # Add this node to the reference map. Unset once resolved in the next stage
-   # of the compiler.
-   REF_MAP[$NODE]=''
+   # Pull identifier's name out of the AST node.
+   local -n node="$NODE"
+   local -- name="${node[value]}"
 
-   # Also needed in the expression map, in case one reference points to another.
-   EXPR_MAP[$NODE]=''
+   # Look up the AST node referred to by this identifier. Given:
+   #
+   #> 1.| a: 1;
+   #> 2.| b: a;
+   #
+   # This function would be called on line 2 for the reference to `a`.
+   #
+   local -n symtab="$SYMTAB"
+   local -n symbol="${symtab[$name]}"
+   local -- ast_node="${symbol[node]}"
+
+   # Resolve the reference in the EXPR_MAP. Given:
+   #
+   #> EXPR_MAP=(
+   #>    [NODE_1]="SKELLY_1"
+   #> )
+   #> SKELLY_1="1"
+   #
+   # Resolves `a` -> SKELLY_1 -> "1".
+   #
+   local -n data="${EXPR_MAP[$ast_node]}"
+   declare -g DATA="$data"
 }
 
 #─────────────────────────────( skeleton to data )──────────────────────────────
-# Need to walk the resulting skelly-tree, and convert to a data-tree. Really
-# it's just reducing all the intermediate/placeholder nodes with their actual
-# values.
-#
-#> S {
-#>    key;
-#>    key2: [1, 2];
-#> }
-#
-#
-#> declare -A _ROOT=(
-#>    [S]=SKELLY_1
-#> )
-#> declare -A SKELLY_1=(
-#>    [key]=SKELLY_2
-#>    [key2]=SKELLY_3
-#> )
-#> declare -- SKELLY_2=
-#> declare -a SKELLY_3=(
-#>    SKELLY_4
-#>    SKELLY_5
-#> )
-#> declare -- SKELLY_4=1
-#> declare -- SKELLY_5=2
-#
-#
-#> declare -A _ROOT=(
-#>    [S]=DATA_1
-#> )
-#> declare -A DATA_1=(
-#>    [key]=''
-#>    [key2]=DATA_2
-#> )
-#> declare -a DATA_2=( 1 2 )
-#
-# For this we may actually need a SKELLY_TYPE{} map.
-#> SKELLY_TYPE = {
-#>    _ROOT    : '-gA'
-#>    SKELLY_1 : '-gA'
-#>    SKELLY_2 : '-g'
-#>    SKELLY_3 : '-ga'
-#>    SKELLY_4 : '-g'
-#>    SKELLY_5 : '-g'
-#> }
-#
-# Can then easily create the new data nodes.
-#> declare -gA _DATA_ROOT=()
-#> declare -gn src=_ROOT
-#> declare -gn dst=_DATA_ROOT
-#> 
-#> for key in "${src[@]}" ; do
-#>    val="${src[$key]}"
-#>    type="${SKELLY_TYPE[$val]}"
-#> 
-#>    (( ++DATA_NUM ))
-#>    declare DATA="_DATA_${DATA_NUM}"
-#>    declare $type "_DATA_${DATA_NUM}"
-#> 
-#>    # Hmmmmmm.
-#> done
-#
-#
-# May honestly just instead want to "move" the values in by one. Replace the
-# pointer to the leaf node with the value of the leaf node itself. Though this
-# still does leave a ton of dangling unused variables. Could go through and
-# unset them based on the map. Anything that only has a value, rather than a
-# pointer, can be unset?
-#
-# Nah, probably a better idea to try to walk the tree and create a parallel one.
-# Wonder if it would be quicker in this case to use some `exec` tomfoolery?
-# Probably not. Should just walk the trees like a normal boy.
-#
-# Should draft out a min product of what that looks like.
-#
-#
-# Thought more about this, think I actually can just "fold" around the
-# placeholder skelly.
-#
-#> function fold {
-#>    local -n src="$1"
-#> 
-#>    for key in "${src[@]}" ; do
-#>       local skelly="${src[$key]}"
-#> 
-#>       if [[ "${SKELLY_TYPE[$key]}" == '-A' ]] ; then
-#>          fold "$skelly"
-#>       else
-#>          local -n val="${skelly[$key]}"
-#>          src[$key]="$val"
-#>       fi
-#>    done
-#> }
+# Folds around the intermediate SKELLY nodes, resulting in the raw data. 
+
+function undead_yoga {
+   local -n src="$1"
+
+   for key in "${!src[@]}" ; do
+      local skelly="${src[$key]}"
+
+      if [[ ${IS_SECTION[$skelly]} ]] ; then
+         undead_yoga "$skelly"
+      else
+         local -n val="$skelly"
+         src[$key]="$val"
+         unset $skelly
+      fi
+   done
+}
