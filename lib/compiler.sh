@@ -18,8 +18,6 @@ function walk_compiler {
    dependency_sort
 
    for ast_node in "${ORDERED_DEPS[@]}" ; do
-      declare -g SYMTAB="${GLOBALS[%inline]}"
-
       local dst="${EXPR_MAP[$ast_node]}"
       _walk_expr_compiler  "$ast_node"  "$dst"
    done
