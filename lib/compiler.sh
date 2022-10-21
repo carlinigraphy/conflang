@@ -113,7 +113,7 @@ function compile_ref_decl_section {
    done
 
    # Add mapping from _NODE_$n -> _SKELLY_$n.
-   EXPR_MAP["$save"]="$skelly"
+   EXPR_MAP["$save"]="$sname"
 
    declare -g SKELLY="$skelly"
    declare -g NODE="$save"
@@ -179,14 +179,13 @@ function compile_ref_identifier {
    # Get identifier name.
    local -n node="$NODE"
    local -- name="${node[value]}"
-   
+
    # Descend to new symbol table.
-   local -n symtab="${SYMTAB}"
+   local -n symtab="$SYMTAB"
    local -n symbol="${symtab[$name]}"
 
    if [[ "${symbol[symtab]}" ]] ; then
-      local -n new_scope="${symbol[symtab]}"
-      declare -g SYMTAB="$new_scope"
+      declare -g SYMTAB="${symbol[symtab]}"
    fi
 
    # Add self as dependency.
@@ -433,8 +432,8 @@ function compile_expr_identifier {
 
    # Look up the AST node referred to by this identifier. Given:
    #
-   #> 1.| a: 1;
-   #> 2.| b: a;
+   #> a: 1;
+   #> b: a;
    #
    # This function would be called on line 2 for the reference to `a`.
    #
