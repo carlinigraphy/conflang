@@ -4,11 +4,11 @@
 # by the config file.
 #
 # IMPORTS:
-#  _DATA_ROOT
+#  _SKELLY_$n
 #  _DATA_$n
 
 function conf {
-   declare -g RV='_DATA_1'
+   declare -g RV='_SKELLY_1'
 
    for arg in "$@" ; do
       local -n d=$RV
