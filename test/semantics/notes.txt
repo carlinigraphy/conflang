@@ -1,3 +1,9 @@
+General notes.
+Need to rethink how the "global" symbol table works. It's sitting above the
+%inline level. Makes it kinda tricky when typechecking. Do we want everything
+to live at the %inline level? Saves us from handling that as an edge case
+every time.
+
 symbol table creation
    - [x] create expected types
    - [x] create ANY type if not specified
@@ -30,3 +36,4 @@ semantic analysis
       - [ ] internal variable types match
    disallows.
       - [ ] unary negation for any expression but integers
+      - [ ] naming an identifier after a type
