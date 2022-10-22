@@ -728,3 +728,50 @@ var, but everything else create new expressions. Hmm.
 
 Maybe just have walk_compiler1 call _walk_compiler1. The first one sets the
 initial global variable, the second is what is called during compilation?
+
+
+----
+2022-10-21
+Sections being an edge case is actually chuckin' a wrench in things. When trying
+to do some subscription of a key within the section, it's nameref'ing the
+variable twice.
+
+Once to select the node:
+   SKELLY_1=DATA_1         <-- "DATA_1"
+   DATA_1="value"
+
+Second time to reference the held value:
+   SKELLY_1=DATA_1
+   DATA_1="value"          <-- "value"
+
+Maybe if we also generate an intermediate SKELLY node for sections?
+
+--
+Given.
+   S0 {
+      one: 1;
+   }
+   _: S0> one;
+
+--
+Compiled.
+   ROOT=(
+      [%inline]=SKELLY1
+   )
+
+   # %inline section
+   SKELLY1=SKELLY2
+   SKELLY2=(
+      [S0]=SKELLY3
+      [_]=''
+   )
+
+   # S0 section
+   SKELLY3=SKELLY4
+   SKELLY4=(
+      [one]=''
+   )
+
+--
+Folding.
+

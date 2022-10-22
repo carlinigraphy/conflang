@@ -451,6 +451,7 @@ function compile_expr_identifier {
    # Resolves `a` -> SKELLY_1 -> "1".
    #
    local -n data="${EXPR_MAP[$ast_node]}"
+   echo "  -- name($name) data(${EXPR_MAP[$ast_node]}) -> $data"
    declare -g DATA="$data"
 }
 
