@@ -22,8 +22,19 @@ function walk_compiler {
       _walk_expr_compiler  "$ast_node"  "$dst"
    done
 
+   # Clean up the generated output. The nodes _SKELLY_{1,2} are uselessly
+   # referring to the '%inline' implicit section.
+   declare -g _SKELLY_ROOT="$_SKELLY_1"
+   unset '$_SKELLY_1'
+
    # Fold around all the temporary SKELLY nodes. Leaves only data.
-   undead_yoga '_SKELLY_1'
+   undead_yoga "$_SKELLY_ROOT"
+
+   # Can't unset during `undead_yoga`, as two references may point to the same
+   # intermediate node. Clean up my skeleton army afterwards.
+   for skelly in "${DISPOSABLE_SKELETONS[@]}" ; do
+      unset "$skelly"
+   done
 }
 
 
@@ -34,8 +45,14 @@ function walk_compiler {
 #    c. Placeholder assigned node is empty, to be filled next pass
 # 2. Create EXPR_MAP{ AST_NODE -> DATA_NODE }
 # 3. Create dependency tree
+
 declare -g  SKELLY=
 declare -gi SKELLY_NUM=0
+declare -ga DISPOSABLE_SKELETONS=()
+
+declare -gA IS_SECTION=()
+# To determine if a disposable skelly is referencing a Section. Necessary when
+# walking the result in `undead_yoga`.
 
 declare -gA EXPR_MAP=()
 # Mapping from NODE_$n -> _SKELLY_$n
@@ -71,16 +88,14 @@ function mk_compile_dict {
 
 
 function mk_skelly {
-   # Creates a generic skeleton placeholder. This is overwritten in the
-   # expression evaluation phase by the actual value & type.
    (( ++SKELLY_NUM ))
    local skelly="_SKELLY_${SKELLY_NUM}"
    declare -g "$skelly"
    declare -g SKELLY="$skelly"
 
-   # Without a value, this isn't glob matched by a ${!_SKELLY_*}
-   local -n _s="$skelly"
-   _s=''
+   # Allows us to clean up after ourselves. After evaluating everything, these
+   # will be dead references, pointing to nothing.
+   DISPOSABLE_SKELETONS+=( "$skelly" ) 
 }
 
 
@@ -91,32 +106,59 @@ function walk_ref_compiler {
 
 
 function compile_ref_decl_section {
+   # TODO:
+   # In this function I'm trying out the idea of consistent variable suffixes
+   # to identify namerefs, as in https://github.com/hre-utils/conflang/issues/6.
+   # Think I'll keep it. Don't know yet. Need to see if it's something that I
+   # real intuitively.
+
    # Save reference to current NODE. Restored at the end.
-   local -- save=$NODE
-   local -n node=$save
+   local -- node="$NODE"
+   local -n node_r="$node"
+   #
+   # Add mapping from _NODE_$n -> _SKELLY_$n. Need one level of indirection to
+   # be able to refer to this node.
+   #
+   #> Section { key; }
+   #>--
+   #> _ROOT=(
+   #>    [Section]=_SKELLY_1
+   #> )
+   #> _SKELLY_1=_SKELLY_2
+   #> _SKELLY_2=(
+   #>    [key]=''
+   #> )
+   #>--
+   #
+   # In which  _SKELLY_1 :: middle_skelly
+   #           _SKELLY_2 :: dict_skelly
+   #
+   mk_skelly                                 #< _SKELLY_1
+   local -- middle_skelly="$SKELLY"
+   local -n middle_skelly_r="$middle_skelly"
 
-   # Create data dictionary object.
-   mk_compile_dict
-   local -- sname="$SKELLY"
-   local -n skelly="$sname"
+   mk_compile_dict                           #< _SKELLY_2
+   local -- dict_skelly="$SKELLY"
+   local -n dict_skelly_r="$dict_skelly"
 
-   local -n items="${node[items]}" 
-   for decl_name in "${items[@]}"; do
-      local -n var_decl="$decl_name"
-      local -n _name="${var_decl[name]}"
-      local -- name="${_name[value]}"
+   middle_skelly_r="$dict_skelly"            #< _SKELLY_1="_SKELLY_2"
+   EXPR_MAP[$node]="$middle_skelly"
+   IS_SECTION[$dict_skelly]='yes'
+
+   local -n items_r="${node_r[items]}" 
+   for var_decl in "${items_r[@]}"; do
+      local -n var_decl_r="$var_decl"
+      local -n name_r="${var_decl_r[name]}"
+      local -- name="${name_r[value]}"
 
       # Variable declarations will create a placeholder skelly, whilst sections
       # will generate an associate array with sub-skellies.
-      walk_ref_compiler "$decl_name"
-      skelly[$name]="$SKELLY"
+      walk_ref_compiler "$var_decl"
+      dict_skelly_r[$name]="$SKELLY"
    done
 
-   # Add mapping from _NODE_$n -> _SKELLY_$n.
-   EXPR_MAP["$save"]="$sname"
-
-   declare -g SKELLY="$skelly"
-   declare -g NODE="$save"
+   declare -g SKELLY="$middle_skelly"
+   declare -g NODE="$node"
 }
 
 
@@ -183,7 +225,6 @@ function compile_ref_identifier {
    # Descend to new symbol table.
    local -n symtab="$SYMTAB"
    local -n symbol="${symtab[$name]}"
-
    if [[ "${symbol[symtab]}" ]] ; then
       declare -g SYMTAB="${symbol[symtab]}"
    fi
@@ -339,8 +380,17 @@ function compile_expr_index {
    walk_expr_compiler "${node[left]}" 
    local -n left="$DATA"
 
-   walk_expr_compiler "${node[right]}"
-   local -- right="$DATA"
+   # XXX: This is some idiot shit. Right now this might be the most hacky and
+   #      messy element of the entire project. Need to come up with a different
+   #      form of array subscription that doesn't lead to such awful edge cases
+   #      when parsing.
+   if [[ "${TYPEOF[${node[right]}]}" == 'identifier' ]] ; then
+      local -n right_node_r="${node[right]}"
+      local right="${right_node_r[value]}"
+   else
+      walk_expr_compiler "${node[right]}"
+      local right="$DATA"
+   fi
 
    declare -g DATA="${left[$right]}"
 }
@@ -426,9 +476,11 @@ function compile_expr_env_var {
 
 
 function compile_expr_identifier {
+   local -- symtab="$SYMTAB"
+
    # Pull identifier's name out of the AST node.
-   local -n node="$NODE"
-   local -- name="${node[value]}"
+   local -n node_r="$NODE"
+   local -- name="${node_r[value]}"
 
    # Look up the AST node referred to by this identifier. Given:
    #
@@ -437,9 +489,16 @@ function compile_expr_identifier {
    #
    # This function would be called on line 2 for the reference to `a`.
    #
+   local -n symtab_r="$SYMTAB"
+   local -n symbol_r="${symtab_r[$name]}"
+   local -- ast_node="${symbol_r[node]}"
+
+   # Descend to new symbol table.
    local -n symtab="$SYMTAB"
    local -n symbol="${symtab[$name]}"
-   local -- ast_node="${symbol[node]}"
+   if [[ "${symbol[symtab]}" ]] ; then
+      declare -g SYMTAB="${symbol[symtab]}"
+   fi
 
    # Resolve the reference in the EXPR_MAP. Given:
    #
@@ -450,26 +509,25 @@ function compile_expr_identifier {
    #
    # Resolves `a` -> SKELLY_1 -> "1".
    #
-   local -n data="${EXPR_MAP[$ast_node]}"
-   echo "  -- name($name) data(${EXPR_MAP[$ast_node]}) -> $data"
-   declare -g DATA="$data"
+   local -n data_r="${EXPR_MAP[$ast_node]}"
+   declare -g DATA="$data_r"
 }
 
 #─────────────────────────────( skeleton to data )──────────────────────────────
 # Folds around the intermediate SKELLY nodes, resulting in the raw data. 
 
 function undead_yoga {
-   local -n src="$1"
+   local -n src_r="$1"
 
-   for key in "${!src[@]}" ; do
-      local skelly="${src[$key]}"
+   local key
+   for key in "${!src_r[@]}" ; do
+      local -- middle="${src_r[$key]}"
+      local -n middle_r="$middle"
 
-      if [[ ${IS_SECTION[$skelly]} ]] ; then
-         undead_yoga "$skelly"
-      else
-         local -n val="$skelly"
-         src[$key]="$val"
-         unset $skelly
+      if [[ ${IS_SECTION[$middle_r]} ]] ; then
+         undead_yoga "$middle_r"
       fi
+
+      src_r[$key]="$middle_r"
    done
 }

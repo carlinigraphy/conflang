@@ -24,6 +24,9 @@ function init_globals {
    # The root NODE_$n of the parent and child AST trees.
    declare -g PARENT_ROOT= CHILD_ROOT=
 
+   # The root of the compiled output.
+   declare -g _SKELLY_ROOT=
+
    # Shouldn't code file names/paths into the generated output. If the user has
    # the same file *data*, but it's in a different place, we shouldn't have to
    # re-compile the output.  An array of files allows us to map a static file

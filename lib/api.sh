@@ -8,7 +8,7 @@
 #  _DATA_$n
 
 function conf {
-   declare -g RV='_SKELLY_1'
+   declare -g RV="$_SKELLY_ROOT"
 
    for arg in "$@" ; do
       local -n d=$RV
