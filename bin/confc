@@ -1,4 +1,5 @@
 #!/bin/bash
+set -eo pipefail
 
 # Current environment's variables. When the user queries an env var (e.g., PATH)
 # we need to make sure it isn't something that's been stomped on by a variable
