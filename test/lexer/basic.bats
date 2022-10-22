@@ -157,8 +157,8 @@ EOF
       f'before{\$HERE}after'
       f"before{\$HERE}after"
 
-      f'{ %internal }'
-      f"{ %internal }"
+      f'{ internal }'
+      f"{ internal }"
 
       f'\{ \' \}'
       f"\{ \" \}"
@@ -183,25 +183,23 @@ EOF
    # fpath.
    declare -A EXP_12=( [type]='PATH'        [value]=''             )
    declare -A EXP_13=( [type]='CONCAT'      [value]=''             )
-   declare -A EXP_14=( [type]='PERCENT'     [value]='%'            )
-   declare -A EXP_15=( [type]='IDENTIFIER'  [value]='internal'     )
-   declare -A EXP_16=( [type]='CONCAT'      [value]=''             )
-   declare -A EXP_17=( [type]='PATH'        [value]=''             )
+   declare -A EXP_14=( [type]='IDENTIFIER'  [value]='internal'     )
+   declare -A EXP_15=( [type]='CONCAT'      [value]=''             )
+   declare -A EXP_16=( [type]='PATH'        [value]=''             )
 
    # fstring.
-   declare -A EXP_18=( [type]='STRING'      [value]=''             )
-   declare -A EXP_19=( [type]='CONCAT'      [value]=''             )
-   declare -A EXP_20=( [type]='PERCENT'     [value]='%'            )
-   declare -A EXP_21=( [type]='IDENTIFIER'  [value]='internal'     )
-   declare -A EXP_22=( [type]='CONCAT'      [value]=''             )
-   declare -A EXP_23=( [type]='STRING'      [value]=''             )
+   declare -A EXP_17=( [type]='STRING'      [value]=''             )
+   declare -A EXP_18=( [type]='CONCAT'      [value]=''             )
+   declare -A EXP_19=( [type]='IDENTIFIER'  [value]='internal'     )
+   declare -A EXP_20=( [type]='CONCAT'      [value]=''             )
+   declare -A EXP_21=( [type]='STRING'      [value]=''             )
 
    # escaped braces
-   declare -A EXP_24=( [type]='PATH'        [value]="{ ' }"        )
-   declare -A EXP_25=( [type]='STRING'      [value]='{ " }'        )
+   declare -A EXP_22=( [type]='PATH'        [value]="{ ' }"        )
+   declare -A EXP_23=( [type]='STRING'      [value]='{ " }'        )
 
    # EOF.
-   declare -A EXP_26=( [type]='EOF'         [value]=''             )
+   declare -A EXP_24=( [type]='EOF'         [value]=''             )
 
    assert [ ${#TOKENS[@]} -gt 0 ]
 
