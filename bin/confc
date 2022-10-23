@@ -93,10 +93,14 @@ source "${LIBDIR}"/semantics.sh
 # shellcheck source=./lib/compiler.sh
 source "${LIBDIR}"/compiler.sh
 
+# shellcheck source=./lib/compiler.sh
+source "${LIBDIR}"/api.sh
+
 init_globals
 argparse "$@"
 do_parse
 do_compile
 
+declare -f conf > "$DATA_OUT"
 [[ ${!_SKELLY_*} ]] && declare -p ${!_SKELLY_*} > "$DATA_OUT"  ||:
 [[ ${!_DATA_*}   ]] && declare -p ${!_DATA_*}   > "$DATA_OUT"  ||:
