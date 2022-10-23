@@ -134,7 +134,25 @@ function mk_typecast {
 }
 
 
+function mk_member {
+   # Only permissible in accessing section keys. Not in array indices.
+
+   (( ++NODE_NUM ))
+   local   --  nname="NODE_${NODE_NUM}"
+   declare -gA $nname
+   declare -g  NODE=$nname
+   local   -n  node=$nname
+
+   node['left']=
+   node['right']=
+
+   TYPEOF[$nname]='member'
+}
+
+
 function mk_index {
+   # Only permissible in accessing array indices. Not in sections.
+
    (( ++NODE_NUM ))
    local   --  nname="NODE_${NODE_NUM}"
    declare -gA $nname
@@ -615,7 +633,7 @@ function p_typedef {
 # everything up by 1bp (+2), so the lowest is lbp=3 rbp=4.
 
 declare -gA prefix_binding_power=(
-   [MINUS]=9
+   [MINUS]=11
 )
 declare -gA NUD=(
    [MINUS]='p_unary'
@@ -633,12 +651,20 @@ declare -gA NUD=(
 declare -gA infix_binding_power=(
    [ARROW]='3'
    [GREATER]=5
-   [CONCAT]=7
+   [CONCAT]=9
 )
 declare -gA LED=(
    [ARROW]='p_typecast'
-   [GREATER]='p_index'
+   [GREATER]='p_member'
    [CONCAT]='p_concat'
+)
+
+
+declare -gA postfix_binding_power=(
+   [L_BRACKET]='7'
+)
+declare -gA RID=(
+   [L_BRACKET]='p_index'
 )
 
 
@@ -664,6 +690,24 @@ function p_expression {
    while :; do
       op_type=${CURRENT[type]}
 
+      #───────────────────────────( postfix )───────────────────────────────────
+      lbp=${postfix_binding_power[$op_type]:-0}
+      (( rbp = (lbp == 0 ? 0 : lbp+1) )) ||:
+
+      if [[ $lbp -ge $min_bp ]] ; then
+         fn="${RID[${CURRENT[type]}]}"
+
+         if [[ ! $fn ]] ; then
+            raise parse_error "not a postfix expression: ${CURRENT[type],,}."
+         fi
+
+         $fn "$lhs" "$rbp"
+         lhs="$NODE"
+
+         continue
+      fi
+
+      #────────────────────────────( infix )────────────────────────────────────
       lbp=${infix_binding_power[$op_type]:-0}
       (( rbp = (lbp == 0 ? 0 : lbp+1) )) ||:
 
@@ -767,15 +811,30 @@ function p_typecast {
 
 
 function p_index {
-   # We can safely ignore $2. It's the operator, passed in from p_expression().
-   # We already know the operator is a GREATER.
-   local lhs="$1"  _=$2  rbp="$3"
-
+   local lhs="$1"  _="$2"
+                     # ^-- don't need the rbp, not calling p_expression()
    mk_index
    local -- save="$NODE"
    local -n index="$NODE"
 
    p_expression "$rbp"
+   index['left']="$lhs"
+   index['right']="$NODE"
+
+   declare -g NODE="$save"
+}
+
+
+function p_member {
+   local lhs="$1"  _=$2  rbp="$3"
+                    # ^-- this is the `>` operator, can ignore.
+   mk_member
+   local -- save="$NODE"
+   local -n index="$NODE"
+
+   p_identifier "$CURRENT_NAME"
+   p_munch 'IDENTIFIER' 'section subscription only possible with identifiers.'
+
    index['left']="$lhs"
    index['right']="$NODE"
 

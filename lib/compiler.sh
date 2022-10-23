@@ -82,8 +82,7 @@ function mk_compile_dict {
    declare -g  SKELLY="$skelly"
 
    # Without a value, this isn't glob matched by a ${!_SKELLY_*}
-   local -n _s="$skelly"
-   _s=()
+   local -n s="$skelly" ; s=()
 }
 
 
@@ -306,13 +305,13 @@ declare -gi DATA_NUM=0
 
 function mk_compile_array {
    (( ++DATA_NUM ))
-   local   --  dname="_DATA_${DATA_NUM}"
-   declare -ga $dname
-   declare -g  DATA=$dname
+   local data="_DATA_${DATA_NUM}"
 
-   # Without a value, this isn't glob matched by a ${!_SKELLY_*}
-   local -n _d="$dname"
-   _d=()
+   declare -ga "$data"
+   declare -g  DATA="$data"
+
+   # Without a value, this isn't glob matched by a ${!_DATA_*}
+   local -n d="$data" ; d=()
 }
 
 

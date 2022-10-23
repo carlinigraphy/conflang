@@ -26,12 +26,12 @@ declare -gA EXIT_STATUS=(
    [symbol_mismatch]=7
    [index_error]=8
    [circular_import]=9
-   [name_error]=10
+   [name_collision]=10
    [missing_file]=11
    [missing_constraint]=12
    [source_failure]=13
    [missing_env_var]=14
-   [missing_int_var]=15
+   [missing_var]=15
    [invalid_interpolation_char]=16
    [unescaped_interpolation_brace]=17
    [munch_error]=18
@@ -49,16 +49,15 @@ function raise {
    if [[ ! $status ]] ; then
       status=255
       type='idiot_programmer'
-      args=( "$type" "${args[@]}" )
+      args=( "no such error $type" )
    fi
 
-   print_"${type}" "$@" 1>&2
+   print_"${type}" "${args[@]}" 1>&2
    exit "$status"
 }
 
 function print_idiot_programmer {
-   local type="$1"
-   printf 'Idiot Programmer Error: no such error [%s]'  "$type"
+   printf 'Idiot Programmer Error: %s'  "$1"
 }
 
 #────────────────────────────( find expr location )─────────────────────────────
@@ -158,11 +157,29 @@ function print_parse_error {
 }
 
 function print_invalid_type_error {
-   printf 'Type Error: %s not defined.\n'  "$1"
+   local -- loc="$1"
+   local -- msg="$2"
+
+   walk_location "$loc"
+   local -n loc_r="$LOC"
+
+   printf 'Type Error: [%s:%s] %s not defined.\n' \
+         "${loc_r[lineno]}" \
+         "${loc_r[colno]}"  \
+         "$1"
 }
 
 function print_not_a_type {
-   printf 'Type Error: %s is not a type.\n'  "$1"
+   local -- loc="$1"
+   local -- msg="$2"
+
+   walk_location "$loc"
+   local -n loc_r="$LOC"
+
+   printf 'Type Error: [%s:%s] %s is not a type.\n' \
+         "${loc_r[lineno]}" \
+         "${loc_r[colno]}"  \
+         "$1"
 }
 
 function print_type_error {
@@ -194,7 +211,7 @@ function print_index_error {
    printf "Index Error: \`%s' not found.\n"  "$1"
 }
 
-function print_name_error {
+function print_name_collision {
    printf "Name Error: \`%s' already defined in this scope.\n"  "$1"
 }
 
@@ -202,8 +219,8 @@ function print_missing_env_var {
    printf "Name Error: env variable \`%s' is not defined.\n"  "$1"
 }
 
-function print_missing_int_var {
-   printf "Name Error: internal variable \`%s' is not defined.\n"  "$1"
+function print_missing_var {
+   printf "Name Error: variable \`%s' is not defined.\n"  "$1"
 }
 
 function print_missing_required {

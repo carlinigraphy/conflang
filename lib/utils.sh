@@ -218,22 +218,20 @@ function do_compile {
    # symbol table. Until they're merged, we want a single point of reference
    # for any globally defined identifiers--currently typedefs. After the symbol
    # tables are merged we can copy the types to the root of the parent symtab.
-   mk_symtab
-   declare -gn GLOBALS="$SYMTAB"
+   symtab new
+   local top_level_symtab="$SYMTAB"
    populate_globals
 
    # Each section assumes there's a symtab above it. There is a "hidden" top-
    # level section `%inline'. Need to create a parent symtab above to hold it.
-   mk_symtab ; parent_symtab=$SYMTAB
+   symtab new ; parent_symtab=$SYMTAB
    walk_symtab "$PARENT_ROOT"
 
    if [[ "$CHILD_ROOT" ]] ; then
-      mk_symtab ; child_symtab=$SYMTAB
+      symtab new ; child_symtab=$SYMTAB
       walk_symtab "$CHILD_ROOT"
 
       # shellcheck disable=SC2128
-      # It thinks the parent_symtab is an array itself, rather than the name of
-      # an array.
       merge_symtab "$PARENT_ROOT"  "$parent_symtab"  "$child_symtab"
    fi
 
@@ -241,18 +239,12 @@ function do_compile {
    declare -g SYMTAB="$parent_symtab"
 
    # Integrate globals at the root of the top-level symbol table.
-   declare -n _symtab="$parent_symtab"
-   for global in "${!GLOBALS[@]}" ; do
-      _symtab[$global]="${GLOBALS[$global]}"
+   declare -n symtab_r="$parent_symtab"
+   declare -n global_r="$top_level_symtab"
+   for key in "${!global_r[@]}" ; do
+      symtab_r[$key]="${global_r[$key]}"
    done
-
-   # Re-point $GLOBALS at the root of the symbol table.
-   declare -gn GLOBALS="${parent_symtab}"
    
-   # Point $INLINE to the implicit %inline table
-   local -n _symbol="${GLOBALS[%inline]}"
-   declare -g INLINE="${_symbol[symtab]}"
-
    walk_semantics "$PARENT_ROOT"
    walk_compiler  "$PARENT_ROOT"
 } 
