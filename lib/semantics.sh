@@ -110,6 +110,7 @@ function _symtab_get {
       _symtab_get "$name"
    fi
 
+   # Return to the original symbol table.
    declare -g SYMTAB="$symtab"
    [[ "$SYMBOL" ]]
 }
@@ -117,11 +118,9 @@ function _symtab_get {
 
 function _symtab_strict {
    local -- name="$1"
-
    local -- symtab="$SYMTAB"
    local -n symtab_r="$symtab"
 
-   declare -g SYMTAB="$symtab"
    declare -g SYMBOL="${symtab_r[$name]}"
    [[ "$SYMBOL" ]]
 }
@@ -131,8 +130,6 @@ function _symtab_set {
    local -- symbol="$1"
    local -n symbol_r="$symbol"
    local -- name="${symbol_r[name]}"
-
-   local -n symtab_r="$SYMTAB"
    symtab_r[$name]="$symbol"
 }
 
@@ -192,70 +189,12 @@ function copy_type {
       copy_type "${t0_r['subtype']}" 
       t1_r['subtype']="$TYPE"
    elif [[ "${t0_r['subtype']+_}" ]] ; then
-      # In the case of complex types, if there is a subtype property, but it has
-      # not been defined.
+      # For complex types with a not-yet-set subtype.
       t1_r['subtype']=''
    fi
 
    declare -g TYPE="$t1"
 }
-
-
-#function create_ffi_symbol {
-#   local -n path="$1"
-#   local -- fn_name="$2"
-#
-#   local file_idx="${path[file]}"
-#   local dir="${FILES[$file_idx]%/*}"
-#
-#   local loc="${dir}/${path[value]}"      # Full path to the .sh file itself
-#   local exe="${loc##*/}"                 # The `basename`, also the prefix of
-#                                          # the -test/directive function names
-#   if [[ ! -d "$loc" ]] ; then
-#      echo "Package [$loc] not found."
-#      exit 1
-#   fi
-#
-#   test_file="${loc}/${exe}"-test.sh
-#   directive_file="${loc}/${exe}"-directive.sh
-#
-#   if [[ -e "$test_file" ]] ; then
-#      #  ┌── ignore non-source file.
-#      # shellcheck disable=SC1090
-#      source "$test_file" || {
-#         raise source_failure  "$test_file"
-#      }
-#      hash_t=$( md5sum "$test_file" )
-#      hash_t="_${hash_t%% *}"
-#   fi
-#
-#   if [[ -e "$directive_file" ]] ; then
-#      #  ┌── ignore non-source file.
-#      # shellcheck disable=SC1090
-#      source "$directive_file" || {
-#         raise source_failure  "$directive_file"
-#      }
-#      hash_d=$( md5sum "$directive_file" )
-#      hash_d="_${hash_t%% *}"
-#   fi
-#
-#   fn=$( declare -f ${exe}-test )
-#   eval "${fn/${exe}_test/$hash_t}"
-#
-#   fn=$( declare -f ${exe}-directive )
-#   eval "${fn/${exe}_directive/$hash_d}"
-#
-#   mk_symbol
-#   local -- symbol_name="$SYMBOL"
-#   local -n symbol="$symbol_name"
-#
-#   extract_type 'fn'
-#   symbol['name']="$fn_name"
-#   symbol['type']="$TYPE"
-#   symbol['test']="$hash_t"
-#   symbol['directive']="$hash_d"
-#   symbol['signature']=
-#}
 
 
 function walk_symtab {
@@ -286,8 +225,6 @@ function symtab_decl_section {
    local -- name="${ident_r[value]}"
    symbol_r['name']="$name"
 
-   # Add reference to current symbol in parent's SYMTAB. First check if the user
-   # has already defined a variable with the same name in this symtab.
    if symtab strict "$name" ; then
       raise name_collision "$name"
    else
