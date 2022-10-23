@@ -7,7 +7,7 @@ function traceback {
 
    printf 'Traceback:\n'
    for (( i=${#FUNCNAME[@]}-1; i>="$depth" ; --i )) ; do
-      printf '%5sln.%4d in %-25s%s\n' \
+      printf '%5sln.%4d in %-28s%s\n' \
          ''                           \
          "${BASH_LINENO[i-1]}"        \
          "${FUNCNAME[i]}"             \
@@ -21,7 +21,7 @@ declare -gA EXIT_STATUS=(
    [syntax_error]=2
    [parse_error]=3
    [type_error]=4
-   [invalid_type_error]=5
+   [undefined_type]=5
    [not_a_type]=6
    [symbol_mismatch]=7
    [index_error]=8
@@ -53,6 +53,8 @@ function raise {
    fi
 
    print_"${type}" "${args[@]}" 1>&2
+   traceback 2
+
    exit "$status"
 }
 
@@ -82,6 +84,12 @@ function location_typedef {
 function location_typecast {
    local -n node="$LOC"
    walk_location "${node[expr]}"
+}
+
+
+function location_array {
+   local -n node="$LOC"
+   walk_location "${node[0]}"
 }
 
 
@@ -156,7 +164,7 @@ function print_parse_error {
    printf 'Parse Error: %s\n'  "$1"
 }
 
-function print_invalid_type_error {
+function print_undefined_type {
    local -- loc="$1"
    local -- msg="$2"
 
@@ -179,7 +187,7 @@ function print_not_a_type {
    printf 'Type Error: [%s:%s] %s is not a type.\n' \
          "${loc_r[lineno]}" \
          "${loc_r[colno]}"  \
-         "$1"
+         "$msg"
 }
 
 function print_type_error {

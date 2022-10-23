@@ -12,7 +12,6 @@ while IFS= read -r -d '' line ; do
    SNAPSHOT["$key"]="$val"
 done < <(env --null)
 
-
 function usage {
 cat <<EOF
 usage: $(basename "${BASH_SOURCE[0]}") [option] FILE

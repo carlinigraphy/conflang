@@ -20,14 +20,14 @@ function mk_metatype {
 
    # Example: _BOOLEAN=_TYPE_12. Useful in the `semantics_$LITERAL` functions
    # as a copy_type() target:  copy_type $_BOOLEAN
-   declare -g "_$kind"="$TYPE"
+   declare -g "_${kind}"="$TYPE"
 
    # Create a type representing Types themselves.
    mk_type
    local -- parent_type="$TYPE"
    local -n parent_type_r="$TYPE"
    parent_type_r['kind']='TYPE'
-   parent_type_r['subtype']="$type_name"
+   parent_type_r['subtype']="$type"
 
    mk_symbol
    local -n symbol_r="$SYMBOL"
@@ -39,7 +39,7 @@ function mk_metatype {
 function populate_globals {
    local -A primitive=(
       [any]='ANY'
-      [fn]='FUNCTION'
+      #[fn]='FUNCTION'
       [int]='INTEGER'
       [str]='STRING'
       [bool]='BOOLEAN'
@@ -48,6 +48,7 @@ function populate_globals {
    )
 
    local -A complex=(
+      [type]='TYPE'
       [array]='ARRAY'
    )
 
@@ -109,6 +110,7 @@ function _symtab_get {
       _symtab_get "$name"
    fi
 
+   declare -g SYMTAB="$symtab"
    [[ "$SYMBOL" ]]
 }
 
@@ -119,6 +121,7 @@ function _symtab_strict {
    local -- symtab="$SYMTAB"
    local -n symtab_r="$symtab"
 
+   declare -g SYMTAB="$symtab"
    declare -g SYMBOL="${symtab_r[$name]}"
    [[ "$SYMBOL" ]]
 }
@@ -257,7 +260,6 @@ function copy_type {
 
 function walk_symtab {
    declare -g NODE="$1"
-   traceback
    symtab_"${TYPEOF[$NODE]}"
 }
 
@@ -377,29 +379,48 @@ function symtab_decl_variable {
 
 
 function symtab_typedef {
-   local -- save=$NODE
-   local -n node=$save
+   local -- node="$NODE"
+   local -n node_r="$node"
 
-   walk_symtab "${node[kind]}"
-   local -- tname=$TYPE
-   local -n type=$TYPE
+   local -n name_r="${node_r[kind]}"
+   local -- name="${name_r[value]}"
+   symtab get "$name"
 
-   if [[ "${node[subtype]}" ]] ; then
+   local -n symbol_r="$SYMBOL"
+   local -- outer_type="${symbol_r[type]}"
+   # Types themselves are defined as such:
+   #> int = Type('TYPE', subtype: Type('INTEGER'))
+   #> str = Type('TYPE', subtype: Type('STRING'))
+
+   if [[ ! "$outer_type" ]] ; then
+      raise undefined_type "${node_r[kind]}"  "$name"
+   fi
+
+   if ! type_equality  "$_TYPE"  "$outer_type" ; then
+      raise not_a_type "${node_r[kind]}" "$name"
+   fi
+
+   local -n outer_type_r="$outer_type"
+   copy_type "${outer_type_r[subtype]}"
+   local -- type="$TYPE"
+   local -n type_r="$type"
+
+   if [[ "${node_r[subtype]}" ]] ; then
       # See ./doc/truth.sh for an explanation on the test below. Tests if the
       # type either has a populated .subtype field, or the field is SET, but
       # empty.
       if [[ ! "${type[subtype]+_}" ]] ; then
-         raise type_error       \
-            "${node[subtype]}"  \
-            "primitive types are not subscriptable."
+         local loc="${node_r[subtype]}"  
+         local msg="primitive types are not subscriptable."
+         raise type_error "$loc" "$msg"
       fi
 
-      walk_symtab "${node[subtype]}"
-      type['subtype']=$TYPE
+      walk_symtab "${node_r[subtype]}"
+      type_r['subtype']=$TYPE
    fi
 
-   declare -g TYPE=$tname
-   declare -g NODE=$save
+   declare -g TYPE="$type"
+   declare -g NODE="$node"
 }
 
 
@@ -683,12 +704,11 @@ function semantics_decl_variable {
       walk_semantics "${node[type]}"
       local target="$TYPE"
    fi
-   
-   # XXX: Still don't like this approach. Need better method.
-   declare -g SYMTAB="$INLINE"
 
-   walk_semantics "${node[expr]}"
-   local actual="$TYPE"
+   if [[ "${node[expr]}" ]] ; then
+      walk_semantics "${node[expr]}"
+      local actual="$TYPE"
+   fi
 
    # Only able to test if the declared type matches the actual type... if an
    # intended type was declared.
@@ -708,16 +728,14 @@ function semantics_typedef {
    local -- name="${name_r[value]}"
    symtab get "$name"
 
-   if [[ ! "$TYPE" ]] ; then
-      raise invalid_type_error "${node_r[kind]}"  "name"
-                                # ^-- location     ^-- msg
-   fi
+   local -n symbol_r="$SYMBOL"
+   local -- outer_type="${symbol_r[type]}"
+   # Types themselves are defined as such:
+   #> int = Type('TYPE', subtype: Type('INTEGER'))
+   #> str = Type('TYPE', subtype: Type('STRING'))
 
-   if ! type_equality  'TYPE'  "$TYPE" ; then
-      raise not_a_type "${node_r[kind]}"  "name"
-                        # ^-- location     ^-- msg
-   fi
-
+   local -n outer_type_r="$outer_type"
+   copy_type "${outer_type_r[subtype]}"
    local -- type="$TYPE"
    local -n type_r="$type"
 
@@ -738,12 +756,13 @@ function semantics_typecast {
 
 
 function semantics_member {
+   local -- symtab="$SYMTAB"
    local -n node_r="$NODE"
 
    walk_semantics "${node_r[left]}"
    local left_t="$TYPE"
 
-   if ! type_equality 'SECTION' "$left_t" ; then
+   if ! type_equality  "$_SECTION"  "$left_t" ; then
       local msg=(
          "indexing with the \`>' operator requires"
          'the left hand side evaluate to a section.'
@@ -751,14 +770,7 @@ function semantics_member {
       raise type_error "${node_r[left]}"  "${msg[@]}"
    fi
 
-   local -n right_r="${node_r[right]}"
-   if ! type_equality 'IDENTIFIER' "${right_r[type]}" ; then
-      local msg=(
-         "indexing with the \`>' operator requires"
-         'the right hand side is an identifier.'
-      )
-      raise type_error "${node_r[left]}"  "${msg[@]}"
-   fi
+   walk_semantics "${node_r[right]}"
 
    declare -g SYMTAB="$symtab"
 }
@@ -766,6 +778,7 @@ function semantics_member {
 
 function semantics_index {
    local -n node="$NODE"
+
 }
 
 
@@ -780,7 +793,7 @@ function semantics_unary {
    local -- type="$TYPE"
 
    if [[ ${node[op]} == 'MINUS' ]] ; then
-      if ! type_equality  'INTEGER'  "$type" ; then
+      if ! type_equality  "$_INTEGER"  "$type" ; then
          raise type_error "${node[right]}" "unary minus only supports integers."
       fi
    else
@@ -798,8 +811,8 @@ function semantics_array {
 
    # Top-level array.
    copy_type "$_ARRAY"
-   local -- array_name=$TYPE
-   local -n array="$array_name"
+   local -- array="$TYPE"
+   local -n array_r="$array"
 
    # If the target type is specific (array:str), the actual type must conform to
    # that.
@@ -809,21 +822,21 @@ function semantics_array {
       local -n type=$TYPE
       local -- kind="${type[kind]}"
 
-      array['subtype']="$TYPE"
+      array_r['subtype']="$TYPE"
       # For now we assume the array will have matching types throughout. If it
       # does, we don't have touch this. If we're wrong, we append each found
       # distinct type to `types_found[]`. If >1, set the subtype to ANY instead.
 
-      types_found[$kind]=true
+      types_found[$kind]='true'
    done
 
    if [[ ${#types_found[@]} -gt 1 ]] ; then
       # User has a mixed-type array. Give `any` type.
       copy_type "$_ANY"
-      array['subtype']="$TYPE"
+      array_r['subtype']="$TYPE"
    fi
 
-   declare -g TYPE="$array_name"
+   declare -g TYPE="$array"
    declare -g NODE="$node"
 }
 
