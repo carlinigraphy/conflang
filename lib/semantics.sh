@@ -37,8 +37,6 @@ function mk_metatype {
 
 
 function populate_globals {
-   local -n symtab="$SYMTAB"
-
    local -A primitive=(
       [any]='ANY'
       [fn]='FUNCTION'
@@ -46,6 +44,7 @@ function populate_globals {
       [str]='STRING'
       [bool]='BOOLEAN'
       [path]='PATH'
+      [section]='SECTION'
    )
 
    local -A complex=(
@@ -53,15 +52,15 @@ function populate_globals {
    )
 
    # Create symbols for primitive types.
-   for short_name in "${!primitive[@]}" ; do
-      mk_metatype "$short_name"  "${primitive[$short_name]}"
-      symtab[$short_name]="$SYMBOL"
+   for name in "${!primitive[@]}" ; do
+      mk_metatype "$name"  "${primitive[$name]}"
+      symtab set "$SYMBOL"
    done
 
    # Create symbols for complex types.
-   for short_name in "${!complex[@]}" ; do
-      mk_metatype "$short_name"  "${complex[$short_name]}"  'complex'
-      symtab[$short_name]="$SYMBOL"
+   for name in "${!complex[@]}" ; do
+      mk_metatype "$name"  "${complex[$name]}"  'complex'
+      symtab set "$SYMBOL"
    done
 }
 
@@ -76,8 +75,11 @@ declare -A SYMTAB_PARENT=()
 # symbol tables an associative array to hold metadata, and a pointer to a second
 # associative array for the actual key:Type pairs.
 
-# Convenience function to more easily call the associated symbol table cmds.
-function symtab { _symtab_"$1"; }
+# Convenience function to more easily call the associated symbol table commands.
+function symtab {
+   local cmd="$1" ; shift
+   _symtab_"$cmd" "$@"
+}
 
 function _symtab_new {
    (( ++SYMTAB_NUM ))
@@ -106,11 +108,24 @@ function _symtab_get {
       declare -g SYMTAB="$parent"
       _symtab_get "$name"
    fi
+
+   [[ "$SYMBOL" ]]
+}
+
+
+function _symtab_strict {
+   local -- name="$1"
+
+   local -- symtab="$SYMTAB"
+   local -n symtab_r="$symtab"
+
+   declare -g SYMBOL="${symtab_r[$name]}"
+   [[ "$SYMBOL" ]]
 }
 
 
 function _symtab_set {
-   local -- symbol="$SYMBOL"
+   local -- symbol="$1"
    local -n symbol_r="$symbol"
    local -- name="${symbol_r[name]}"
 
@@ -129,7 +144,7 @@ function mk_type {
    declare -gA $type
    declare -g  TYPE="$type"
 
-   local t="$type"
+   local -n t="$type"
    t['kind']=         #-> str
    #type['subtype']=  #-> Type
    # .subtype is only present in complex types. It is unset in primitive types,
@@ -222,10 +237,10 @@ function copy_type {
 #   fi
 #
 #   fn=$( declare -f ${exe}-test )
-#   eval "${fn/${exe}-test/$hash_t}"
+#   eval "${fn/${exe}_test/$hash_t}"
 #
 #   fn=$( declare -f ${exe}-directive )
-#   eval "${fn/${exe}-directive/$hash_d}"
+#   eval "${fn/${exe}_directive/$hash_d}"
 #
 #   mk_symbol
 #   local -- symbol_name="$SYMBOL"
@@ -242,74 +257,68 @@ function copy_type {
 
 function walk_symtab {
    declare -g NODE="$1"
+   traceback
    symtab_"${TYPEOF[$NODE]}"
 }
 
 
 function symtab_decl_section {
    # Save references: current SYMTAB & NODE
-   local -- symtab_name=$SYMTAB
-   local -- node_name=$NODE
-   local -n node=$NODE
-   local -n symtab=$SYMTAB
+   local -- node="$NODE"
+   local -n node_r="$NODE"
 
    # Create symbol referring to this section.
    mk_symbol
-   local -- symbol_name=$SYMBOL
-   local -n symbol=$SYMBOL
+   local -- symbol="$SYMBOL"
+   local -n symbol_r="$SYMBOL"
 
    # Save reference to this declaration NODE in the symbol. Needed when merging
    # a child tree into the parent's. Any identifiers that are present in a
    # child's symtab but not a parents are directly appended into the parent's
    # tree. The only way that's possible is with a reference to the node itself.
-   symbol['node']=$node_name
+   symbol_r['node']="$node"
 
    # Get string value of identifier node.
-   local -- identifier_node=${node[name]}
-   local -n identifier=$identifier_node
-   local -- name="${identifier[value]}"
-   symbol['name']="$name"
+   local -- ident="${node_r[name]}"
+   local -n ident_r="$ident"
+   local -- name="${ident_r[value]}"
+   symbol_r['name']="$name"
 
    # Add reference to current symbol in parent's SYMTAB. First check if the user
    # has already defined a variable with the same name in this symtab.
-   if [[ ${symtab[$name]} ]] ; then
+   if symtab strict "$name" ; then
       raise name_collision "$name"
    else
-      symtab[$name]=$symbol_name
+      symtab set "$symbol"
    fi
 
    # Create Type(kind: 'Section') for this node. Used in semantic analysis to
    # validate the config files.
-   mk_type
-   local -- type_name=$TYPE
-   local -n type=$TYPE
-   type[kind]='SECTION'
-   symbol['type']=$type_name
+   copy_type "$_SECTION"
+   symbol_r['type']="$TYPE"
 
    # Create new symtab for children of this section. Populate parent's symtab
    # with a reference to this one.
    symtab new
-   symbol['symtab']=$SYMTAB
+   symbol_r['symtab']="$SYMTAB"
 
-   local -n items="${node[items]}" 
-   for nname in "${items[@]}"; do
-      walk_symtab "$nname"
+   local -n items_r="${node_r[items]}" 
+   for ast_node in "${items_r[@]}"; do
+      walk_symtab "$ast_node"
    done
 
    # Check if this section is `required'. If any of its children are required,
    # it must be present in a child file.
-   local -n child_symtab="${symbol[symtab]}"
-   for c_sym_name in "${child_symtab[@]}" ; do
-      local -n c_sym=$c_sym_name
-      if [[ "${c_sym[required]}" ]] ; then
-         symbol['required']='yes'
+   local -n child_symtab_r="${symbol_r[symtab]}"
+   for sym in "${child_symtab_r[@]}" ; do
+      local -n sym_r="$sym"
+      if [[ "${sym_r[required]}" ]] ; then
+         symbol_r['required']='yes'
          break
       fi
    done
 
-   # Restore saved refs to the parent SYMTAB, and current NODE.
-   declare -g NODE=$node_name
-   declare -g SYMTAB=$symtab_name
+   declare -g NODE="$node"
 }
 
 
@@ -627,7 +636,6 @@ function type_equality {
    fi
 
    if [[ ${t1[subtype]} ]] ; then
-      echo "t1[subtype]=${t1[subtype]}  t2[subtype]=${t2[subtype]}"
       type_equality "${t1[subtype]}" "${t2[subtype]}" 
       return $?
    fi
@@ -824,8 +832,7 @@ function semantics_identifier {
    local -n node_r="$NODE"
    local -- name="${node_r[value]}"
 
-   symtab get "$name"
-   if [[ ! "$SYMBOL" ]] ; then
+   if ! symtab get "$name" ; then
       raise missing_var "$name"
    fi
 
@@ -833,22 +840,7 @@ function semantics_identifier {
    copy_type "${symbol_r[type]}"
 }
 
-
-function semantics_path {
-   copy_type "$_PATH"
-}
-
-
-function semantics_boolean {
-   copy_type "$_BOOLEAN"
-}
-
-
-function semantics_integer {
-   copy_type "$_INTEGER"
-}
-
-
-function semantics_string {
-   copy_type "$_STRING"
-}
+function semantics_path    { copy_type "$_PATH"    ;}
+function semantics_boolean { copy_type "$_BOOLEAN" ;}
+function semantics_integer { copy_type "$_INTEGER" ;}
+function semantics_string  { copy_type "$_STRING"  ;}
