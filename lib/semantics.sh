@@ -130,6 +130,8 @@ function _symtab_set {
    local -- symbol="$1"
    local -n symbol_r="$symbol"
    local -- name="${symbol_r[name]}"
+
+   local -n symtab_r="$SYMTAB"
    symtab_r[$name]="$symbol"
 }
 

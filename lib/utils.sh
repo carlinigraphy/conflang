@@ -14,13 +14,6 @@ function init_globals {
    # Compiled output tree file location. Defaults to stdout.
    declare -g DATA_OUT=/dev/stdout
 
-   # Nameref to the outermost symbol table, holding typedefs, imported
-   # functions, and the implicit `%inline` section.
-   declare -g GLOBALS=
-
-   # Pointer (non-ref) to the %inline symbol table.
-   declare -g INLINE=
-
    # The root NODE_$n of the parent and child AST trees.
    declare -g PARENT_ROOT= CHILD_ROOT=
 
@@ -49,19 +42,18 @@ function init_globals {
 function add_file {
    # Serves to both ensure we don't have circular imports, as well as resolving
    # relative paths to their fully qualified path.
-   local -- file=$1
+   local file="$1"
 
    # The full, absolute path to the file.
-   local -- fq_path 
-   local -- parent
+   local fq_path 
+   local parent
 
-   # The 1st call of `add_file()` will have an empty FILES[] array.
-   if [[ "${#FILES[@]}" -gt 0 ]] ; then
-      parent="${FILES[-1]%/*}"
-   else
+   if [[ "${#FILES[@]}" -eq 0 ]] ; then
       # If there's nothing in FILES[], it's our first run. Any path that's
       # relative is inherently relative to our current working directory.
-      parent='.'
+      parent="$PWD"
+   else
+      parent="${FILES[-1]%/*}"
    fi
 
    case "$file" in
@@ -90,8 +82,8 @@ function add_file {
 function merge_includes {
    # Parse all `%include` files.
    for (( idx=0; idx<${#INCLUDES[@]}; ++idx )) ; do
-      local -n node=${INCLUDES[idx]}
-      insert_node_path="${node[path]}"
+      local -n node_r=${INCLUDES[idx]}
+      insert_node_path="${node_r[path]}"
 
       add_file "$insert_node_path"
       _parse
@@ -99,33 +91,32 @@ function merge_includes {
       # Construct array (backwards) of the $ROOT nodes for each %include
       # statement.  Allows us to iter the INCLUDES backwards, and match $idx to
       # its corresponding root here.
-      INCLUDE_ROOT=( "$ROOT" "${INCLUDE_ROOT[@]}" )
+      INCLUDE_ROOT=( "$ROOT"  "${INCLUDE_ROOT[@]}" )
    done
 
    # Iterates bottom-to-top over the %include statements. Appends the items
    # from the included section into the target section.
-   local -i len=${#INCLUDES[@]}
+   local -i len="${#INCLUDES[@]}"
    for (( idx=(len - 1); idx >= 0; idx-- )) ; do
-      local -- include_name=${INCLUDES[idx]}
-      local -n include_node=${include_name}
+      local -- include="${INCLUDES[$idx]}"
+      local -n include_r="$include"
       # e.g., INCLUDE_1(path: './colors.conf', target: NODE_2)
 
-      local -n target_node=${include_node[target]}
-      local -n target_items=${target_node[items]}
+      local -n target_r=${include_r['target']}
+      local -n target_items_r=${target_r['items']}
       # e.g., NODE_2(items: NODE_3, name: NODE_1)
       #       target_items = NODE_3[]
 
-      local -- root_name=${INCLUDE_ROOT[idx]}
-      local -n root_node=${root_name}
-      local -n root_items=${root_node[items]}
+      local -n root_r="${INCLUDE_ROOT[$idx]}"
+      local -n root_items_r="${root_r['items']}"
       # e.g., INCLUDE_ROOT[idx] = NODE_16
       #       NODE_16(items: NODE_17, name: NODE_15)
       #       root_items = NODE_17[]
 
       # For each node in the sub-file, append it to the targetted node's
       # .items[].
-      for n in "${root_items[@]}" ; do
-         target_items+=( "$n" )
+      for n in "${root_items_r[@]}" ; do
+         target_items_r+=( "$n" )
       done
    done
 }
@@ -194,6 +185,8 @@ function do_parse {
    # Parse the top-level `base' file.
    add_file "$INPUT"
 
+   # TODO: I've always thought it was stupid that `do_parse` calls `_parse`
+   # which calls `parse`.
    _parse
    declare -g PARENT_ROOT=$ROOT
    merge_includes
