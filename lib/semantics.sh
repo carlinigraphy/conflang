@@ -210,6 +210,10 @@ function symtab_decl_section {
    local -- node="$NODE"
    local -n node_r="$NODE"
 
+   # Save reference to the symbol table at the current scope. Needed in the
+   # linear compilation phase.
+   node_r['symtab']="$SYMTAB"
+
    # Create symbol referring to this section.
    mk_symbol
    local -- symbol="$SYMBOL"
@@ -238,10 +242,8 @@ function symtab_decl_section {
    copy_type "$_SECTION"
    symbol_r['type']="$TYPE"
 
-   # Create new symtab for children of this section. Populate parent's symtab
-   # with a reference to this one.
+   local symtab="$SYMTAB"
    symtab new
-   symbol_r['symtab']="$SYMTAB"
 
    local -n items_r="${node_r[items]}"
    for ast_node in "${items_r[@]}"; do
@@ -253,12 +255,14 @@ function symtab_decl_section {
    local -n child_symtab_r="${symbol_r[symtab]}"
    for sym in "${child_symtab_r[@]}" ; do
       local -n sym_r="$sym"
+
       if [[ "${sym_r[required]}" ]] ; then
          symbol_r['required']='yes'
          break
       fi
    done
 
+   declare -g SYMTAB="$symtab"
    declare -g NODE="$node"
 }
 
@@ -267,6 +271,10 @@ function symtab_decl_variable {
    # Save references: current SYMTAB & NODE
    local -- node="$NODE"
    local -n node_r="$node"
+
+   # Save reference to the symbol table at the current scope. Needed in the
+   # linear compilation phase.
+   node_r['symtab']="$SYMTAB"
 
    # Create symbol referring to this section.
    mk_symbol
@@ -359,9 +367,13 @@ function symtab_typedef {
 
 
 function symtab_identifier {
-   # Identifiers in this context are only used in typecasts.
-   local -n node=$NODE
-   local -- value="${node[value]}"
+   local -n node_r=$NODE
+
+   # Save reference to the symbol table at the current scope. Needed in the
+   # linear compilation phase.
+   node_r['symtab']="$SYMTAB"
+
+   local value="${node_r[value]}"
    copy_type "$NODE"  "$value"
 }
 
