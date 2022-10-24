@@ -101,6 +101,6 @@ argparse "$@"
 do_parse
 do_compile
 
-declare -f conf > "$DATA_OUT"
+#declare -f conf > "$DATA_OUT"
 [[ ${!_SKELLY_*} ]] && declare -p ${!_SKELLY_*} > "$DATA_OUT"  ||:
 [[ ${!_DATA_*}   ]] && declare -p ${!_DATA_*}   > "$DATA_OUT"  ||:
