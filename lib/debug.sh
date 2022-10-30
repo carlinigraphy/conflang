@@ -245,10 +245,6 @@ function pprint_int_var {
    local -n symtab="${inline[symtab]}"
 
    local symbol_name="${symtab[$var]}"
-   if [[ ! "$symbol_name" ]] ; then
-      raise missing_int_var "$var"
-   fi
-
    local -n symbol="$symbol_name"
    local -- nname="${symbol[node]}"
    local -n node="$nname"
