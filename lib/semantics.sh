@@ -136,6 +136,12 @@ function _symtab_set {
 }
 
 
+function _symtab_descend {
+   local -n node_r="$1"
+   declare -g SYMTAB="${node_r[symtab]}"
+}
+
+
 declare -- TYPE=
 declare -i TYPE_NUM=${TYPE_NUM:-0}
 
@@ -210,10 +216,6 @@ function symtab_decl_section {
    local -- node="$NODE"
    local -n node_r="$NODE"
 
-   # Save reference to the symbol table at the current scope. Needed in the
-   # linear compilation phase.
-   node_r['symtab']="$SYMTAB"
-
    # Create symbol referring to this section.
    mk_symbol
    local -- symbol="$SYMBOL"
@@ -245,6 +247,10 @@ function symtab_decl_section {
    local symtab="$SYMTAB"
    symtab new
 
+   # Save reference to the symbol table at the current scope. Needed in the
+   # linear compilation phase.
+   node_r['symtab']="$SYMTAB"
+
    local -n items_r="${node_r[items]}"
    for ast_node in "${items_r[@]}"; do
       walk_symtab "$ast_node"
@@ -252,8 +258,8 @@ function symtab_decl_section {
 
    # Check if this section is `required'. If any of its children are required,
    # it too must be present in a child file.
-   local -n child_symtab_r="${symbol_r[symtab]}"
-   for sym in "${child_symtab_r[@]}" ; do
+   local -n section_symtab_r="$symtab"
+   for sym in "${section_symtab_r[@]}" ; do
       local -n sym_r="$sym"
 
       if [[ "${sym_r[required]}" ]] ; then

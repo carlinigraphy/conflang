@@ -3,15 +3,17 @@
 #trap 'traceback 2' ERR EXIT
 function traceback {
    local -i depth="$1"
-   (( depth = (depth < 1 ? 1 : depth) ))
+   local -i len=${#FUNCNAME[@]}-1
+
+   (( depth = (depth < 1) ? 1 : depth ))
 
    printf 'Traceback:\n'
-   for (( i=${#FUNCNAME[@]}-1; i>="$depth" ; --i )) ; do
-      printf '%5sln.%4d in %-28s%s\n' \
-         ''                           \
-         "${BASH_LINENO[i-1]}"        \
-         "${FUNCNAME[i]}"             \
-         "${BASH_SOURCE[i]##*/}"
+   for (( i=len; i>=depth; --i )) ; do
+      printf '%5sln.%4d in %-28s%s\n'  \
+         ''                            \
+         "${BASH_LINENO[$i-1]}"        \
+         "${FUNCNAME[$i]}"             \
+         "${BASH_SOURCE[$i]##*/}"
    done
 }
 

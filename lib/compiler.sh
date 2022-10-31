@@ -105,16 +105,10 @@ function walk_ref_compiler {
 
 
 function compile_ref_decl_section {
-   # TODO:
-   # In this function I'm trying out the idea of consistent variable suffixes
-   # to identify namerefs, as in https://github.com/hre-utils/conflang/issues/6.
-   # Think I'll keep it. Don't know yet. Need to see if it's something that I
-   # real intuitively.
-
-   # Save reference to current NODE. Restored at the end.
+   local -- symtab="$SYMTAB"
    local -- node="$NODE"
    local -n node_r="$node"
-   #
+
    # Add mapping from _NODE_$n -> _SKELLY_$n. Need one level of indirection to
    # be able to refer to this node.
    #
@@ -144,93 +138,91 @@ function compile_ref_decl_section {
    EXPR_MAP[$node]="$middle_skelly"
    IS_SECTION[$dict_skelly]='yes'
 
+   symtab descend "$node"
+
    local -n items_r="${node_r[items]}" 
    for var_decl in "${items_r[@]}"; do
       local -n var_decl_r="$var_decl"
       local -n name_r="${var_decl_r[name]}"
       local -- name="${name_r[value]}"
 
-      # Variable declarations will create a placeholder skelly, whilst sections
-      # will generate an associate array with sub-skellies.
       walk_ref_compiler "$var_decl"
       dict_skelly_r[$name]="$SKELLY"
    done
 
    declare -g SKELLY="$middle_skelly"
    declare -g NODE="$node"
+   declare -g SYMTAB="$symtab"
 }
 
 
 function compile_ref_decl_variable {
-   local -- save="$NODE"
-   local -n node="$save"
+   local -- node="$NODE"
+   local -n node_r="$node"
 
    # Create skeleton node to be inserted into the parent section, and add
    # mapping from the AST node to the output skeleton node.
    mk_skelly
-   EXPR_MAP["$save"]="$SKELLY"
+   EXPR_MAP["$node"]="$SKELLY"
 
    # Create global "${SKELLY}_DEPS" array holding all the dependencies we run
    # into downstream.
-   mk_dependency "$save"
+   mk_dependency "$node"
 
-   # TODO: Need to think this through a little more. Don't know if I love the
-   # concept of having a "global" scope that's distinct from the `%inline`
-   # scope.
-   declare -g SYMTAB="$INLINE"
-   if [[ -n ${node[expr]} ]] ; then
-      walk_ref_compiler "${node[expr]}"
+   if [[ -n ${node_r[expr]} ]] ; then
+      walk_ref_compiler "${node_r[expr]}"
    fi
 
-   declare -g NODE="$save"
+   declare -g NODE="$node"
 }
 
 
 function compile_ref_typecast {
-   local -n node="$NODE"
-   walk_ref_compiler "${node[expr]}" 
+   local -n node_r="$NODE"
+   walk_ref_compiler "${node_r[expr]}" 
+}
+
+
+function compile_ref_member {
+   local -n node_r=$NODE
+   walk_ref_compiler "${node_r[left]}"
+   walk_ref_compiler "${node_r[right]}"
 }
 
 
 function compile_ref_index {
-   local -n node=$NODE
-   walk_ref_compiler "${node[left]}"
-   walk_ref_compiler "${node[right]}"
+   local -n node_r=$NODE
+   walk_ref_compiler "${node_r[left]}"
+   walk_ref_compiler "${node_r[right]}"
 }
 
 
 function compile_ref_unary {
-   local -n node=$NODE
-   walk_ref_compiler "${node[right]}"
+   local -n node_r=$NODE
+   walk_ref_compiler "${node_r[right]}"
 }
 
 
 function compile_ref_array {
-   local -n node=$NODE
-   for ast_node in "${node[@]}"; do
+   local -n node_r=$NODE
+   for ast_node in "${node_r[@]}"; do
       walk_ref_compiler "$ast_node"
    done
 }
 
 
 function compile_ref_identifier {
-   local -- symtab="$SYMTAB"
-   local -- save="$NODE"
+   local -n dep="$DEPENDENCY"
 
    # Get identifier name.
-   local -n node="$NODE"
-   local -- name="${node[value]}"
+   local -n node_r="$NODE"
+   local -- name="${node_r[value]}"
 
-   # Descend to new symbol table.
-   local -n symtab="$SYMTAB"
-   local -n symbol="${symtab[$name]}"
-   if [[ "${symbol[symtab]}" ]] ; then
-      declare -g SYMTAB="${symbol[symtab]}"
-   fi
+   symtab get "$name"
+   local -n symbol_r="$SYMBOL"
 
    # Add self as dependency.
-   local -n dep="$DEPENDENCY"
-   dep+=( "${symbol[node]}" )
+   dep+=( "${symbol_r[node]}" )
 }
 
 
@@ -243,7 +235,6 @@ function compile_ref_env_var { :; }
 
 #────────────────────────────( order dependencies )─────────────────────────────
 declare -gi DEPTH=0
-
 
 function dependency_to_map {
    for dep_node in "${UNORDERED_DEPS[@]}" ; do
