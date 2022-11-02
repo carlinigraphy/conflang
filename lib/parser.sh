@@ -812,15 +812,17 @@ function p_typecast {
 
 function p_index {
    local lhs="$1"  _="$2"
-                     # ^-- don't need the rbp, not calling p_expression()
+   p_advance # past L_BRACKET.
+
    mk_index
    local -- save="$NODE"
    local -n index="$NODE"
 
-   p_expression "$rbp"
+   p_expression
    index['left']="$lhs"
    index['right']="$NODE"
 
+   p_munch 'R_BRACKET' "array must be closed by \`]'."
    declare -g NODE="$save"
 }
 
