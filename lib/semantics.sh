@@ -136,7 +136,7 @@ function _symtab_set {
 }
 
 
-function _symtab_descend {
+function _symtab_from {
    local -n node_r="$1"
    declare -g SYMTAB="${node_r[symtab]}"
 }
@@ -315,9 +315,13 @@ function symtab_decl_variable {
       symbol_r['type']="$TYPE"
    fi
 
-   # Variables are `required' when they do not contain an expression. A child
-   # must fill in the value.
-   if [[ ! ${node_r['expr']} ]] ; then
+   if [[ ${node_r['expr']} ]] ; then
+      # Still must descend into expression, as to make references to the symtab
+      # in identifier nodes.
+      walk_symtab "${node_r['expr']}"
+   else
+      # Variables are `required' when they do not contain an expression. A
+      # child must fill in the value.
       symbol_r[required]='yes'
    fi
 
@@ -372,6 +376,34 @@ function symtab_typedef {
 }
 
 
+function symtab_member {
+   local -n node_r=$NODE
+   walk_symtab "${node_r[left]}"
+   walk_symtab "${node_r[right]}"
+}
+
+
+function symtab_index {
+   local -n node_r=$NODE
+   walk_symtab "${node_r[left]}"
+   walk_symtab "${node_r[right]}"
+}
+
+
+function symtab_unary {
+   local -n node_r=$NODE
+   walk_symtab "${node_r[right]}"
+}
+
+
+function symtab_array {
+   local -n node_r=$NODE
+   for ast_node in "${node_r[@]}"; do
+      walk_symtab "$ast_node"
+   done
+}
+
+
 function symtab_identifier {
    local -n node_r=$NODE
 
@@ -382,6 +414,12 @@ function symtab_identifier {
    local value="${node_r[value]}"
    copy_type "$NODE"  "$value"
 }
+
+function symtab_boolean { :; }
+function symtab_integer { :; }
+function symtab_string  { :; }
+function symtab_path    { :; }
+function symtab_env_var { :; }
 
 #───────────────────────────────( merge trees )─────────────────────────────────
 # After generating the symbol tables for the parent & child, iterate over the

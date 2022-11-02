@@ -18,8 +18,9 @@ function walk_compiler {
    dependency_sort
 
    for ast_node in "${ORDERED_DEPS[@]}" ; do
-      local dst="${EXPR_MAP[$ast_node]}"
-      _walk_expr_compiler  "$ast_node"  "$dst"
+      local -n dst="${EXPR_MAP[$ast_node]}"
+      walk_expr_compiler "$ast_node"
+      dst="$DATA"
    done
 
    # Clean up the generated output. The nodes _SKELLY_{1,2} are uselessly
@@ -138,7 +139,7 @@ function compile_ref_decl_section {
    EXPR_MAP[$node]="$middle_skelly"
    IS_SECTION[$dict_skelly]='yes'
 
-   symtab descend "$node"
+   symtab from "$node"
 
    local -n items_r="${node_r[items]}" 
    for var_decl in "${items_r[@]}"; do
@@ -240,7 +241,7 @@ function dependency_to_map {
    for dep_node in "${UNORDERED_DEPS[@]}" ; do
       dependency_depth "$dep_node"
 
-      local -- ast_node="${dep_node/DEP_/}"
+      local ast_node="${dep_node/DEP_/}"
       DEPS_MAP[$ast_node]="$DEPTH"
    done
 }
@@ -301,25 +302,9 @@ function mk_compile_array {
    declare -ga "$data"
    declare -g  DATA="$data"
 
-   # Without a value, this isn't glob matched by a ${!_DATA_*}
+   # Without a value, this isn't glob matched by a ${!_DATA_*}. Necessary for
+   # dumping to $DATA_OUT.
    local -n d="$data" ; d=()
-}
-
-
-# This is the function that's actually called to initiate the expression
-# evaluation. To simplify things, all compilation steps are wrapped by the
-# `walk_compiler` function.
-function _walk_expr_compiler {
-   local -- src="$1"
-   local -n dst="$2"
-
-   # XXX: Gotta come up with a better way of doing this. Currently need to
-   #      reset the symbol table between each time we're calling this phase of
-   #      the compiler, as indices leaves us in an inner scope.
-   declare -g SYMTAB="$INLINE"
-
-   walk_expr_compiler "$src"
-   dst="$DATA"
 }
 
 
@@ -479,25 +464,19 @@ function compile_expr_identifier {
    #
    # This function would be called on line 2 for the reference to `a`.
    #
-   local -n symtab_r="$SYMTAB"
-   local -n symbol_r="${symtab_r[$name]}"
+   symtab from "$NODE"
+   symtab get "$name"
+   local -n symbol_r="$SYMBOL"
    local -- ast_node="${symbol_r[node]}"
-
-   # Descend to new symbol table.
-   local -n symtab="$SYMTAB"
-   local -n symbol="${symtab[$name]}"
-   if [[ "${symbol[symtab]}" ]] ; then
-      declare -g SYMTAB="${symbol[symtab]}"
-   fi
 
    # Resolve the reference in the EXPR_MAP. Given:
    #
    #> EXPR_MAP=(
-   #>    [NODE_1]="SKELLY_1"
+   #>    [NODE_1]="DATA_1"
    #> )
-   #> SKELLY_1="1"
+   #> DATA_1="1"
    #
-   # Resolves `a` -> SKELLY_1 -> "1".
+   # Resolves `a` -> DATA_1 -> "1".
    #
    local -n data_r="${EXPR_MAP[$ast_node]}"
    declare -g DATA="$data_r"
