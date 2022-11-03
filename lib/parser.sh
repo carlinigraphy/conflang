@@ -650,12 +650,12 @@ declare -gA NUD=(
 
 declare -gA infix_binding_power=(
    [ARROW]='3'
-   [GREATER]=5
+   [DOT]=5
    [CONCAT]=9
 )
 declare -gA LED=(
    [ARROW]='p_typecast'
-   [GREATER]='p_member'
+   [DOT]='p_member'
    [CONCAT]='p_concat'
 )
 

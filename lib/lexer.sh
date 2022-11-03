@@ -131,7 +131,6 @@ function scan {
          ':')  Token      'COLON' "$CURRENT"  ; continue ;;
          '$')  Token     'DOLLAR' "$CURRENT"  ; continue ;;
          '%')  Token    'PERCENT' "$CURRENT"  ; continue ;;
-         '>')  Token    'GREATER' "$CURRENT"  ; continue ;;
          '?')  Token   'QUESTION' "$CURRENT"  ; continue ;;
 
          '(')  Token    'L_PAREN' "$CURRENT"  ; continue ;;

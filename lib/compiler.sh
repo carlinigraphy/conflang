@@ -106,7 +106,6 @@ function walk_ref_compiler {
 
 
 function compile_ref_decl_section {
-   local -- symtab="$SYMTAB"
    local -- node="$NODE"
    local -n node_r="$node"
 
@@ -139,6 +138,10 @@ function compile_ref_decl_section {
    EXPR_MAP[$node]="$middle_skelly"
    IS_SECTION[$dict_skelly]='yes'
 
+   # Save current symtab
+   local symtab="$SYMTAB"
+
+   # Load new one from $NODE.
    symtab from "$node"
 
    local -n items_r="${node_r[items]}" 
@@ -346,28 +349,35 @@ function compile_expr_typecast {
 }
 
 
+function compile_expr_member {
+   # A 'member' is a combination of...
+   #    .left   section
+   #    .right  identifier
+   local -n node_r="$NODE"
+
+   walk_expr_compiler "${node_r[left]}" 
+   local -n left_r="$DATA"
+
+   local -n right_r="${node_r[right]}"
+   local -- name="${right_r[value]}"
+
+   declare -g DATA="${left_r[$name]}"
+}
+
+
 function compile_expr_index {
    # An 'index' is a combination of...
-   #    .left   subscriptable expression (section, array)
-   #    .right  index expression (identifier, integer)
-   local -n node="$NODE"
+   #    .left   array
+   #    .right  integer
+   local -n node_r="$NODE"
 
-   walk_expr_compiler "${node[left]}" 
-   local -n left="$DATA"
+   walk_expr_compiler "${node_r[left]}" 
+   local -n left_r="$DATA"
 
-   # XXX: This is some idiot shit. Right now this might be the most hacky and
-   #      messy element of the entire project. Need to come up with a different
-   #      form of array subscription that doesn't lead to such awful edge cases
-   #      when parsing.
-   if [[ "${TYPEOF[${node[right]}]}" == 'identifier' ]] ; then
-      local -n right_node_r="${node[right]}"
-      local right="${right_node_r[value]}"
-   else
-      walk_expr_compiler "${node[right]}"
-      local right="$DATA"
-   fi
+   local -n right_r="${node_r[right]}"
+   local -- integer="${right_r[value]}"
 
-   declare -g DATA="${left[$right]}"
+   declare -g DATA="${left_r[$integer]}"
 }
 
 
@@ -451,11 +461,11 @@ function compile_expr_env_var {
 
 
 function compile_expr_identifier {
-   local -- symtab="$SYMTAB"
-
    # Pull identifier's name out of the AST node.
    local -n node_r="$NODE"
    local -- name="${node_r[value]}"
+
+   echo "COMPILING: $name"
 
    # Look up the AST node referred to by this identifier. Given:
    #
