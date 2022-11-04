@@ -89,6 +89,11 @@ function location_typecast {
 }
 
 
+function location_index {
+   local -n node="$LOC"
+   walk_location "${node[left]}"
+}
+
 function location_array {
    local -n node="$LOC"
    walk_location "${node[0]}"

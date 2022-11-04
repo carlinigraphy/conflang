@@ -767,6 +767,9 @@ function semantics_index {
    local -n node_r="$NODE"
 
    walk_semantics "${node_r[left]}"
+   local -n lhs_r="$NODE"
+
+   declare -p NODE $NODE
 
    #  ┌── doesn't know about dynamically created $_ARRAY var.
    # shellcheck disable=SC2154
@@ -778,9 +781,7 @@ function semantics_index {
    fi
 
    walk_semantics "${node_r[right]}"
-
-   local -n right_r="${node_r[right]}"
-   local -- index="${right_r[value]}"
+   local -n rhs_r="$NODE"
 
    #  ┌── doesn't know about dynamically created $_INTEGER var.
    # shellcheck disable=SC2154
@@ -790,16 +791,15 @@ function semantics_index {
       raise type_error  "$loc"  "$msg"
    fi
 
-   # TODO: This doesn't allow for more than a single nested array index.
-   # Something like `[[1, 2, 3]][0][1]` would not be supported. I believe we can
-   # solve this by defining a global variable just above this function (since
-   # it won't be used anywhere else) to keep track of the NODE_$n the lhs
-   # evaluates to. Similar to how we use the global symbol table pointer in
-   # the `semantics_member` function.
-   local -n items_r="${node_r[items]}"
-   if [[ ! "${items_r[$index]}" ]] ; then
+   local -- index="${rhs_r[value]}"
+   local -- rv="${lhs_r[$index]}"
+
+   if [[ ! "$rv" ]] ; then
       raise index_error "$index"
    fi
+
+   walk_semantics "$rv"
+   declare -g NODE="$rv"
 }
 
 
@@ -829,6 +829,9 @@ function semantics_unary {
 }
 
 
+# TODO: This definitely need fixing. Doesn't work for typechecking nested
+# arrays. Arrays of mixed types is good. Arrays of arrays of mixed types is not.
+#
 function semantics_array {
    local -- node="$NODE"
    local -n node_r="$node"
@@ -836,7 +839,7 @@ function semantics_array {
    # shellcheck disable=SC2154
    copy_type "$_ARRAY"
    local -- array_t="$TYPE"
-   local -n array_r="$array"
+   local -n array_r="$array_t"
 
    # If the target type is specific (array:str), the actual type must conform to
    # that.
@@ -877,6 +880,11 @@ function semantics_identifier {
 
    local -n symbol_r="$SYMBOL"
    copy_type "${symbol_r[type]}"
+
+   # Need to set the $NODE to "return" the expression referenced by this
+   # variable.
+   local -n ref_node_r="${symbol_r[node]}"
+   declare -g NODE="${ref_node_r[expr]}"
 }
 
 

@@ -465,8 +465,6 @@ function compile_expr_identifier {
    local -n node_r="$NODE"
    local -- name="${node_r[value]}"
 
-   echo "COMPILING: $name"
-
    # Look up the AST node referred to by this identifier. Given:
    #
    #> a: 1;
