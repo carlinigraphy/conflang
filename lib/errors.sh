@@ -94,6 +94,13 @@ function location_index {
    walk_location "${node[left]}"
 }
 
+
+function location_member {
+   local -n node="$LOC"
+   walk_location "${node[left]}"
+}
+
+
 function location_array {
    local -n node="$LOC"
    walk_location "${node[0]}"
