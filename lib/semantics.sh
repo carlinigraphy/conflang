@@ -1,6 +1,5 @@
 #!/bin/bash
 
-
 function mk_metatype {
    local name="$1"
    local kind="$2"
@@ -8,31 +7,31 @@ function mk_metatype {
 
    mk_type
    local -- type="$TYPE"
-   local -n type_r="$type"
+   local -n type_r="$TYPE"
    type_r['kind']="$kind"
 
+   # The presence of a set `.subtype` property defines a "complex" type.
    if [[ "$complex" ]] ; then
       type_r['subtype']=''
-      # This is what makes it a `complex' type. If the type.subtype is
-      # *UNSET* (note, not "set but empty"--unset), then it may not have a
-      # subtype.
    fi
 
-   # Example: _BOOLEAN=_TYPE_12. Useful in the `semantics_$LITERAL` functions
-   # as a copy_type() target:  copy_type $_BOOLEAN
+   # Example: _BOOLEAN=_TYPE_12. Useful in the `semantics_*` functions as a
+   # copy_type() target, e.g.,  `copy_type $_BOOLEAN`.
    declare -g "_${kind}"="$TYPE"
 
-   # Create a type representing Types themselves.
+   # Create Type representing Types.
    mk_type
-   local -- parent_type="$TYPE"
-   local -n parent_type_r="$TYPE"
-   parent_type_r['kind']='TYPE'
-   parent_type_r['subtype']="$type"
+   local -- metatype="$TYPE"
+   local -n metatype_r="$TYPE"
+   metatype_r['kind']='TYPE'
+   metatype_r['subtype']="$type"
 
    mk_symbol
    local -n symbol_r="$SYMBOL"
-   symbol_r['type']="$parent_type"
+   symbol_r['type']="$metatype"
    symbol_r['name']="$name"
+
+   declare -g TYPE="$metatype"
 }
 
 
@@ -67,21 +66,27 @@ function populate_globals {
 
 
 #───────────────────────────────( symbol table )────────────────────────────────
-# Dict(s) of name -> Type mappings... and other information.
 declare -- SYMTAB=
 declare -i SYMTAB_NUM=0
 
 declare -A SYMTAB_PARENT=()
-# Points to each symbol table's parent symtab. Saves us from needing to make the
-# symbol tables an associative array to hold metadata, and a pointer to a second
-# associative array for the actual key:Type pairs.
+# Rather than the traditional stack of symbol tables that we push & pop from,
+# a map of each symtab to its parent is easier to implement in Bash. Less
+# nonsense.
 
-# Convenience function to more easily call the associated symbol table commands.
+# Symbol table API. Directly calls sub-commands:
+#  new()       :: creates new symtab, assigns previous one as its parent.
+#  get(key)    :: recursively searches upward for Symbol identified by $key.
+#  strict(key) :: searches only current symtab for Symbol identified by $key.
+#  set(symbol) :: sets ${symbol[name]} -> $symbol in current symtab
+#  from(node)  :: sets global $SYMTAB pointer to that referenced in $node
+#
 function symtab {
    local cmd="$1" ; shift
    _symtab_"$cmd" "$@"
 }
 
+# new()  :: creates new symtab, assigns previous one as its parent.
 function _symtab_new {
    (( ++SYMTAB_NUM ))
    local symtab="SYMTAB_${SYMTAB_NUM}"
@@ -96,6 +101,7 @@ function _symtab_new {
 }
 
 
+# get(key)  :: recursively searches upward for Symbol identified by $key.
 function _symtab_get {
    local name="$1"
 
@@ -116,6 +122,7 @@ function _symtab_get {
 }
 
 
+# strict(key)  :: searches only current symtab for Symbol identified by $key.
 function _symtab_strict {
    local -- name="$1"
    local -- symtab="$SYMTAB"
@@ -126,6 +133,7 @@ function _symtab_strict {
 }
 
 
+# set(symbol)  :: sets ${symbol[name]} -> $symbol in current symtab
 function _symtab_set {
    local -- symbol="$1"
    local -n symbol_r="$symbol"
@@ -136,27 +144,10 @@ function _symtab_set {
 }
 
 
+# from(node)  :: sets global $SYMTAB pointer to that referenced in $node
 function _symtab_from {
    local -n node_r="$1"
    declare -g SYMTAB="${node_r[symtab]}"
-}
-
-
-declare -- TYPE=
-declare -i TYPE_NUM=${TYPE_NUM:-0}
-
-function mk_type {
-   (( ++TYPE_NUM ))
-
-   local type="TYPE_${TYPE_NUM}"
-   declare -gA $type
-   declare -g  TYPE="$type"
-
-   local -n t="$type"
-   t['kind']=         #-> str
-   #type['subtype']=  #-> Type
-   # .subtype is only present in complex types. It is unset in primitive types,
-   # which allows for throwing errors in semantic analysis for invalid subtypes.
 }
 
 
@@ -182,6 +173,24 @@ function mk_symbol {
    # Variable declaration symbols are `required' if its NODE has no expression.
    # A Section is considered to be `required' if *any* of its children are
    # required. This is only needed when enforcing constraints upon a child file.
+}
+
+
+declare -- TYPE=
+declare -i TYPE_NUM=${TYPE_NUM:-0}
+
+function mk_type {
+   (( ++TYPE_NUM ))
+
+   local type="TYPE_${TYPE_NUM}"
+   declare -gA $type
+   declare -g  TYPE="$type"
+
+   local -n t="$type"
+   t['kind']=         #-> str
+   #type['subtype']=  #-> Type
+   # .subtype is only present in complex types. It is unset in primitive types,
+   # which allows for throwing errors in semantic analysis for invalid subtypes.
 }
 
 
@@ -212,22 +221,16 @@ function walk_symtab {
 
 
 function symtab_decl_section {
-   # Save references: current SYMTAB & NODE
-   local -- node="$NODE"
    local -n node_r="$NODE"
 
-   # Create symbol referring to this section.
    mk_symbol
    local -- symbol="$SYMBOL"
    local -n symbol_r="$SYMBOL"
 
-   # Save reference to this declaration NODE in the symbol. Needed when merging
-   # a child tree into the parent's. Any identifiers that are present in a
-   # child's symtab but not a parents are directly appended into the parent's
-   # tree. The only way that's possible is with a reference to the node itself.
-   symbol_r['node']="$node"
+   # Save node name in symbol.
+   symbol_r['node']="$NODE"
 
-   # Get string value of identifier node.
+   # Save section name in symbol.
    local -n ident_r="${node_r[name]}"
    symbol_r['name']="${ident_r[value]}"
 
@@ -246,7 +249,7 @@ function symtab_decl_section {
    symtab new
 
    # Save reference to the symbol table at the current scope. Needed in the
-   # linear compilation phase.
+   # linear evaluation phase.
    node_r['symtab']="$SYMTAB"
 
    local -n items_r="${node_r[items]}"
@@ -267,31 +270,24 @@ function symtab_decl_section {
    done
 
    declare -g SYMTAB="$symtab"
-   declare -g NODE="$node"
 }
 
 
 function symtab_decl_variable {
-   # Save references: current SYMTAB & NODE
-   local -- node="$NODE"
-   local -n node_r="$node"
+   local -n node_r="$NODE"
 
    # Save reference to the symbol table at the current scope. Needed in the
    # linear compilation phase.
    node_r['symtab']="$SYMTAB"
 
-   # Create symbol referring to this section.
    mk_symbol
    local -- symbol="$SYMBOL"
    local -n symbol_r="$symbol"
 
-   # Save reference to this declaration NODE in the symbol. Needed when merging
-   # a child tree into the parent's. Any identifiers that are present in a
-   # child's symtab but not a parents are directly appended into the parent's
-   # tree. The only way that's possible is with a reference to the node itself.
-   symbol_r['node']="$node"
+   # Save node name in symbol.
+   symbol_r['node']="$NODE"
 
-   # Get string value of identifier node.
+   # Save variable name in symbol.
    local -- identifier="${node_r[name]}"
    local -n identifier_r="$identifier"
    local -- name="${identifier_r[value]}"
@@ -303,7 +299,7 @@ function symtab_decl_variable {
       symtab set "$symbol"
    fi
 
-   # If user does not specify a type declaration, it gets an implicit ANY type
+   # Set Type('ANY') if unspecified.
    if [[ ${node_r['type']} ]] ; then
       walk_symtab "${node_r['type']}"
       symbol_r['type']="$TYPE"
@@ -322,14 +318,11 @@ function symtab_decl_variable {
       # child must fill in the value.
       symbol_r[required]='yes'
    fi
-
-   declare -g NODE="$node"
 }
 
 
 function symtab_typedef {
-   local -- node="$NODE"
-   local -n node_r="$node"
+   local -n node_r="$NODE"
 
    local -n name_r="${node_r[kind]}"
    local -- name="${name_r[value]}"
@@ -345,18 +338,19 @@ function symtab_typedef {
       raise undefined_type "${node_r[kind]}"  "$name"
    fi
 
-   # shellcheck disable=SC2154
+   #  ┌── doesn't know about dynamically created $_TYPE (confused with $TYPE).
+   # shellcheck disable=SC2153,SC2154
    if ! type_equality  "$_TYPE"  "$outer_type" ; then
       raise not_a_type "${node_r[kind]}" "$name"
    fi
 
    local -n outer_type_r="$outer_type"
    copy_type "${outer_type_r[subtype]}"
-   local -- type="$TYPE"
+   local type="$TYPE"
    local -n type_r="$type"
 
    if [[ "${node_r[subtype]}" ]] ; then
-      # See ./doc/truth.sh for an explanation on the test below. Tests if the
+      # See ./doc/truth.sh for an explanation on the test below. Checks if the
       # type has an unset .subtype field (indicating non-complex type).
       if [[ ! "${type[subtype]+_}" ]] ; then
          local loc="${node_r[subtype]}"
@@ -365,44 +359,43 @@ function symtab_typedef {
       fi
 
       walk_symtab "${node_r[subtype]}"
-      type_r['subtype']=$TYPE
+      type_r['subtype']="$TYPE"
    fi
 
    declare -g TYPE="$type"
-   declare -g NODE="$node"
 }
 
 
 function symtab_member {
-   local -n node_r=$NODE
+   local -n node_r="$NODE"
    walk_symtab "${node_r[left]}"
    walk_symtab "${node_r[right]}"
 }
 
 
 function symtab_index {
-   local -n node_r=$NODE
+   local -n node_r="$NODE"
    walk_symtab "${node_r[left]}"
    walk_symtab "${node_r[right]}"
 }
 
 
 function symtab_unary {
-   local -n node_r=$NODE
+   local -n node_r="$NODE"
    walk_symtab "${node_r[right]}"
 }
 
 
 function symtab_array {
-   local -n node_r=$NODE
-   for ast_node in "${node_r[@]}"; do
+   local -n node_r="$NODE"
+   for ast_node in "${node_r[@]}" ; do
       walk_symtab "$ast_node"
    done
 }
 
 
 function symtab_identifier {
-   local -n node_r=$NODE
+   local -n node_r="$NODE"
    node_r['symtab']="$SYMTAB"
 }
 
@@ -496,22 +489,16 @@ function merge_section {
    #  1. It is required in the parent, and missing in the child
    #  2. It is of a non-Section type in the child
 
-   local -- p_sym="$1"
+   local -n p_sym_r="$1"
    local -- c_sym="$2"
-
-   # We know the parent symbol exists. Can safely nameref it.
-   local -n p_sym_r="$p_sym"
 
    # case 1.
    # Child section is missing, but was required in the parent.
    if [[ ! "$c_sym" ]] ; then
       if [[ "${p_sym_r[required]}" ]] ; then
-         # TODO: FQ_NAME is undefined
          raise missing_required
       else
-         # If child section was missing, but not required... nothing to do. We
-         # gucci & scoochie.
-         return 0
+         return 0  # if not required, can ignore.
       fi
    fi
 
@@ -538,18 +525,15 @@ function merge_variable {
    #     a. it's not also a type(var_decl)
    #     b. it's declaring a different type
 
-   local -- p_sym="$1"
+   local -n p_sym_r="$1"
    local -- c_sym="$2"
-
-   # We know the parent symbol exists. Can safely nameref it.
-   local -n p_sym_r="$p_sym"
 
    # case 1a.
    if [[ ! "$c_sym" ]] ; then
       if [[ "${p_sym_r[required]}" ]] ; then
          raise missing_required
       else
-         return 0
+         return 0  # if not required, can ignore.
       fi
    fi
 
@@ -654,8 +638,7 @@ function walk_semantics {
 
 
 function semantics_decl_section {
-   local -- node="$NODE"
-   local -n node_r="$node"
+   local -n node_r="$NODE"
 
    local symtab="$SYMTAB"
    symtab from "$NODE"
@@ -666,7 +649,6 @@ function semantics_decl_section {
    done
 
    declare -g SYMTAB="$symtab"
-   declare -g NODE="$node"
 }
 
 
@@ -733,33 +715,37 @@ function semantics_typecast {
 
 
 function semantics_member {
-   local -- symtab="$SYMTAB"
    local -n node_r="$NODE"
 
+   local symtab="$SYMTAB"
    symtab from "${node_r[left]}"
    walk_semantics "${node_r[left]}"
 
    #  ┌── doesn't know about dynamically created $_SECTION var.
    # shellcheck disable=SC2154
    if ! type_equality  "$_SECTION"  "$TYPE" ; then
-      local msg=''
-      msg+="indexing with the \`.' operator requires"
-      msg+='the left hand side evaluate to a section.'
+      local msg='the left hand side must evaluate to a section.'
       raise type_error "${node_r[left]}"  "$msg"
    fi
 
-   # Descend to section's symtab.
+   # Descend to section's symtab (from above `walk_semantics`).
    local -n symbol_r="$SYMBOL"
    symtab from "${symbol_r[node]}"
 
    local -n right_r="${node_r[right]}"
    local -- index="${right_r[value]}"
 
-   if ! symtab strict "$index" ; then
+   if symtab strict "$index" ; then
+      local -n section_r="$SYMBOL"
+   else
       raise missing_var "$index"
    fi
 
+   local rv="${section_r[node]}"
+   walk_semantics "$rv"
+
    declare -g SYMTAB="$symtab"
+   declare -g NODE="$rv"
 }
 
 
@@ -769,14 +755,10 @@ function semantics_index {
    walk_semantics "${node_r[left]}"
    local -n lhs_r="$NODE"
 
-   declare -p NODE $NODE
-
    #  ┌── doesn't know about dynamically created $_ARRAY var.
    # shellcheck disable=SC2154
    if ! type_equality  "$_ARRAY"  "$TYPE" ; then
-      local msg=''
-      msg+="indexing with the \`.' operator requires"
-      msg+='the left hand side evaluate to a section.'
+      local msg='the left hand side must evaluate to an section.'
       raise type_error "${node_r[left]}"  "$msg"
    fi
 
@@ -804,68 +786,54 @@ function semantics_index {
 
 
 function semantics_unary {
-   local -- save=$NODE
-   local -n node=$save
+   local -n node_r="$NODE"
+   walk_semantics ${node_r[right]}
 
-   if [[ ${node[op]} == 'MINUS' ]] ; then
-      # shellcheck disable=SC2154
-      if ! type_equality  "$_INTEGER"  "$type" ; then
-         raise type_error "${node[right]}" "unary minus only supports integers."
-      fi
-   else
-      raise parse_error "unary expressions aside from \`minus' are unsupported."
-   fi
-
-   walk_semantics ${node[right]}
+   #  ┌── doesn't know about dynamically created $_INTEGER var.
+   # shellcheck disable=SC2154
    if ! type_equality  "$_INTEGER"  "$TYPE" ; then
-      local loc="${node[right]}"
-      local msg="unary expressions may only be integer negation."
+      local loc="${node_r[right]}"
+      local msg="may only negate integers."
       raise type_error  "$loc"  "$msg"
    fi
 
    # If it hasn't exploded, it's an integer.
    copy_type "$_INTEGER"
-   declare -g NODE="$save"
 }
 
 
-# TODO: This definitely need fixing. Doesn't work for typechecking nested
-# arrays. Arrays of mixed types is good. Arrays of arrays of mixed types is not.
-#
 function semantics_array {
-   local -- node="$NODE"
-   local -n node_r="$node"
+   local -n node_r="$NODE"
 
    # shellcheck disable=SC2154
    copy_type "$_ARRAY"
-   local -- array_t="$TYPE"
-   local -n array_r="$array_t"
+   local -- type="$TYPE"
+   local -n type_r="$TYPE"
 
-   # If the target type is specific (array:str), the actual type must conform to
-   # that.
+   # If the target type is specific (e.g., array:str), the actual type must
+   # conform to that.
    local -A types_found=()
-   for item in "${node_r[@]}" ; do
-      walk_semantics "$item"
-      local -n type=$TYPE
-      local -- kind="${type[kind]}"
+   for ast_node in "${node_r[@]}" ; do
+      walk_semantics "$ast_node"
+      local -n subtype_r=$TYPE
+      local -- subtype="${subtype_r[kind]}"
 
-      array_r['subtype']="$TYPE"
+      type_r['subtype']="$TYPE"
       # For now we assume the array will have matching types throughout. If it
       # does, we don't have touch this. If we're wrong, we append each found
       # distinct type to `types_found[]`. If >1, set the subtype to ANY instead.
 
-      types_found[$kind]='true'
+      types_found[$subtype]='true'
    done
 
    if [[ ${#types_found[@]} -gt 1 ]] ; then
       #  ┌── doesn't know about dynamically created $_ANY var.
       # shellcheck disable=SC2154
       copy_type "$_ANY"
-      array_r['subtype']="$TYPE"
+      type_r['subtype']="$TYPE"
    fi
 
-   declare -g TYPE="$array_t"
-   declare -g NODE="$node"
+   declare -g TYPE="$type"
 }
 
 
@@ -882,7 +850,7 @@ function semantics_identifier {
    copy_type "${symbol_r[type]}"
 
    # Need to set the $NODE to "return" the expression referenced by this
-   # variable.
+   # variable. Necessary in index/member subscription expressions.
    local -n ref_node_r="${symbol_r[node]}"
    declare -g NODE="${ref_node_r[expr]}"
 }
