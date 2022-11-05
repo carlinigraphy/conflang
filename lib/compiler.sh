@@ -23,16 +23,14 @@ function walk_compiler {
       dst="$DATA"
    done
 
-   # Clean up the generated output. The nodes _SKELLY_{1,2} are uselessly
-   # referring to the '%inline' implicit section.
-   declare -g _SKELLY_ROOT="$_SKELLY_1"
-   unset '$_SKELLY_1'
-
    # Fold around all the temporary SKELLY nodes. Leaves only data.
+   declare -g _SKELLY_ROOT="$_SKELLY_1"
    undead_yoga "$_SKELLY_ROOT"
 
-   # Can't unset during `undead_yoga`, as two references may point to the same
-   # intermediate node. Clean up my skeleton army afterwards.
+   # Clean up the generated output. The nodes _SKELLY_{1,2} are uselessly
+   # referring to the '%inline' implicit section. Can't unset during
+   # `undead_yoga`, as two references may point to the same intermediate node.
+   # Clean up my skeleton army afterwards.
    for skelly in "${DISPOSABLE_SKELETONS[@]}" ; do
       unset "$skelly"
    done
@@ -60,13 +58,13 @@ declare -gA EXPR_MAP=()
 
 declare -g  DEPENDENCY=
 declare -ga UNORDERED_DEPS=()
-declare -gA DEPS_MAP=()
+declare -gA DEPTH_MAP=()
 declare -ga ORDERED_DEPS=()
 # ^-- This is where dependencies go during the reference phase of the compiler.
 # Each variable declaration also creates an array to hold everything it depends
 # upon. Before the 2nd phase, they're sorted into ORDERED_DEPS[].
 #
-# Order is DEPEND -> UNORDERED_DEPS[] -> DEPS_MAP{} -> ORDERED_DEPS[]
+# Order is DEPENDENCY -> UNORDERED_DEPS[] -> DEPTH_MAP{} -> ORDERED_DEPS[]
 
 function mk_dependency {
    local dep="DEP_${1}"
@@ -82,7 +80,7 @@ function mk_compile_dict {
    declare -gA "$skelly"
    declare -g  SKELLY="$skelly"
 
-   # Without a value, this isn't glob matched by a ${!_SKELLY_*}
+   # Without a value, this isn't glob matched by a ${!_SKELLY_*}.
    local -n s="$skelly" ; s=()
 }
 
@@ -112,16 +110,15 @@ function compile_ref_decl_section {
    # Add mapping from _NODE_$n -> _SKELLY_$n. Need one level of indirection to
    # be able to refer to this node.
    #
-   #> Section { key; }
-   #>--
+   #> Section { key; }      # Compiles to...
+   #
    #> _ROOT=(
-   #>    [Section]=_SKELLY_1
+   #>    [Section]="_SKELLY_1"
    #> )
-   #> _SKELLY_1=_SKELLY_2
+   #> _SKELLY_1="_SKELLY_2"
    #> _SKELLY_2=(
    #>    [key]=''
    #> )
-   #>--
    #
    # In which  _SKELLY_1 :: middle_skelly
    #           _SKELLY_2 :: dict_skelly
@@ -138,10 +135,7 @@ function compile_ref_decl_section {
    EXPR_MAP[$node]="$middle_skelly"
    IS_SECTION[$dict_skelly]='yes'
 
-   # Save current symtab
    local symtab="$SYMTAB"
-
-   # Load new one from $NODE.
    symtab from "$node"
 
    local -n items_r="${node_r[items]}" 
@@ -155,29 +149,25 @@ function compile_ref_decl_section {
    done
 
    declare -g SKELLY="$middle_skelly"
-   declare -g NODE="$node"
    declare -g SYMTAB="$symtab"
 }
 
 
 function compile_ref_decl_variable {
-   local -- node="$NODE"
-   local -n node_r="$node"
+   local -n node_r="$NODE"
 
    # Create skeleton node to be inserted into the parent section, and add
    # mapping from the AST node to the output skeleton node.
    mk_skelly
-   EXPR_MAP["$node"]="$SKELLY"
+   EXPR_MAP["$NODE"]="$SKELLY"
 
    # Create global "${SKELLY}_DEPS" array holding all the dependencies we run
    # into downstream.
-   mk_dependency "$node"
+   mk_dependency "$NODE"
 
    if [[ -n ${node_r[expr]} ]] ; then
       walk_ref_compiler "${node_r[expr]}"
    fi
-
-   declare -g NODE="$node"
 }
 
 
@@ -186,6 +176,60 @@ function compile_ref_typecast {
    walk_ref_compiler "${node_r[expr]}" 
 }
 
+
+
+# TODO: Need to actually descend symbol table scopes so we can refer to the
+#       node pointed to by this identifier. In an expression like...
+#       >      a.b.c
+#       ...we must descend into a's scope, search for b, descend into b's scope,
+#       search for c, descend into c's scope. Add each of these symbol.node's to
+#       the current dependencies array, then reset back to whatever symtab we
+#       were at prior to member nonsense.
+#       
+#       Kinda also need to consider this when doing indexing, but we're only
+#       descending scopes a singular time, by definition. Only the first LHS
+#       may have an identifier. But still need to reset scopes regardless.
+#
+#       .left is always an identifier (pointing to a section),
+#                          interior member expression
+#       In both cases we need `walk(node.left)` to set SYMTAB to, in the case
+#       of each:
+#             identifier: the 'target' expression of the identifier
+#                         (symtab.get(ident.name).node.expr)
+#             member:     the symtab scope of lhs[rhs], which honestly should
+#                         be the same as rhs.symtab.
+#
+#       The LHS & RHS may both be identifiers. Can cover both those cases by
+#       setting SYMTAB to what is set at the end of walk(node.right).
+#
+#
+#     # Compiling this.
+#     key: S0.S1.key;
+#
+#     # Expanded w/ parens to (lhs, rhs).
+#     key: ((S0, S1), key);
+#
+#     # Ths 'inner' search of (S0, S1)
+#     node.left
+#        - is an identifier, walk(node.left)
+#           - name   is node.left.name
+#           - symbol is symtab.get(name)
+#           - target is symbol.node
+#           - descend into new symtab:
+#              - symtab get target
+#              - section declaration nodes have a .symtab reference to their
+#                own new symbol table
+#     node.right
+#        - is an identifier
+#        - don't walk(node.right)
+#
+#
+#     Conclusions:
+#        walk(node.left)   MUST yield $SYMTAB pointing to the descended section
+#        manual `symtab strict node.right` yields new symbol, set as SYMTAB
+#
+#     .right is always an identifier, strictly present in .left's scope.
+#     .left always "resolves" to a section, setting SYMTAB appropriately
 
 function compile_ref_member {
    local -n node_r=$NODE
@@ -216,8 +260,6 @@ function compile_ref_array {
 
 
 function compile_ref_identifier {
-   local -n dep="$DEPENDENCY"
-
    # Get identifier name.
    local -n node_r="$NODE"
    local -- name="${node_r[value]}"
@@ -225,8 +267,12 @@ function compile_ref_identifier {
    symtab get "$name"
    local -n symbol_r="$SYMBOL"
 
-   # Add self as dependency.
-   dep+=( "${symbol_r[node]}" )
+   # Add variable target as a dependency.
+   local -- target="${symbol_r[node]}" 
+   local -n dep="$DEPENDENCY"
+   dep+=( "$target" )
+
+   symtab from "$target"
 }
 
 
@@ -245,7 +291,7 @@ function dependency_to_map {
       dependency_depth "$dep_node"
 
       local ast_node="${dep_node/DEP_/}"
-      DEPS_MAP[$ast_node]="$DEPTH"
+      DEPTH_MAP[$ast_node]="$DEPTH"
    done
 }
 
@@ -280,11 +326,11 @@ function dependency_depth {
 function dependency_sort {
    local -i  i=0  depth=0
 
-   while (( ${#DEPS_MAP[@]} )) ; do
-      for ast_node in "${!DEPS_MAP[@]}" ; do
-         depth="${DEPS_MAP[$ast_node]}"
+   while (( ${#DEPTH_MAP[@]} )) ; do
+      for ast_node in "${!DEPTH_MAP[@]}" ; do
+         depth="${DEPTH_MAP[$ast_node]}"
          if (( depth == i )) ; then
-            unset 'DEPS_MAP[$ast_node]'
+            unset 'DEPTH_MAP[$ast_node]'
             ORDERED_DEPS+=( "$ast_node" )
          fi
       done
@@ -318,34 +364,25 @@ function walk_expr_compiler {
 
 
 function compile_expr_decl_section {
-   # Save reference to current NODE. Restored at the end.
-   local -- save=$NODE
-   local -n node=$save
-
-   local -n items="${node[items]}" 
-   for var_decl in "${items[@]}"; do
-      walk_expr_compiler "$var_decl"
+   local -n node_r="$NODE"
+   local -n items_r="${node_r[items]}" 
+   for ast_node in "${items_r[@]}"; do
+      walk_expr_compiler "$ast_node"
    done
-
-   declare -g NODE="$save"
 }
 
 
 function compile_expr_decl_variable {
-   local -- save=$NODE
-   local -n node=$save
-
-   if [[ -n ${node[expr]} ]] ; then
-      walk_expr_compiler "${node[expr]}"
+   local -n node_r="$NODE"
+   if [[ -n ${node_r[expr]} ]] ; then
+      walk_expr_compiler "${node_r[expr]}"
    fi
-
-   declare -g NODE="$save"
 }
 
 
 function compile_expr_typecast {
-   local -n node="$NODE"
-   walk_expr_compiler "${node[expr]}" 
+   local -n node_r="$NODE"
+   walk_expr_compiler "${node_r[expr]}" 
 }
 
 
@@ -382,52 +419,48 @@ function compile_expr_index {
 
 
 function compile_expr_unary {
-   local -- save=$NODE
-   local -n node=$save
-
-   walk_expr_compiler "${node[right]}"
+   local -n node_r="$NODE"
+   walk_expr_compiler "${node_r[right]}"
    (( DATA = DATA * -1 ))
 }
 
 
 function compile_expr_array {
-   local -- save="$NODE"
-   local -n node="$save"
+   local -n node_r="$NODE"
 
    mk_compile_array
-   local -- array_name="$DATA"
-   local -n array="$DATA"
+   local -- array="$DATA"
+   local -n array_r="$DATA"
 
-   for ast_node in "${node[@]}"; do
+   for ast_node in "${node_r[@]}"; do
       walk_expr_compiler "$ast_node"
-      array+=( "$DATA" )
+      array_r+=( "$DATA" )
    done
 
-   declare -g DATA="$array_name"
-   declare -g NODE="$save"
+   declare -g DATA="$array"
 }
 
 
 function compile_expr_boolean {
-   local -n node=$NODE
-   declare -g DATA="${node[value]}"
+   local -n node_r="$NODE"
+   declare -g DATA="${node_r[value]}"
 }
 
 
 function compile_expr_integer {
-   local -n node=$NODE
-   declare -g DATA="${node[value]}"
+   local -n node_r="$NODE"
+   declare -g DATA="${node_r[value]}"
 }
 
 
 function compile_expr_string {
-   local -n node=$NODE
-   local -- string="${node[value]}"
+   local -n node_r="$NODE"
+   local -- string="${node_r[value]}"
 
-   while [[ "${node[concat]}" ]] ; do
-      walk_expr_compiler "${node[concat]}"
+   while [[ "${node_r[concat]}" ]] ; do
+      walk_expr_compiler "${node_r[concat]}"
       string+="$DATA"
-      local -n node="${node[concat]}"
+      local -n node="${node_r[concat]}"
    done
 
    declare -g DATA="$string"
@@ -435,13 +468,13 @@ function compile_expr_string {
 
 
 function compile_expr_path {
-   local -n node=$NODE
-   local -- path="${node[value]}"
+   local -n node_r=$NODE
+   local -- path="${node_r[value]}"
 
-   while [[ "${node[concat]}" ]] ; do
-      walk_expr_compiler "${node[concat]}"
+   while [[ "${node_r[concat]}" ]] ; do
+      walk_expr_compiler "${node_r[concat]}"
       path+="$DATA"
-      local -n node="${node[concat]}"
+      local -n node="${node_r[concat]}"
    done
 
    declare -g DATA="$path"
@@ -449,14 +482,14 @@ function compile_expr_path {
 
 
 function compile_expr_env_var {
-   local -n node=$NODE
-   local -- var_name="${node[value]}" 
+   local -n node_r="$NODE"
+   local -- ident="${node_r[value]}" 
 
-   if [[ ! "${SNAPSHOT[$var_name]+_}" ]] ; then
-      raise missing_env_var "$var_name"
+   if [[ ! "${SNAPSHOT[$ident]+_}" ]] ; then
+      raise missing_env_var "$ident"
    fi
 
-   declare -g DATA="${SNAPSHOT[$var_name]}"
+   declare -g DATA="${SNAPSHOT[$ident]}"
 }
 
 

@@ -631,9 +631,16 @@ function p_typedef {
 #
 # Had to do a little bit of tomfoolery with the binding powers. Shifted
 # everything up by 1bp (+2), so the lowest is lbp=3 rbp=4.
+#
+# Priority (lowest to highest)
+#  ->       type casts                 3
+#   -       unary minus                5
+#   [       array index                7
+#   .       member index               9
+# N/A       string concatenation       11
 
 declare -gA prefix_binding_power=(
-   [MINUS]=11
+   [MINUS]=5
 )
 declare -gA NUD=(
    [MINUS]='p_unary'
@@ -650,8 +657,8 @@ declare -gA NUD=(
 
 declare -gA infix_binding_power=(
    [ARROW]='3'
-   [DOT]=5
-   [CONCAT]=9
+   [DOT]=9
+   [CONCAT]=11
 )
 declare -gA LED=(
    [ARROW]='p_typecast'
@@ -829,18 +836,16 @@ function p_index {
 
 function p_member {
    local lhs="$1"  _=$2  rbp="$3"
-                    # ^-- this is the `>` operator, can ignore.
+                    # ^-- ignore `.` operator
    mk_member
-   local -- save="$NODE"
-   local -n index="$NODE"
+   local -- node="$NODE"
+   local -n node_r="$NODE"
 
-   p_identifier "$CURRENT_NAME"
-   p_munch 'IDENTIFIER' 'section subscription only possible with identifiers.'
+   p_expression "$rbp"
+   node_r['left']="$lhs"
+   node_r['right']="$NODE"
 
-   index['left']="$lhs"
-   index['right']="$NODE"
-
-   declare -g NODE="$save"
+   declare -g NODE="$node"
 }
 
 

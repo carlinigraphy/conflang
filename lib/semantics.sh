@@ -717,6 +717,8 @@ function semantics_typecast {
 function semantics_member {
    local -n node_r="$NODE"
 
+   # TODO: node.left may be another member expression and not have a symtab.
+   #       Need to rethink this section. Draft it out on paper.
    local symtab="$SYMTAB"
    symtab from "${node_r[left]}"
    walk_semantics "${node_r[left]}"
@@ -838,6 +840,7 @@ function semantics_array {
 
 
 function semantics_identifier {
+   # Get identifier name.
    local -n node_r="$NODE"
    local -- name="${node_r[value]}"
 
@@ -851,8 +854,8 @@ function semantics_identifier {
 
    # Need to set the $NODE to "return" the expression referenced by this
    # variable. Necessary in index/member subscription expressions.
-   local -n ref_node_r="${symbol_r[node]}"
-   declare -g NODE="${ref_node_r[expr]}"
+   local -n target_r="${symbol_r[node]}"
+   declare -g NODE="${target_r[expr]}"
 }
 
 
