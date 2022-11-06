@@ -841,7 +841,12 @@ function p_member {
    local -- node="$NODE"
    local -n node_r="$NODE"
 
-   p_expression "$rbp"
+   p_identifier "$CURRENT_NAME"
+   p_munch 'IDENTIFIER'
+   # TODO(error reporting):
+   # Include more helpful information. Check if it's an INTEGER, suggest they
+   # instead use [int].
+
    node_r['left']="$lhs"
    node_r['right']="$NODE"
 

@@ -55,8 +55,6 @@ function raise {
    fi
 
    print_"${type}" "${args[@]}" 1>&2
-   traceback 2
-
    exit "$status"
 }
 

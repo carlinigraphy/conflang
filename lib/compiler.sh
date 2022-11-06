@@ -16,6 +16,9 @@ function walk_compiler {
 
    dependency_to_map
    dependency_sort
+   
+   #declare -p ${!_SKELLY_*}
+   #declare -p EXPR_MAP
 
    for ast_node in "${ORDERED_DEPS[@]}" ; do
       local -n dst="${EXPR_MAP[$ast_node]}"
@@ -80,7 +83,8 @@ function mk_compile_dict {
    declare -gA "$skelly"
    declare -g  SKELLY="$skelly"
 
-   # Without a value, this isn't glob matched by a ${!_SKELLY_*}.
+   # Without a value, this isn't glob matched by a ${!_SKELLY_*}. Can't assign
+   # in the initial `declare -g` as you can with strings values.
    local -n s="$skelly" ; s=()
 }
 
@@ -88,7 +92,7 @@ function mk_compile_dict {
 function mk_skelly {
    (( ++SKELLY_NUM ))
    local skelly="_SKELLY_${SKELLY_NUM}"
-   declare -g "$skelly"
+   declare -g "$skelly"=''
    declare -g SKELLY="$skelly"
 
    # Allows us to clean up after ourselves. After evaluating everything, these
@@ -176,60 +180,6 @@ function compile_ref_typecast {
    walk_ref_compiler "${node_r[expr]}" 
 }
 
-
-
-# TODO: Need to actually descend symbol table scopes so we can refer to the
-#       node pointed to by this identifier. In an expression like...
-#       >      a.b.c
-#       ...we must descend into a's scope, search for b, descend into b's scope,
-#       search for c, descend into c's scope. Add each of these symbol.node's to
-#       the current dependencies array, then reset back to whatever symtab we
-#       were at prior to member nonsense.
-#       
-#       Kinda also need to consider this when doing indexing, but we're only
-#       descending scopes a singular time, by definition. Only the first LHS
-#       may have an identifier. But still need to reset scopes regardless.
-#
-#       .left is always an identifier (pointing to a section),
-#                          interior member expression
-#       In both cases we need `walk(node.left)` to set SYMTAB to, in the case
-#       of each:
-#             identifier: the 'target' expression of the identifier
-#                         (symtab.get(ident.name).node.expr)
-#             member:     the symtab scope of lhs[rhs], which honestly should
-#                         be the same as rhs.symtab.
-#
-#       The LHS & RHS may both be identifiers. Can cover both those cases by
-#       setting SYMTAB to what is set at the end of walk(node.right).
-#
-#
-#     # Compiling this.
-#     key: S0.S1.key;
-#
-#     # Expanded w/ parens to (lhs, rhs).
-#     key: ((S0, S1), key);
-#
-#     # Ths 'inner' search of (S0, S1)
-#     node.left
-#        - is an identifier, walk(node.left)
-#           - name   is node.left.name
-#           - symbol is symtab.get(name)
-#           - target is symbol.node
-#           - descend into new symtab:
-#              - symtab get target
-#              - section declaration nodes have a .symtab reference to their
-#                own new symbol table
-#     node.right
-#        - is an identifier
-#        - don't walk(node.right)
-#
-#
-#     Conclusions:
-#        walk(node.left)   MUST yield $SYMTAB pointing to the descended section
-#        manual `symtab strict node.right` yields new symbol, set as SYMTAB
-#
-#     .right is always an identifier, strictly present in .left's scope.
-#     .left always "resolves" to a section, setting SYMTAB appropriately
 
 function compile_ref_member {
    local -n node_r=$NODE
@@ -396,9 +346,12 @@ function compile_expr_member {
    local -n left_r="$DATA"
 
    local -n right_r="${node_r[right]}"
-   local -- name="${right_r[value]}"
+   local name="${right_r[value]}"
 
-   declare -g DATA="${left_r[$name]}"
+   # left[name] points to the intermediate skelly node. Need to go one
+   # additional level of indirection past that.
+   local -n rv="${left_r[$name]}"
+   declare -g DATA="$rv"
 }
 
 
@@ -412,7 +365,7 @@ function compile_expr_index {
    local -n left_r="$DATA"
 
    local -n right_r="${node_r[right]}"
-   local -- integer="${right_r[value]}"
+   local integer="${right_r[value]}"
 
    declare -g DATA="${left_r[$integer]}"
 }
@@ -531,13 +484,13 @@ function undead_yoga {
 
    local key
    for key in "${!src_r[@]}" ; do
-      local -- middle="${src_r[$key]}"
-      local -n middle_r="$middle"
+      local skelly="${src_r[$key]}"
+      local -n skelly_r="$skelly"
 
-      if [[ ${IS_SECTION[$middle_r]} ]] ; then
-         undead_yoga "$middle_r"
+      if [[ ${IS_SECTION[$skelly_r]} ]] ; then
+         undead_yoga "$skelly_r"
       fi
 
-      src_r[$key]="$middle_r"
+      src_r[$key]="$skelly_r"
    done
 }

@@ -182,6 +182,10 @@ declare -i TYPE_NUM=${TYPE_NUM:-0}
 function mk_type {
    (( ++TYPE_NUM ))
 
+   if (( TYPE_NUM == 20 )) ; then
+      traceback
+   fi
+
    local type="TYPE_${TYPE_NUM}"
    declare -gA $type
    declare -g  TYPE="$type"
@@ -300,8 +304,8 @@ function symtab_decl_variable {
    fi
 
    # Set Type('ANY') if unspecified.
-   if [[ ${node_r['type']} ]] ; then
-      walk_symtab "${node_r['type']}"
+   if [[ "${node_r[type]}" ]] ; then
+      walk_symtab "${node_r[type]}"
       symbol_r['type']="$TYPE"
    else
       # shellcheck disable=SC2154
@@ -309,10 +313,10 @@ function symtab_decl_variable {
       symbol_r['type']="$TYPE"
    fi
 
-   if [[ ${node_r['expr']} ]] ; then
+   if [[ "${node_r[expr]}" ]] ; then
       # Still must descend into expression, as to make references to the symtab
       # in identifier nodes.
-      walk_symtab "${node_r['expr']}"
+      walk_symtab "${node_r[expr]}"
    else
       # Variables are `required' when they do not contain an expression. A
       # child must fill in the value.
@@ -561,10 +565,6 @@ function merge_variable {
       # shellcheck disable=SC2034
       p_node_r['expr']="${c_node_r[expr]}"
    fi
-
-   # TODO: feature
-   # This is where we would also append the directive/test context information
-   # over. But it doesn't exist yet.
 }
 
 
@@ -715,12 +715,15 @@ function semantics_typecast {
 
 
 function semantics_member {
+   local symtab="$SYMTAB"
    local -n node_r="$NODE"
 
-   # TODO: node.left may be another member expression and not have a symtab.
-   #       Need to rethink this section. Draft it out on paper.
-   local symtab="$SYMTAB"
-   symtab from "${node_r[left]}"
+   # node.left is either
+   #  - AST(member)
+   #  - AST(identifier)
+   # Both must set $SYMTAB to point to either the result of the member
+   # subscription, or the target symtab of the identifier respectively. it must
+   # also set $TYPE to its resulting type.
    walk_semantics "${node_r[left]}"
 
    #  ┌── doesn't know about dynamically created $_SECTION var.
@@ -730,24 +733,33 @@ function semantics_member {
       raise type_error "${node_r[left]}"  "$msg"
    fi
 
-   # Descend to section's symtab (from above `walk_semantics`).
+   local right="${node_r[right]}"
+   local -n right_r="$right"
+
+   if [[ ! "${TYPEOF[$right]}" == identifier ]] ; then
+      local msg='the right hand side must be an identifier.'
+      raise type_error "$right"  "$msg"
+   fi
+
+   # Descend to section's scope (from above `walk_semantics`).
    local -n symbol_r="$SYMBOL"
    symtab from "${symbol_r[node]}"
 
-   local -n right_r="${node_r[right]}"
-   local -- index="${right_r[value]}"
-
-   if symtab strict "$index" ; then
-      local -n section_r="$SYMBOL"
-   else
+   local index="${right_r[value]}"
+   if ! symtab strict "$index" ; then
       raise missing_var "$index"
    fi
 
+   local -n section_r="$SYMBOL"
    local rv="${section_r[node]}"
-   walk_semantics "$rv"
 
-   declare -g SYMTAB="$symtab"
+   # Necessary for an expression using both member & index subscription. E.g.,
+   #> _: a.b[0];
+   # Need to "return" the result of (a.b) so it can be subscripted by [0].
    declare -g NODE="$rv"
+
+   declare -g TYPE="${section_r[type]}"
+   declare -g SYMTAB="$symtab"
 }
 
 
@@ -760,7 +772,7 @@ function semantics_index {
    #  ┌── doesn't know about dynamically created $_ARRAY var.
    # shellcheck disable=SC2154
    if ! type_equality  "$_ARRAY"  "$TYPE" ; then
-      local msg='the left hand side must evaluate to an section.'
+      local msg='the left hand side must evaluate to an array.'
       raise type_error "${node_r[left]}"  "$msg"
    fi
 
