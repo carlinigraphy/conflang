@@ -163,8 +163,6 @@ function mk_symbol {
 
    symbol['type']=    #> TYPE
    symbol['node']=    #> NODE
-   symbol['symtab']=  #> SYMTAB
-
    symbol['name']=    #> str
    # While it isn't really required, it's substantially easier if we have a
    # string name, rather than needing to pull it from the symbol.node.name.value
@@ -181,10 +179,6 @@ declare -i TYPE_NUM=${TYPE_NUM:-0}
 
 function mk_type {
    (( ++TYPE_NUM ))
-
-   if (( TYPE_NUM == 20 )) ; then
-      traceback
-   fi
 
    local type="TYPE_${TYPE_NUM}"
    declare -gA $type
@@ -303,15 +297,15 @@ function symtab_decl_variable {
       symtab set "$symbol"
    fi
 
-   # Set Type('ANY') if unspecified.
+   # Set the symbol's type to the declared type (if exists), else implicitly
+   # takes a Type('ANY').
    if [[ "${node_r[type]}" ]] ; then
       walk_symtab "${node_r[type]}"
-      symbol_r['type']="$TYPE"
    else
       # shellcheck disable=SC2154
       copy_type "$_ANY"
-      symbol_r['type']="$TYPE"
    fi
+   symbol_r['type']="$TYPE"
 
    if [[ "${node_r[expr]}" ]] ; then
       # Still must descend into expression, as to make references to the symtab
@@ -327,20 +321,18 @@ function symtab_decl_variable {
 
 function symtab_typedef {
    local -n node_r="$NODE"
-
    local -n name_r="${node_r[kind]}"
    local -- name="${name_r[value]}"
-   symtab get "$name"
+
+   if ! symtab get "$name" ; then
+      raise undefined_type "${node_r[kind]}"  "$name"
+   fi
 
    local -n symbol_r="$SYMBOL"
    local -- outer_type="${symbol_r[type]}"
    # Types themselves are defined as such:
    #> int = Type('TYPE', subtype: Type('INTEGER'))
    #> str = Type('TYPE', subtype: Type('STRING'))
-
-   if [[ ! "$outer_type" ]] ; then
-      raise undefined_type "${node_r[kind]}"  "$name"
-   fi
 
    #  ┌── doesn't know about dynamically created $_TYPE (confused with $TYPE).
    # shellcheck disable=SC2153,SC2154
@@ -416,12 +408,6 @@ function symtab_env_var { :; }
 #
 # Merging is only necessary if the parent has %constrain statements.
 
-# Gives friendly means of reporting to the user where an error has occurred.
-# As we descend into each symtab, push its name to the stack. Print by doing a
-# FQ_LOCATION.join('.'). Used in lib/errors.sh
-declare -a FQ_LOCATION=()
-
-
 function merge_symtab {
    local -n parent=$1
    local -n parent_symtab=$2
@@ -437,10 +423,6 @@ function merge_symtab {
    done
 
    for p_key in "${!parent_symtab[@]}" ; do
-      if [[ "$p_key" != '%inline' ]] ; then
-         FQ_LOCATION+=( "$p_key" )
-      fi
-
       # Parent Symbol.
       local -- p_sym_name="${parent_symtab[$p_key]}"
       local -n p_sym=$p_sym_name
@@ -467,8 +449,6 @@ function merge_symtab {
       else
          merge_variable "$p_sym_name" "$c_sym_name"
       fi
-
-      FQ_LOCATION=( "${FQ_LOCATION[@]::${#FQ_LOCATION[@]}-1}" )
    done
 
    # Any additional keys from the child need to be copied into both...
@@ -639,6 +619,7 @@ function walk_semantics {
 
 function semantics_decl_section {
    local -n node_r="$NODE"
+   local -n name_r="${node_r[name]}"
 
    local symtab="$SYMTAB"
    symtab from "$NODE"
@@ -851,6 +832,12 @@ function semantics_array {
 }
 
 
+# TODO: re-think semantics(identifier)
+# When a variable is declared without a type, its Symbol takes an implicit
+# Type('ANY'). This function returns the DECLARED symbol.type, rather than the
+# EVALUATED type of expressions. Wonder if we want to just re-walk whatever is
+# being pointed to? Feels catastrophically wasteful when hitting a section.
+#
 function semantics_identifier {
    # Get identifier name.
    local -n node_r="$NODE"
@@ -862,7 +849,7 @@ function semantics_identifier {
    fi
 
    local -n symbol_r="$SYMBOL"
-   copy_type "${symbol_r[type]}"
+   declare -g TYPE="${symbol_r[type]}"
 
    # Need to set the $NODE to "return" the expression referenced by this
    # variable. Necessary in index/member subscription expressions.

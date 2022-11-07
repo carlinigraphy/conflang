@@ -1,6 +1,5 @@
 #!/bin/bash
 
-#trap 'traceback 2' ERR EXIT
 function traceback {
    local -i depth="$1"
    local -i len=${#FUNCNAME[@]}-1
@@ -218,12 +217,18 @@ function print_type_error {
 }
 
 function print_symbol_mismatch {
-   local fq_name=''
-   for part in "${FQ_LOCATION[@]}" ; do
-      fq_name+="${fq_name:+.}${part}"
-   done
+   #local fq_name=''
+   #for part in "${FQ_LOCATION[@]}" ; do
+   #   fq_name+="${fq_name:+.}${part}"
+   #done
+   #
+   #printf "Type Error: child key \`${fq_name}' does not match parent's type.\n"
 
-   printf "Type Error: child key \`${fq_name}' does not match parent's type.\n"
+   # TODO: error reporting
+   # Part of the large error reporting overhaul, need to add more useful cursor
+   # markers on every object before I can print helpful locations & error
+   # messaging.
+   printf "Type Error: child key doesn't match parent's type.\n"
 }
 
 #────────────────────────────────( key errors )─────────────────────────────────
