@@ -6,7 +6,7 @@ function mk_metatype {
    local complex="$3"
 
    mk_type
-   local -- type="$TYPE"
+   local type="$TYPE"
    local -n type_r="$TYPE"
    type_r['kind']="$kind"
 
@@ -21,7 +21,7 @@ function mk_metatype {
 
    # Create Type representing Types.
    mk_type
-   local -- metatype="$TYPE"
+   local metatype="$TYPE"
    local -n metatype_r="$TYPE"
    metatype_r['kind']='TYPE'
    metatype_r['subtype']="$type"
@@ -124,8 +124,8 @@ function _symtab_get {
 
 # strict(key)  :: searches only current symtab for Symbol identified by $key.
 function _symtab_strict {
-   local -- name="$1"
-   local -- symtab="$SYMTAB"
+   local name="$1"
+   local symtab="$SYMTAB"
    local -n symtab_r="$symtab"
 
    declare -g SYMBOL="${symtab_r[$name]}"
@@ -135,9 +135,9 @@ function _symtab_strict {
 
 # set(symbol)  :: sets ${symbol[name]} -> $symbol in current symtab
 function _symtab_set {
-   local -- symbol="$1"
+   local symbol="$1"
    local -n symbol_r="$symbol"
-   local -- name="${symbol_r[name]}"
+   local name="${symbol_r[name]}"
 
    local -n symtab_r="$SYMTAB"
    symtab_r[$name]="$symbol"
@@ -196,7 +196,7 @@ function copy_type {
    local -n t0_r="$1"
 
    mk_type
-   local -- t1="$TYPE"
+   local t1="$TYPE"
    local -n t1_r="$TYPE"
    t1_r['kind']="${t0_r[kind]}"
 
@@ -222,7 +222,7 @@ function symtab_decl_section {
    local -n node_r="$NODE"
 
    mk_symbol
-   local -- symbol="$SYMBOL"
+   local symbol="$SYMBOL"
    local -n symbol_r="$SYMBOL"
 
    # Save node name in symbol.
@@ -275,20 +275,20 @@ function symtab_decl_variable {
    local -n node_r="$NODE"
 
    # Save reference to the symbol table at the current scope. Needed in the
-   # linear compilation phase.
+   # linear compilation phase(s).
    node_r['symtab']="$SYMTAB"
 
    mk_symbol
-   local -- symbol="$SYMBOL"
+   local symbol="$SYMBOL"
    local -n symbol_r="$symbol"
 
    # Save node name in symbol.
    symbol_r['node']="$NODE"
 
    # Save variable name in symbol.
-   local -- identifier="${node_r[name]}"
+   local identifier="${node_r[name]}"
    local -n identifier_r="$identifier"
-   local -- name="${identifier_r[value]}"
+   local name="${identifier_r[value]}"
    symbol_r['name']="$name"
 
    if symtab strict "$name" ; then
@@ -322,14 +322,14 @@ function symtab_decl_variable {
 function symtab_typedef {
    local -n node_r="$NODE"
    local -n name_r="${node_r[kind]}"
-   local -- name="${name_r[value]}"
+   local name="${name_r[value]}"
 
    if ! symtab get "$name" ; then
       raise undefined_type "${node_r[kind]}"  "$name"
    fi
 
    local -n symbol_r="$SYMBOL"
-   local -- outer_type="${symbol_r[type]}"
+   local outer_type="${symbol_r[type]}"
    # Types themselves are defined as such:
    #> int = Type('TYPE', subtype: Type('INTEGER'))
    #> str = Type('TYPE', subtype: Type('STRING'))
@@ -401,6 +401,7 @@ function symtab_string  { :; }
 function symtab_path    { :; }
 function symtab_env_var { :; }
 
+
 #───────────────────────────────( merge trees )─────────────────────────────────
 # After generating the symbol tables for the parent & child, iterate over the
 # parent's, merging in nodes. I'm not 100% sure if this should be in the
@@ -424,19 +425,19 @@ function merge_symtab {
 
    for p_key in "${!parent_symtab[@]}" ; do
       # Parent Symbol.
-      local -- p_sym_name="${parent_symtab[$p_key]}"
+      local p_sym_name="${parent_symtab[$p_key]}"
       local -n p_sym=$p_sym_name
-      local -- p_node=${p_sym[node]}
+      local p_node=${p_sym[node]}
 
       # Parent type information.
-      local -- p_type_name="${p_sym[type]}"
+      local p_type_name="${p_sym[type]}"
       local -n p_type=$p_type_name
 
       # Child Symbol.
       # The child symbol may not necessarily exist. These cases, and the error
       # reporting, are both handled in their respective functions:
       # `merge_variable`, `merge_section`.
-      local -- c_sym_name="${child_symtab[$p_key]}"
+      local c_sym_name="${child_symtab[$p_key]}"
 
       # shellcheck disable=SC2184
       unset overflow["$p_key"]
@@ -474,7 +475,7 @@ function merge_section {
    #  2. It is of a non-Section type in the child
 
    local -n p_sym_r="$1"
-   local -- c_sym="$2"
+   local c_sym="$2"
 
    # case 1.
    # Child section is missing, but was required in the parent.
@@ -510,7 +511,7 @@ function merge_variable {
    #     b. it's declaring a different type
 
    local -n p_sym_r="$1"
-   local -- c_sym="$2"
+   local c_sym="$2"
 
    # case 1a.
    if [[ ! "$c_sym" ]] ; then
@@ -581,6 +582,186 @@ function merge_type {
 }
 
 
+#─────────────────────────────( dependency tree )───────────────────────────────
+# Can't typecheck off the AST directly, as some dependent nodes may occur
+# earlier than their dependencies. Example:
+#
+#> item (str): arr[0];
+#> arr: [0, 1];
+#
+# The array `arr` was declared with no type. Until we can walk its expression to
+# determine the "evaluated" type, it's impossible to know if `item` is actually
+# a valid assignment.
+#
+# Building a tree of dependencies, and flatting the AST into an ordered list
+# ensures never walking a note before its dependants have been evaluated first.
+
+declare -g DEPENDENCY=
+# Current DEP_$n node we're in.
+
+declare -gA DEPTH_MAP=()
+# Mapping of {NODE_$n -> $depth}. Intermediate phase in going from unordered to
+# ordered.
+
+declare -ga UNORDERED_DEPS=()
+declare -ga ORDERED_DEPS=()
+# UNORDERED_DEPS[] -> DEPTH_MAP{} -> ORDERED_DEPS[]
+
+
+function mk_dependency {
+   local dep="DEP_${1}"
+   declare -ga "$dep"
+   declare -g  DEPENDENCY="$dep"
+   UNORDERED_DEPS+=( "$dep" )
+}
+
+
+function walk_flatten {
+   declare -g NODE="$1"
+   flatten_"${TYPEOF[$NODE]}"
+}
+
+
+function flatten_decl_section {
+   local node="$NODE"
+   local -n node_r="$node"
+
+   local symtab="$SYMTAB"
+   symtab from "$node"
+
+   local -n items_r="${node_r[items]}" 
+   for var_decl in "${items_r[@]}"; do
+      walk_flatten "$var_decl"
+   done
+
+   declare -g NODE="$node"
+   declare -g SYMTAB="$symtab"
+}
+
+
+function flatten_decl_variable {
+   local -n node_r="$NODE"
+
+   mk_dependency "$NODE"
+   if [[ -n ${node_r[expr]} ]] ; then
+      walk_flatten "${node_r[expr]}"
+   fi
+}
+
+
+function flatten_typecast {
+   local -n node_r="$NODE"
+   walk_flatten "${node_r[expr]}" 
+}
+
+
+function flatten_member {
+   local -n node_r=$NODE
+   walk_flatten "${node_r[left]}"
+   walk_flatten "${node_r[right]}"
+}
+
+
+function flatten_index {
+   local -n node_r=$NODE
+   walk_flatten "${node_r[left]}"
+   walk_flatten "${node_r[right]}"
+}
+
+
+function flatten_unary {
+   local -n node_r=$NODE
+   walk_flatten "${node_r[right]}"
+}
+
+
+function flatten_array {
+   local -n node_r=$NODE
+   for ast_node in "${node_r[@]}"; do
+      walk_flatten "$ast_node"
+   done
+}
+
+
+function flatten_identifier {
+   # Get identifier name.
+   local -n node_r="$NODE"
+   local name="${node_r[value]}"
+
+   symtab get "$name"
+   local -n symbol_r="$SYMBOL"
+
+   # Add variable target as a dependency.
+   local target="${symbol_r[node]}" 
+   local -n dep="$DEPENDENCY"
+   dep+=( "$target" )
+
+   symtab from "$target"
+}
+
+
+function flatten_boolean { :; }
+function flatten_integer { :; }
+function flatten_string  { :; }
+function flatten_path    { :; }
+function flatten_env_var { :; }
+
+#────────────────────────────( order dependencies )─────────────────────────────
+declare -gi DEPTH=0
+
+function dependency_to_map {
+   for dep_node in "${UNORDERED_DEPS[@]}" ; do
+      dependency_depth "$dep_node"
+
+      local ast_node="${dep_node/DEP_/}"
+      DEPTH_MAP[$ast_node]="$DEPTH"
+   done
+}
+
+
+function dependency_depth {
+   local -n node="$1"
+   local -i level="${2:-0}"
+
+   # When we've reached the end of a dependency chain, return the accumulated
+   # depth level.
+   if ! (( ${#node[@]} )) ; then
+      DEPTH="$level" ; return
+   fi
+
+   (( ++level ))
+
+   local -a sub_levels=()
+   for ast_node in "${node[@]}" ; do
+      dependency_depth "DEP_${ast_node}"  "$level"
+      sub_levels+=( "$DEPTH" )
+   done
+
+   local -i max="${sub_levels[0]}"
+   for n in "${sub_levels[@]}" ; do
+      (( max = (n > max)? n : max ))
+   done
+
+   declare -g DEPTH="$max"
+}
+
+
+function dependency_sort {
+   local -i  i=0  depth=0
+
+   while (( ${#DEPTH_MAP[@]} )) ; do
+      for ast_node in "${!DEPTH_MAP[@]}" ; do
+         depth="${DEPTH_MAP[$ast_node]}"
+         if (( depth == i )) ; then
+            unset 'DEPTH_MAP[$ast_node]'
+            ORDERED_DEPS+=( "$ast_node" )
+         fi
+      done
+      (( ++i ))
+   done
+}
+
+
 #─────────────────────────────( semantic analysis )─────────────────────────────
 function type_equality {
    local -n t1_r="$1"
@@ -617,66 +798,74 @@ function walk_semantics {
 }
 
 
+# Can only hit this as the LHS of a member expression.
+#> _: Section.key;   ->   index(Section, key)
 function semantics_decl_section {
    local -n node_r="$NODE"
    local -n name_r="${node_r[name]}"
 
-   local symtab="$SYMTAB"
-   symtab from "$NODE"
+   symtab get "${name_r[value]}"
 
-   local -n items_r="${node_r[items]}"
-   for ast_node in "${items_r[@]}"; do
-      walk_semantics "$ast_node"
-   done
-
-   declare -g SYMTAB="$symtab"
+   # Need to "return" the resulting 
+   local -n symbol_r="$SYMBOL"
+   declare -g TYPE="${symbol_r[type]}"
 }
 
 
 function semantics_decl_variable {
-   local -- save=$NODE
-   local -n node=$save
-   local -n name="${node[name]}"
+   # The Symbol.type will be set to the "evaluated" type. If there is a typedef,
+   # the expression's type must evaluate to *at least* the requirements of the
+   # declared type.
+   #
+   #> arr (array): [0, 1];
+   #> # declared: Type(ARRAY)
+   #> # actual:   Type(ARRAY, subtype: Type(INTEGER))
 
-   if [[ "${node[type]}" ]] ; then
-      # Sets target type. The type of the expression should match the type of
-      # the typedef in the symbol table.
-      walk_semantics "${node[type]}"
-      local target="$TYPE"
-   fi
+   local -n node_r="$NODE"
+   local -n name_r="${node_r[name]}"
+   local name="${name_r[value]}"
 
-   if [[ "${node[expr]}" ]] ; then
+   # Initially set a Type(ANY). If this is overwritten by walking the
+   # expression, that sets the evaluated type.
+   declare -g TYPE="$_ANY"
+   if [[ "${node_r[expr]}" ]] ; then
       walk_semantics "${node[expr]}"
-      local actual="$TYPE"
+   fi
+   local actual="$TYPE"
+
+   if [[ "${node_r[type]}" ]] ; then
+      walk_semantics "${node_r[type]}"
+   fi
+   local target="$TYPE"
+
+   if ! type_equality  "$target"  "$actual" ; then
+      raise type_error "${node_r[expr]}"
    fi
 
-   # Only able to test if the declared type matches the actual type... if an
-   # intended type was declared.
-   if [[ "$target" ]] && ! type_equality  "$target"  "$actual" ; then
-      raise type_error "${node[expr]}"
-   fi
+   symtab from "$name"
+   symtab get "name"
 
-   declare -g NODE=$save
+   local -n symbol_r="$SYMBOL"
+   symbol_r['type']="$actual"
 }
 
 
 function semantics_typedef {
-   local -- node="$NODE"
+   local node="$NODE"
    local -n node_r="$node"
-
    local -n name_r="${node_r[kind]}"
-   local -- name="${name_r[value]}"
-   symtab get "$name"
+   local name="${name_r[value]}"
 
+   symtab get "$name"
    local -n symbol_r="$SYMBOL"
-   local -- outer_type="${symbol_r[type]}"
+   local outer_type="${symbol_r[type]}"
    # Types themselves are defined as such:
    #> int = Type('TYPE', subtype: Type('INTEGER'))
    #> str = Type('TYPE', subtype: Type('STRING'))
 
    local -n outer_type_r="$outer_type"
    copy_type "${outer_type_r[subtype]}"
-   local -- type="$TYPE"
+   local type="$TYPE"
    local -n type_r="$type"
 
    if [[ ${node_r[subtype]} ]] ; then
@@ -716,11 +905,6 @@ function semantics_member {
 
    local right="${node_r[right]}"
    local -n right_r="$right"
-
-   if [[ ! "${TYPEOF[$right]}" == identifier ]] ; then
-      local msg='the right hand side must be an identifier.'
-      raise type_error "$right"  "$msg"
-   fi
 
    # Descend to section's scope (from above `walk_semantics`).
    local -n symbol_r="$SYMBOL"
@@ -768,8 +952,8 @@ function semantics_index {
       raise type_error  "$loc"  "$msg"
    fi
 
-   local -- index="${rhs_r[value]}"
-   local -- rv="${lhs_r[$index]}"
+   local index="${rhs_r[value]}"
+   local rv="${lhs_r[$index]}"
 
    if [[ ! "$rv" ]] ; then
       raise index_error "$index"
@@ -802,7 +986,7 @@ function semantics_array {
 
    # shellcheck disable=SC2154
    copy_type "$_ARRAY"
-   local -- type="$TYPE"
+   local type="$TYPE"
    local -n type_r="$TYPE"
 
    # If the target type is specific (e.g., array:str), the actual type must
@@ -811,7 +995,7 @@ function semantics_array {
    for ast_node in "${node_r[@]}" ; do
       walk_semantics "$ast_node"
       local -n subtype_r=$TYPE
-      local -- subtype="${subtype_r[kind]}"
+      local subtype="${subtype_r[kind]}"
 
       type_r['subtype']="$TYPE"
       # For now we assume the array will have matching types throughout. If it
@@ -841,7 +1025,7 @@ function semantics_array {
 function semantics_identifier {
    # Get identifier name.
    local -n node_r="$NODE"
-   local -- name="${node_r[value]}"
+   local name="${node_r[value]}"
 
    symtab from "$NODE"
    if ! symtab get "$name" ; then

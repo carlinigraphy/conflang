@@ -12,17 +12,11 @@
 
 # Abstract away all the stuff below.
 function walk_compiler {
-   walk_ref_compiler "$1"
-
-   dependency_to_map
-   dependency_sort
+   walk_skelly "$1"
    
-   #declare -p ${!_SKELLY_*}
-   #declare -p EXPR_MAP
-
    for ast_node in "${ORDERED_DEPS[@]}" ; do
       local -n dst="${EXPR_MAP[$ast_node]}"
-      walk_expr_compiler "$ast_node"
+      walk_evaluate "$ast_node"
       dst="$DATA"
    done
 
@@ -59,24 +53,6 @@ declare -gA IS_SECTION=()
 declare -gA EXPR_MAP=()
 # Mapping from NODE_$n -> _SKELLY_$n
 
-declare -g  DEPENDENCY=
-declare -ga UNORDERED_DEPS=()
-declare -gA DEPTH_MAP=()
-declare -ga ORDERED_DEPS=()
-# ^-- This is where dependencies go during the reference phase of the compiler.
-# Each variable declaration also creates an array to hold everything it depends
-# upon. Before the 2nd phase, they're sorted into ORDERED_DEPS[].
-#
-# Order is DEPENDENCY -> UNORDERED_DEPS[] -> DEPTH_MAP{} -> ORDERED_DEPS[]
-
-function mk_dependency {
-   local dep="DEP_${1}"
-   declare -ga "$dep"
-   declare -g  DEPENDENCY="$dep"
-   UNORDERED_DEPS+=( "$dep" )
-}
-
-
 function mk_compile_dict {
    (( ++SKELLY_NUM ))
    local skelly="_SKELLY_${SKELLY_NUM}"
@@ -101,13 +77,13 @@ function mk_skelly {
 }
 
 
-function walk_ref_compiler {
+function walk_skelly {
    declare -g NODE="$1"
-   compile_ref_"${TYPEOF[$NODE]}"
+   skelly_"${TYPEOF[$NODE]}"
 }
 
 
-function compile_ref_decl_section {
+function skelly_decl_section {
    local -- node="$NODE"
    local -n node_r="$node"
 
@@ -148,144 +124,19 @@ function compile_ref_decl_section {
       local -n name_r="${var_decl_r[name]}"
       local -- name="${name_r[value]}"
 
-      walk_ref_compiler "$var_decl"
+      walk_skelly "$var_decl"
       dict_skelly_r[$name]="$SKELLY"
    done
 
    declare -g SKELLY="$middle_skelly"
-   declare -g SYMTAB="$symtab"
 }
 
 
-function compile_ref_decl_variable {
-   local -n node_r="$NODE"
-
+function skelly_decl_variable {
    # Create skeleton node to be inserted into the parent section, and add
    # mapping from the AST node to the output skeleton node.
    mk_skelly
    EXPR_MAP["$NODE"]="$SKELLY"
-
-   # Create global "${SKELLY}_DEPS" array holding all the dependencies we run
-   # into downstream.
-   mk_dependency "$NODE"
-
-   if [[ -n ${node_r[expr]} ]] ; then
-      walk_ref_compiler "${node_r[expr]}"
-   fi
-}
-
-
-function compile_ref_typecast {
-   local -n node_r="$NODE"
-   walk_ref_compiler "${node_r[expr]}" 
-}
-
-
-function compile_ref_member {
-   local -n node_r=$NODE
-   walk_ref_compiler "${node_r[left]}"
-   walk_ref_compiler "${node_r[right]}"
-}
-
-
-function compile_ref_index {
-   local -n node_r=$NODE
-   walk_ref_compiler "${node_r[left]}"
-   walk_ref_compiler "${node_r[right]}"
-}
-
-
-function compile_ref_unary {
-   local -n node_r=$NODE
-   walk_ref_compiler "${node_r[right]}"
-}
-
-
-function compile_ref_array {
-   local -n node_r=$NODE
-   for ast_node in "${node_r[@]}"; do
-      walk_ref_compiler "$ast_node"
-   done
-}
-
-
-function compile_ref_identifier {
-   # Get identifier name.
-   local -n node_r="$NODE"
-   local -- name="${node_r[value]}"
-
-   symtab get "$name"
-   local -n symbol_r="$SYMBOL"
-
-   # Add variable target as a dependency.
-   local -- target="${symbol_r[node]}" 
-   local -n dep="$DEPENDENCY"
-   dep+=( "$target" )
-
-   symtab from "$target"
-}
-
-
-function compile_ref_boolean { :; }
-function compile_ref_integer { :; }
-function compile_ref_string  { :; }
-function compile_ref_path    { :; }
-function compile_ref_env_var { :; }
-
-
-#────────────────────────────( order dependencies )─────────────────────────────
-declare -gi DEPTH=0
-
-function dependency_to_map {
-   for dep_node in "${UNORDERED_DEPS[@]}" ; do
-      dependency_depth "$dep_node"
-
-      local ast_node="${dep_node/DEP_/}"
-      DEPTH_MAP[$ast_node]="$DEPTH"
-   done
-}
-
-
-function dependency_depth {
-   local -n node="$1"
-   local -i level="${2:-0}"
-
-   # When we've reached the end of a dependency chain, return the accumulated
-   # depth level.
-   if ! (( ${#node[@]} )) ; then
-      DEPTH="$level" ; return
-   fi
-
-   (( ++level ))
-
-   local -a sub_levels=()
-   for ast_node in "${node[@]}" ; do
-      dependency_depth "DEP_${ast_node}"  "$level"
-      sub_levels+=( "$DEPTH" )
-   done
-
-   local -i max="${sub_levels[0]}"
-   for n in "${sub_levels[@]}" ; do
-      (( max = (n > max)? n : max ))
-   done
-
-   declare -g DEPTH="$max"
-}
-
-
-function dependency_sort {
-   local -i  i=0  depth=0
-
-   while (( ${#DEPTH_MAP[@]} )) ; do
-      for ast_node in "${!DEPTH_MAP[@]}" ; do
-         depth="${DEPTH_MAP[$ast_node]}"
-         if (( depth == i )) ; then
-            unset 'DEPTH_MAP[$ast_node]'
-            ORDERED_DEPS+=( "$ast_node" )
-         fi
-      done
-      (( ++i ))
-   done
 }
 
 
@@ -307,42 +158,42 @@ function mk_compile_array {
 }
 
 
-function walk_expr_compiler {
+function walk_evaluate {
    declare -g NODE="$1"
-   compile_expr_"${TYPEOF[$NODE]}"
+   evaluate_"${TYPEOF[$NODE]}"
 }
 
 
-function compile_expr_decl_section {
+function evaluate_decl_section {
    local -n node_r="$NODE"
    local -n items_r="${node_r[items]}" 
    for ast_node in "${items_r[@]}"; do
-      walk_expr_compiler "$ast_node"
+      walk_evaluate "$ast_node"
    done
 }
 
 
-function compile_expr_decl_variable {
+function evaluate_decl_variable {
    local -n node_r="$NODE"
    if [[ -n ${node_r[expr]} ]] ; then
-      walk_expr_compiler "${node_r[expr]}"
+      walk_evaluate "${node_r[expr]}"
    fi
 }
 
 
-function compile_expr_typecast {
+function evaluate_typecast {
    local -n node_r="$NODE"
-   walk_expr_compiler "${node_r[expr]}" 
+   walk_evaluate "${node_r[expr]}" 
 }
 
 
-function compile_expr_member {
+function evaluate_member {
    # A 'member' is a combination of...
    #    .left   section
    #    .right  identifier
    local -n node_r="$NODE"
 
-   walk_expr_compiler "${node_r[left]}" 
+   walk_evaluate "${node_r[left]}" 
    local -n left_r="$DATA"
 
    local -n right_r="${node_r[right]}"
@@ -355,13 +206,13 @@ function compile_expr_member {
 }
 
 
-function compile_expr_index {
+function evaluate_index {
    # An 'index' is a combination of...
    #    .left   array
    #    .right  integer
    local -n node_r="$NODE"
 
-   walk_expr_compiler "${node_r[left]}" 
+   walk_evaluate "${node_r[left]}" 
    local -n left_r="$DATA"
 
    local -n right_r="${node_r[right]}"
@@ -371,14 +222,14 @@ function compile_expr_index {
 }
 
 
-function compile_expr_unary {
+function evaluate_unary {
    local -n node_r="$NODE"
-   walk_expr_compiler "${node_r[right]}"
+   walk_evaluate "${node_r[right]}"
    (( DATA = DATA * -1 ))
 }
 
 
-function compile_expr_array {
+function evaluate_array {
    local -n node_r="$NODE"
 
    mk_compile_array
@@ -386,7 +237,7 @@ function compile_expr_array {
    local -n array_r="$DATA"
 
    for ast_node in "${node_r[@]}"; do
-      walk_expr_compiler "$ast_node"
+      walk_evaluate "$ast_node"
       array_r+=( "$DATA" )
    done
 
@@ -394,24 +245,24 @@ function compile_expr_array {
 }
 
 
-function compile_expr_boolean {
+function evaluate_boolean {
    local -n node_r="$NODE"
    declare -g DATA="${node_r[value]}"
 }
 
 
-function compile_expr_integer {
+function evaluate_integer {
    local -n node_r="$NODE"
    declare -g DATA="${node_r[value]}"
 }
 
 
-function compile_expr_string {
+function evaluate_string {
    local -n node_r="$NODE"
    local -- string="${node_r[value]}"
 
    while [[ "${node_r[concat]}" ]] ; do
-      walk_expr_compiler "${node_r[concat]}"
+      walk_evaluate "${node_r[concat]}"
       string+="$DATA"
       local -n node="${node_r[concat]}"
    done
@@ -420,12 +271,12 @@ function compile_expr_string {
 }
 
 
-function compile_expr_path {
+function evaluate_path {
    local -n node_r=$NODE
    local -- path="${node_r[value]}"
 
    while [[ "${node_r[concat]}" ]] ; do
-      walk_expr_compiler "${node_r[concat]}"
+      walk_evaluate "${node_r[concat]}"
       path+="$DATA"
       local -n node="${node_r[concat]}"
    done
@@ -434,7 +285,7 @@ function compile_expr_path {
 }
 
 
-function compile_expr_env_var {
+function evaluate_env_var {
    local -n node_r="$NODE"
    local -- ident="${node_r[value]}" 
 
@@ -446,7 +297,7 @@ function compile_expr_env_var {
 }
 
 
-function compile_expr_identifier {
+function evaluate_identifier {
    # Pull identifier's name out of the AST node.
    local -n node_r="$NODE"
    local -- name="${node_r[value]}"

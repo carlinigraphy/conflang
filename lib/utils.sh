@@ -185,8 +185,10 @@ function do_parse {
    # Parse the top-level `base' file.
    add_file "$INPUT"
 
-   # TODO: I've always thought it was stupid that `do_parse` calls `_parse`
-   # which calls `parse`.
+   # TODO(issue#1): I've always thought it was stupid that `do_parse` calls
+   # `_parse` which calls `parse`. Should replace with something along the lines
+   # of:  parse() -> utils:parse_file() -> parser:parse().
+   #
    _parse
    declare -g PARENT_ROOT=$ROOT
    merge_includes
@@ -238,6 +240,10 @@ function do_compile {
       symtab_r[$key]="${global_r[$key]}"
    done
    
+   walk_flatten   "$PARENT_ROOT"
+   dependency_to_map
+   dependency_sort
+
    walk_semantics "$PARENT_ROOT"
    walk_compiler  "$PARENT_ROOT"
 } 
