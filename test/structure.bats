@@ -11,16 +11,16 @@ function setup {
 }
 
 
-@test "lexer does not include \`p_\` prefixed functions" {
+@test "lexer does not include \`parser\` prefixed functions" {
    # Awk regex pattern.
-   pattern='/^[[:alpha:]_][[:alnum:]_]* \(\)/'
+   pattern='/^[[:alpha:]_][[:alnum:]_:]* \(\)/'
 
    # Get initial list of functions from the environment. Don't want these
    # polluting the results from the lexer function names. Filter them out.
    readarray -td $'\n' _fns < <(declare -f | awk "${pattern} {print \$1}")
 
    # Source in the lexer, compile list of function names. None of these should
-   # begin with an `p_` prefix.
+   # begin with an `parser:` prefix.
    source "$lib_lexer"
    readarray -td $'\n' fns < <(declare -f | awk "${pattern} {print \$1}")
 
@@ -31,22 +31,22 @@ function setup {
 
    for f in "${fns[@]}" ; do
       if [[ ! "${filter[$f]}" ]] ; then
-          [[ ! "$f" =~ ^p_ ]]
+          [[ ! "$f" =~ ^parser: ]]
       fi
    done
 }
 
 
-@test "parser does not include \`l_\` prefixed functions" {
+@test "parser does not include \`lexer:\` prefixed functions" {
    # Awk regex pattern.
-   pattern='/^[[:alpha:]_][[:alnum:]_]* \(\)/'
+   pattern='/^[[:alpha:]_][[:alnum:]_:]* \(\)/'
 
    # Get initial list of functions from the environment. Don't want these
    # polluting the results from the lexer function names. Filter them out.
    readarray -td $'\n' _fns < <(declare -f | awk "${pattern} {print \$1}")
 
    # Source in the parser, compile list of function names. None of these should
-   # begin with an `l_` prefix.
+   # begin with an `lexer:` prefix.
    source "$lib_parser"
    readarray -td $'\n' fns < <(declare -f | awk "${pattern} {print \$1}")
 
@@ -57,7 +57,7 @@ function setup {
 
    for f in "${fns[@]}" ; do
       if [[ ! "${filter[$f]}" ]] ; then
-          [[ ! "$f" =~ ^l_ ]]
+          [[ ! "$f" =~ ^lexer: ]]
       fi
    done
 }

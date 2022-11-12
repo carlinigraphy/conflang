@@ -9,7 +9,7 @@ function setup {
 
    # These have functions that are directly invoked:
    source "${LIBDIR}/../bin/confc"     # init_globals()
-   source "${LIBDIR}/utils.sh"         # add_file(), merge_includes()
+   source "${LIBDIR}/utils.sh"         # utils:add_file(), merge_includes()
 
    # These are more strictly library code. Nothing called directly.
    source "${LIBDIR}/lexer.sh"
@@ -39,21 +39,21 @@ function setup {
 }
 
 
-@test "add_file() fails on unreadable file" {
+@test "utils:add_file() fails on unreadable file" {
    init_globals
 
    local f="${BATS_FILE_TMPDIR}"/UNREADABLE
    touch   "$f"
    chmod 0 "$f"
 
-   run add_file "$f"
+   run utils:add_file "$f"
    assert_failure
    assert_output --regexp  '^File Error: '
    assert_output --partial "missing or unreadable source file ${f}."
 }
 
 
-@test "add_file() fails on nonexistent file" {
+@test "utils:add_file() fails on nonexistent file" {
    # We can be very confident this file will not exist beforehand, as we have
    # control over the environment in which the tests are run. The new file is
    # created in a temporary directory only used by tests in this file itself.
@@ -61,7 +61,7 @@ function setup {
 
    local f="${BATS_FILE_TMPDIR}"/DOESNT_EXIT
 
-   run add_file "$f"
+   run utils:add_file "$f"
    assert_failure
    assert_output --regexp  '^File Error: '
    assert_output --partial "missing or unreadable source file ${f}."
@@ -73,9 +73,9 @@ function setup {
    echo '_{}'                      > "$PARENT_F2"
 
    init_globals
-   add_file "$PARENT_F1"
+   utils:add_file "$PARENT_F1"
 
-   _parse
+   utils:parse_file
    assert_equal "${#FILES[@]}"       1
    assert_equal "${FILES[-1]}"       "$PARENT_F1"
 
@@ -109,9 +109,9 @@ function setup {
    echo '_{}' > "$PARENT_F2"
 
    init_globals
-   add_file "$PARENT_F1"
+   utils:add_file "$PARENT_F1"
 
-   _parse
+   utils:parse_file
    assert_equal "${#FILES[@]}"       1
    assert_equal "${FILES[-1]}"       "$PARENT_F1"
 
@@ -151,9 +151,9 @@ function setup {
    echo '_{}' > "$CHILD_F1"
 
    init_globals
-   add_file "$PARENT_F1"
+   utils:add_file "$PARENT_F1"
 
-   _parse
+   utils:parse_file
    assert_equal "${#FILES[@]}"       1
    assert_equal "${FILES[-1]}"       "$PARENT_F1"
 
@@ -188,9 +188,9 @@ function setup {
    echo 'key;' > "$PARENT_F1"
 
    init_globals
-   add_file "$CHILD_F1"
+   utils:add_file "$CHILD_F1"
 
-   _parse
+   utils:parse_file
    assert_equal "${#FILES[@]}"       1
    assert_equal "${FILES[-1]}"       "$CHILD_F1"
 
@@ -246,9 +246,9 @@ function setup {
    echo 'key;' > "$CHILD_F1"
 
    init_globals
-   add_file "$PARENT_F1"
+   utils:add_file "$PARENT_F1"
 
-   _parse
+   utils:parse_file
    assert_equal "${#FILES[@]}"       1
    assert_equal "${FILES[-1]}"       "$PARENT_F1"
 
@@ -310,9 +310,9 @@ function setup {
    echo 'key;' > "$CHILD_F1"
 
    init_globals
-   add_file "$PARENT_F1"
+   utils:add_file "$PARENT_F1"
 
-   _parse
+   utils:parse_file
    assert_equal "${#FILES[@]}"       1
    assert_equal "${FILES[-1]}"       "$PARENT_F1"
 

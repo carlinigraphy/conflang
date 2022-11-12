@@ -39,7 +39,7 @@ function init_globals {
 }
 
 
-function add_file {
+function utils:add_file {
    # Serves to both ensure we don't have circular imports, as well as resolving
    # relative paths to their fully qualified path.
    local file="$1"
@@ -70,8 +70,10 @@ function add_file {
       [[ "$f" == "$file" ]] && raise circular_import "$file"
    done
 
-   # File must exist, and must be a file. Also stdin is always allowed.
-   if [[ ! -f "$fq_path" ]] && [[ "$fq_path" != /dev/stdin ]] ; then
+   if [[ ! -e "$fq_path" ]] ||
+      [[ ! -r "$fq_path" ]] ||
+      [[   -d "$fq_path" ]]
+   then
       raise missing_file "$fq_path"
    fi
 
@@ -85,8 +87,8 @@ function merge_includes {
       local -n node_r=${INCLUDES[idx]}
       insert_node_path="${node_r[path]}"
 
-      add_file "$insert_node_path"
-      _parse
+      utils:add_file "$insert_node_path"
+      utils:parse_file
 
       # Construct array (backwards) of the $ROOT nodes for each %include
       # statement.  Allows us to iter the INCLUDES backwards, and match $idx to
@@ -182,8 +184,7 @@ function utils:parse_file {
 
 function utils:parse {
    # Parse the top-level `base' file.
-   add_file "$INPUT"
-
+   utils:add_file "$INPUT"
    utils:parse_file
    declare -g PARENT_ROOT=$ROOT
    merge_includes
