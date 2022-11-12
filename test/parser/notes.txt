@@ -1,0 +1,9 @@
+ast.bats
+   - [ ] typecasting is lowest precedence
+   - [ ] grouping works
+   - [ ] grouping works for typecasting
+         - may help with inane things, such as an environment variable pointing
+           to an integer for unary negation:  `-($SHLVL -> int);`
+         - though I guess you could just:     `f"-{$SHLVL}" -> int;`
+         - or in two steps:                   `_lvl: $SHLVL -> int;  lvl: -_lvl;`
+   - [ ] a.b[0]  =>  ((a, b), 0) and not (a, (b, 0))

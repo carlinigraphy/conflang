@@ -1,0 +1,7 @@
+Missed errors, or reports wrong/poorly:
+
+
+(1)      Assignments with non-identifiers.
+         | S { 0; }
+
+         The message "expecting variable declaration" isn't super precise."
