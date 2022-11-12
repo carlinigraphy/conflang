@@ -70,8 +70,8 @@ function add_file {
       [[ "$f" == "$file" ]] && raise circular_import "$file"
    done
 
-   # File must exist, must be readable.
-   if [[ ! -r "$fq_path" ]] ; then
+   # File must exist, and must be a file.
+   if [[ ! -f "$fq_path" ]] ; then
       raise missing_file "$fq_path"
    fi
 
@@ -240,10 +240,13 @@ function do_compile {
       symtab_r[$key]="${global_r[$key]}"
    done
    
-   walk_flatten   "$PARENT_ROOT"
+   walk_flatten "$PARENT_ROOT"
    dependency_to_map
    dependency_sort
 
-   walk_semantics "$PARENT_ROOT"
+   for ast_node in "${ORDERED_DEPS[@]}" ; do
+      walk_semantics "$ast_node"
+   done
+
    walk_compiler  "$PARENT_ROOT"
 } 

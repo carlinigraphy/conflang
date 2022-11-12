@@ -1,6 +1,6 @@
 #!/bin/bash
 
-function mk_metatype {
+function mk_metatype() {
    local name="$1"
    local kind="$2"
    local complex="$3"
@@ -720,19 +720,19 @@ function dependency_to_map {
 
 
 function dependency_depth {
-   local -n node="$1"
+   local -n node_r="$1"
    local -i level="${2:-0}"
 
    # When we've reached the end of a dependency chain, return the accumulated
    # depth level.
-   if ! (( ${#node[@]} )) ; then
+   if ! (( ${#node_r[@]} )) ; then
       DEPTH="$level" ; return
    fi
 
    (( ++level ))
 
    local -a sub_levels=()
-   for ast_node in "${node[@]}" ; do
+   for ast_node in "${node_r[@]}" ; do
       dependency_depth "DEP_${ast_node}"  "$level"
       sub_levels+=( "$DEPTH" )
    done
@@ -825,25 +825,32 @@ function semantics_decl_variable {
    local -n name_r="${node_r[name]}"
    local name="${name_r[value]}"
 
+   symtab from "$NODE"
+   symtab get "$name"
+
+   echo "[$name]"
+   echo " .node  : $(declare -p $NODE)"
+
    # Initially set a Type(ANY). If this is overwritten by walking the
    # expression, that sets the evaluated type.
    declare -g TYPE="$_ANY"
    if [[ "${node_r[expr]}" ]] ; then
-      walk_semantics "${node[expr]}"
+      walk_semantics "${node_r[expr]}"
    fi
    local actual="$TYPE"
 
+   # As above, if there is no declared type, the target inherits the evaluated
+   # type. This obviously matches. It becomes the Symbol.type.
    if [[ "${node_r[type]}" ]] ; then
       walk_semantics "${node_r[type]}"
    fi
    local target="$TYPE"
 
+   echo " .type2 : $(declare -p $TYPE)"
+
    if ! type_equality  "$target"  "$actual" ; then
       raise type_error "${node_r[expr]}"
    fi
-
-   symtab from "$name"
-   symtab get "name"
 
    local -n symbol_r="$SYMBOL"
    symbol_r['type']="$actual"
@@ -879,8 +886,8 @@ function semantics_typedef {
 
 
 function semantics_typecast {
-   local -n node="$NODE"
-   walk_semantics ${node[typedef]}
+   local -n node_r="$NODE"
+   walk_semantics ${node_r[typedef]}
 }
 
 
@@ -929,6 +936,20 @@ function semantics_member {
 
 
 function semantics_index {
+   # THINKIES: the lhs of an index expression can be one of four things:
+   #  1. A raw array declaration:  zero: [0, 1][0];
+   #  2. A direct reference:       arr: [0, 1];       one: arr[1];
+   #  3. An index expression:      arr: [[0, 1]];     one: arr[0][1];
+   #  4. A member expression:      S { arr: [0, 1]; } one: S.arr[1];
+   # Must have $NODE set to the array node. Either the decl.expr.items, or
+   # the node itself directly.
+   #
+   # - What is "returned" by each fn() that can land here?
+   # - Does anything else use that return? Do we need to make it more universal,
+   #   or can everything point to the .items prop?
+   #
+   # CURRENT: it is late--finish this later.
+
    local -n node_r="$NODE"
 
    walk_semantics "${node_r[left]}"
@@ -1016,13 +1037,11 @@ function semantics_array {
 }
 
 
-# TODO: re-think semantics(identifier)
-# When a variable is declared without a type, its Symbol takes an implicit
-# Type('ANY'). This function returns the DECLARED symbol.type, rather than the
-# EVALUATED type of expressions. Wonder if we want to just re-walk whatever is
-# being pointed to? Feels catastrophically wasteful when hitting a section.
-#
 function semantics_identifier {
+   # Before this stage, we've flattened the AST to an array, and sorted by
+   # dependency order. Can safely look up the .type of the target Symbol without
+   # worry that it may be uninitialized.
+
    # Get identifier name.
    local -n node_r="$NODE"
    local name="${node_r[value]}"
@@ -1032,24 +1051,22 @@ function semantics_identifier {
       raise missing_var "$name"
    fi
 
-   local -n symbol_r="$SYMBOL"
-   declare -g TYPE="${symbol_r[type]}"
-
    # Need to set the $NODE to "return" the expression referenced by this
    # variable. Necessary in index/member subscription expressions.
+   local -n symbol_r="$SYMBOL"
    local -n target_r="${symbol_r[node]}"
    declare -g NODE="${target_r[expr]}"
+   declare -g TYPE="${symbol_r[type]}"
 }
 
+# shellcheck disable=SC2154
+function semantics_path    { declare -g TYPE="$_PATH"    ;}
 
 # shellcheck disable=SC2154
-function semantics_path    { copy_type "$_PATH"    ;}
+function semantics_boolean { declare -g TYPE="$_BOOLEAN" ;}
 
 # shellcheck disable=SC2154
-function semantics_boolean { copy_type "$_BOOLEAN" ;}
+function semantics_integer { declare -g TYPE="$_INTEGER" ;}
 
 # shellcheck disable=SC2154
-function semantics_integer { copy_type "$_INTEGER" ;}
-
-# shellcheck disable=SC2154
-function semantics_string  { copy_type "$_STRING"  ;}
+function semantics_string  { declare -g TYPE="$_STRING"  ;}
