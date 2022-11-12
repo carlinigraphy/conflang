@@ -329,6 +329,10 @@ function evaluate_identifier {
 
 #─────────────────────────────( skeleton to data )──────────────────────────────
 # Folds around the intermediate SKELLY nodes, resulting in the raw data. 
+#
+# _SKELLY_1="_SKELLY_2" ; _SKELLY_2="value"
+#             o< ---snip-snip--- >o                <-- these are scissors
+# _SKELLY_1=                        "value"
 
 function undead_yoga {
    local -n src_r="$1"

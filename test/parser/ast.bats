@@ -222,18 +222,18 @@ function setup {
 }
 
 
-@test "declaration w/ internal variable" {
+@test "declaration w/ identifier" {
    local -a FILES=( /dev/stdin )
 
    init_scanner
-   scan <<< '_: %internal;'
+   scan <<< '_: foo;'
 
    init_parser
    parse
 
    local -n node='NODE_6'
-   assert_equal  "${TYPEOF[NODE_6]}"  'int_var'
-   assert_equal  "${node[value]}"     'internal'
+   assert_equal  "${TYPEOF[NODE_6]}"  'identifier'
+   assert_equal  "${node[value]}"     'foo'
 }
 
 
@@ -241,14 +241,14 @@ function setup {
    local -a FILES=( /dev/stdin )
 
    init_scanner
-   scan <<< '_: $environment;'
+   scan <<< '_: $ENV;'
 
    init_parser
    parse
 
    local -n node='NODE_6'
    assert_equal  "${TYPEOF[NODE_6]}"  'env_var'
-   assert_equal  "${node[value]}"     'environment'
+   assert_equal  "${node[value]}"     'ENV'
 }
 
 
@@ -256,7 +256,7 @@ function setup {
    local -a FILES=( /dev/stdin )
 
    init_scanner
-   scan <<< '_: ["one"].0;'
+   scan <<< '_: [0][0];'
 
    init_parser
    parse
