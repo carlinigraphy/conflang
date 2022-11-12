@@ -5,40 +5,47 @@
 :pygments-style:           algol_nu
 :pygments-linenums-mode:   table
 
-Configuration file format & language, featuring strong typing and a small but robust feature set.
+<DRAFT>
+
+Configuration language, featuring strong typing and a small but robust feature set.
+
+NOTE:
+Kinda just slamming words below.
+Getting the gists of the necessary documentation below.
+I'd imagine it's still very unclear to anyone else what _exactly_ this does, let alone how it works.
+Need to come up with a brutally simple outline to explain it.
+
 
 == What works
-
-* [x] Parsing, compilation
+* [ ] Parsing, evaluation
+* [ ] Typechecking
+* [ ] VM & post-compilation validation
 * [x] Accessing values from input data
-* [x] Typechecking
 * [x] Including sub-files
 * [x] Enforcing contraints upon child-files
-* [ ] VM & post-compilation validation
 
+Around a503e1b917aa or so I broke a good amount of core functionality while fixing symbol tables.
+Gonna be worse before it gets better.
 
 == Why it do
-Another stepping stone in my path to write my own programming language.
+Learning.
 
-Many projects in the last few years have served that goal.
-I consistently find myself hitting sticking points.
-Stemming from both the gaps in my non-existent CS education, as well as difficulties approaching design problems.
-Smaller scale projects, like this one, help me to work through specific conceptual slices.
+Several years ago I began learning to write a "real" programming language.
+Turns out it's hard.
+I found myself consistently hitting conceptual sticking points.
+Approaching these in the context of something I already understand very well (bash) makes them easier to approach.
 
+Many of my recent projects were building towards this goal.
 This is the spiritual successor to `mkconf`, `conf`, and `shql`.
-Each better than the last.
 
 I do not intend for anyone to actually use `conflang`, just as I didn't `shql`.
 Journey over destination and all that.
 
 
 == How it look
-First thing anyone wants to see is some example syntax.
-
-
 .Variable declarations
 ----
-# Basic, untyped key value pairs.
+# Basic, untyped key/value pairs.
 name : "Marcus";
 age  : 30;
 
@@ -49,12 +56,21 @@ age  (int): 30;
 
 
 # Complex types.
-name_pieces (array:str): [
+full_name (array:str): [
    "Marcus",
    "Aurelius",
 ];
 ----
 
+
+.Types
+----
+# (str)    Surrounded with double-quotes:  "this is a string"
+# (int)    Negative & positive integers:   -1, 0, 1, ...
+# (bool)   Boolean values:                 true, false
+# (path)   Surrounded with single-quotes:  './relative', '~/relative', '/absolute'
+# (array)  Arrays, allows mixed types:     [0, 1, 2],  ["one", 2, '~/three.txt']
+----
 
 .Environment variables
 ----
@@ -62,16 +78,20 @@ homedir   (path): $HOME;
 configdir (path): $XDG_CONFIG_HOME;
 ----
 
-.'`Internal`' variables
+.Variables
 ----
 key1: "val1";
-key2: %key1;
+key2: key1;
 
+Section {
+   key: "val";
 
-section1 {
-   key3: "val3";
+   key2: key;
+   #     ^-- relative reference
+
+   key3: Section.key;
+   #     ^-- absolute reference
 }
-key4: %sec1.key3;
 ----
 
 .Sections
@@ -90,7 +110,7 @@ globals {
 ----
 # String interpolation.
 project_dir (path): '{$HOME}/projects/';
-sub_dir     (path): '{%project_dir}/sub/';
+sub_dir     (path): '{project_dir}/sub/';
 
 # Type casting.
 shell_level: $SHLVL -> int;
@@ -100,9 +120,9 @@ shell_level: $SHLVL -> int;
 ----
 common {
    colors (array:str) [
-      "#hex...";
-      "#hex...";
-      "#hex...";
+      "#000000";
+      "#111111";
+      "#222222";
    ];
 }
 
@@ -113,8 +133,8 @@ window {
    }
 
    theme {
-      foreground: %common.colors.0;
-      foreground: %common.colors.1;
+      foreground: common.colors.0;
+      foreground: common.colors.1;
    }
 }
 
@@ -128,15 +148,6 @@ Most every application/tool uses one.
 
 They have many common problems.
 
-=== Poor documentation
-Unless the project maintainer was a benevolent god, thoroughly documenting the file itself, it can be difficult to determine what keys are required or values are expected.
-Is a boolean looking for `true` or `True`, or maybe just anything _truthy_?
-Should integers be in quotes, or standalone?
-Can I include environment variables?
-What about references to other config variables, to keep my code _DRY_.
-
-Who knows.
-
 === Weak typing
 By their nature, configuration files are untyped.
 Even more modern file formats (json, yaml, toml) don't even have type hinting, let alone strong type requirements.
@@ -144,16 +155,24 @@ For configuring utilities as critical a backup application, or system monitoring
 
 No script should fail due to semantic oversights in the configuration.
 
+=== Poor documentation
+Is a boolean looking for `true` or `True`, or maybe just anything _truthy_?
+Can I include environment variables?
+What about references to other config variables, to keep my code _DRY_.
+
+What is allowed, what is expected, what is required.
+Who knows.
+
 === Inconsistent validation
 Validating a configuration file is left entirely to the program author.
 The extent to which they attempt to catch & appropriately handle edge cases can vary wildly.
-Error reporting is often cryptic, or non-existent.
+Error reporting is often unhelpful ("`an error has occurred`"), or non-existent ("`exit 1`").
 
 Programmers don't want to spend their time validating user input.
 Shifting that responsibility to the config file itself allows them to write code.
 
 === Limited features and limited portability
-Bash config files must typically sacrifice features for portability.
+Bash config files must sacrifice features for portability.
 You don't want to download the entirety of Python3 just to parse a more complex config file for your project.
 Thus limiting you to easily bash-parsable formats.
 Largely just a series of `KEY=VALUE` lines.
@@ -168,12 +187,12 @@ The core premise is: two configuration files are present.
 One written by the programmer, the other by the end user.
 
 The parent (programmer's) file enforces variables and types upon the child (end user's) file.
-The child must declare sections & variables required by the parent.
+The child must declare values for the sections & variables required by the parent.
 
-The increased transparency makes it easier on both parties.
+This increased transparency makes it easier on both parties.
 
 === Variables
-Variables are required in the child file if the parent does not have an expression.
+A variable is "`required`" in the child file if there's no expression present in the parent's.
 If the parent's variable does have an expression, it serves as a default if omitted in the child.
 
 [cols='1,1,3']
@@ -201,7 +220,6 @@ If the parent's variable does have an expression, it serves as a default if omit
 | `Type Error: type of age may not be overwritten`
 
 |===
-
 
 
 === Sections
@@ -247,8 +265,8 @@ required {
 }
 ----
 
-== How it do
 
+== How it do
 At its core, conflang does this:
 
 [source]
@@ -261,7 +279,7 @@ fn main(src):
 
    child = None
    if constrain:
-      child = parse(src)
+      child = parse(constrain)
       while includes > 0:
          child += parse(includes.pop())
 
@@ -270,5 +288,5 @@ fn main(src):
 
    ast, symtab = merge(parent_symtab, child_symtab)
    semantics(ast, symtab)
-   compile(ast)
+   evaluate(ast, symtab)
 ----
