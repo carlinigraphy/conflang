@@ -15,11 +15,11 @@ function setup {
 @test 'empty array' {
    local -a FILES=( /dev/stdin )
 
-   init_scanner
-   scan <<< '_: [];'
+   lexer:init
+   lexer:scan <<< '_: [];'
 
-   init_parser
-   parse
+   parser:init
+   parser:parse
 
    local -- node_name='NODE_6'
    local -n node="$node_name"
@@ -39,11 +39,11 @@ function setup {
       ];
    '
 
-   init_scanner
-   scan <<< "$input"
+   lexer:init
+   lexer:scan <<< "$input"
 
-   init_parser
-   parse
+   parser:init
+   parser:parse
 
    local -- a1_name='NODE_6'
    local -n a1="$a1_name"
@@ -75,11 +75,11 @@ function setup {
       ];
    '
 
-   init_scanner
-   scan <<< "$input"
+   lexer:init
+   lexer:scan <<< "$input"
 
-   init_parser
-   run parse
+   parser:init
+   parser:parse
    assert_failure
 }
 
@@ -92,11 +92,11 @@ function setup {
       ];
    "
 
-   init_scanner
-   scan <<< "$input"
+   lexer:init
+   lexer:scan <<< "$input"
 
-   init_parser
-   parse
+   parser:init
+   parser:parse
 
    local -- node_name='NODE_6'
    local -n items="$node_name"
@@ -117,11 +117,11 @@ function setup {
       }
    '
 
-   init_scanner
-   scan <<< "$input"
+   lexer:init
+   lexer:scan <<< "$input"
 
-   init_parser
-   parse
+   parser:init
+   parser:parse
 
    local -- s1_name='NODE_5'
    local -n s1="$s1_name"

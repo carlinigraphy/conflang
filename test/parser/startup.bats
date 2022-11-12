@@ -52,9 +52,9 @@ function setup {
    source "$lib_parser"
 
    local -a FILES=( /dev/stdin )
-   init_scanner
+   lexer:init
 
-   scan <<< ''
+   lexer:scan <<< ''
    parse
 }
 
@@ -67,9 +67,9 @@ function setup {
    source "$lib_parser"
 
    local -a FILES=( /dev/stdin )
-   init_scanner
+   lexer:init
 
-   scan <<< 'this (str): "that";'
+   lexer:scan <<< 'this (str): "that";'
 
    run parse
    assert_success

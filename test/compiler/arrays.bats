@@ -19,8 +19,8 @@ function setup {
    init_globals
    INPUT=/dev/stdin
 
-   do_parse <<< 'array: [];'
-   do_compile
+   utils:parse <<< 'array: [];'
+   utils:eval
 
    # %inline container
    declare -n d1='_DATA_1'
@@ -40,8 +40,8 @@ function setup {
    init_globals
    INPUT=/dev/stdin
 
-   do_parse <<< 'array: [[]];'
-   do_compile
+   utils:parse <<< 'array: [[]];'
+   utils:eval
 
    # %inline container
    declare -n d1='_DATA_1'

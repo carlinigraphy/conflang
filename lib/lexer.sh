@@ -18,7 +18,7 @@ declare -gA KEYWORD=(
    ['constrain']=true
 )
 
-function init_scanner {
+function lexer:init {
    # Some variables need to be reset at the start of every run. They hold
    # information that should not be carried from file to file.
 
@@ -74,7 +74,7 @@ function Token {
 }
 
                                      
-function l_advance {
+function lexer:advance {
    # Advance cursor position, pointing to each sequential character. Also incr.
    # the column number indicator. If we go to a new line, it's reset to 0.
    #
@@ -98,7 +98,7 @@ function l_advance {
 }
 
 
-function scan {
+function lexer:scan {
    # For easier lookahead, read all characters first into an array. Allows us
    # to seek/index very easily.
    while read -rN1 character ; do
@@ -106,7 +106,7 @@ function scan {
    done < "${FILES[-1]}"
 
    while [[ ${CURSOR[offset]} -lt ${#CHARRAY[@]} ]] ; do
-      l_advance ; [[ -z "$CURRENT" ]] && break
+      lexer:advance ; [[ -z "$CURRENT" ]] && break
 
       # Save current cursor information.
       FREEZE['offset']=${CURSOR['offset']}
@@ -115,7 +115,7 @@ function scan {
 
       # Skip comments.
       if [[ $CURRENT == '#' ]] ; then
-         l_comment ; continue
+         lexer:comment ; continue
       fi
 
       # Skip whitespace.
@@ -147,7 +147,7 @@ function scan {
       if [[ $CURRENT == '-' ]] ; then
          # If subsequent `>', is an arrow for typecast.
          if [[ $PEEK == '>' ]] ; then
-            l_advance
+            lexer:advance
             Token 'ARROW' '->'
          else
             Token 'MINUS' '-'
@@ -159,27 +159,27 @@ function scan {
       # f-{strings,paths}
       if [[ $CURRENT == 'f' ]] ; then
          if   [[ $PEEK == '"' ]] ; then
-            l_advance ; l_fstring
+            lexer:advance ; lexer:fstring
             continue
          elif [[ $PEEK == "'" ]] ; then
-            l_advance ; l_fpath
+            lexer:advance ; lexer:fpath
             continue
          fi
       fi
 
       # Identifiers.
       if [[ $CURRENT =~ [[:alpha:]_] ]] ; then
-         l_identifier ; continue
+         lexer:identifier ; continue
       fi
 
       # Strings. Surrounded by `"`.
       if [[ $CURRENT == '"' ]] ; then
-         l_string ; continue
+         lexer:string ; continue
       fi
 
       # Paths. Surrounded by `'`.
       if [[ $CURRENT == "'" ]] ; then
-         l_path ; continue
+         lexer:path ; continue
       fi
 
       # Numbers.
@@ -190,7 +190,7 @@ function scan {
          # external functions that support float comparisons. Or maybe you just
          # accept that you're taking a performance hit by using floats. More
          # subshells and whatnot.
-         l_number ; continue
+         lexer:number ; continue
       fi
 
       # Can do a dedicated error pass, scanning for error tokens, and assembling
@@ -202,21 +202,21 @@ function scan {
 }
 
 
-function l_comment {
+function lexer:comment {
    # There are no multiline comments. Seeks from '#' to the end of the line.
    while [[ -n $CURRENT ]] ; do
       [[ "$PEEK" =~ $'\n' ]] && break
-      l_advance
+      lexer:advance
    done
 }
 
 
-function l_identifier {
+function lexer:identifier {
    local buffer="$CURRENT"
 
    while [[ -n $CURRENT ]] ; do
       [[ $PEEK =~ [^[:alnum:]_] ]] && break
-      l_advance ; buffer+="$CURRENT"
+      lexer:advance ; buffer+="$CURRENT"
    done
 
    if [[ ${KEYWORD[$buffer]} ]] ; then
@@ -227,11 +227,11 @@ function l_identifier {
 }
 
 
-function l_string {
+function lexer:string {
    local -a buffer=()
 
    while [[ $PEEK ]] ; do
-      l_advance
+      lexer:advance
 
       if [[ $CURRENT == '"' ]] ; then
          # shellcheck disable=SC1003
@@ -257,11 +257,11 @@ function l_string {
 }
 
 
-function l_path {
+function lexer:path {
    local -a buffer=()
 
    while [[ $PEEK ]] ; do
-      l_advance
+      lexer:advance
 
       if [[ $CURRENT == "'" ]] ; then
          # shellcheck disable=SC1003
@@ -287,18 +287,18 @@ function l_path {
 }
 
 
-function l_number {
+function lexer:number {
    local number="${CURRENT}"
 
    while [[ $PEEK =~ [[:digit:]] ]] ; do
-      l_advance ; number+="$CURRENT"
+      lexer:advance ; number+="$CURRENT"
    done
 
    Token 'INTEGER' "$number"
 }
 
 
-function l_interpolation {
+function lexer:interpolation {
    while [[ ${CURSOR[offset]} -lt ${#CHARRAY[@]} ]] ; do
       # String interpolation ends upon a closing R_BRACE token, or if there's
       # no current character.
@@ -306,7 +306,7 @@ function l_interpolation {
          break
       fi
 
-      l_advance
+      lexer:advance
 
       # Skip whitespace.
       if [[ $CURRENT =~ [[:space:]] ]] ; then
@@ -325,7 +325,7 @@ function l_interpolation {
 
       # Identifiers.
       if [[ $CURRENT =~ [[:alpha:]_] ]] ; then
-         l_identifier ; continue
+         lexer:identifier ; continue
       fi
 
       raise invalid_interpolation_char "$CURRENT"
@@ -333,11 +333,11 @@ function l_interpolation {
 }
 
 
-function l_fstring {
+function lexer:fstring {
    local -a buffer=()
 
    while [[ $PEEK ]] ; do
-      l_advance
+      lexer:advance
 
       if [[ $CURRENT == '"' ]] ; then
          # shellcheck disable=SC1003
@@ -391,8 +391,8 @@ function l_fstring {
          # omit the closing one.
          local t0="$TOKEN_NUM"
 
-         l_interpolation
-         l_advance # past the closing `}'
+         lexer:interpolation
+         lexer:advance # past the closing `}'
 
          # Only create the closing CONCAT token if there were contents to the
          # expression.
@@ -417,11 +417,11 @@ function l_fstring {
 }
 
 
-function l_fpath {
+function lexer:fpath {
    local -a buffer=()
 
    while [[ $PEEK ]] ; do
-      l_advance
+      lexer:advance
 
       if [[ $CURRENT == "'" ]] ; then
          # shellcheck disable=SC1003
@@ -475,8 +475,8 @@ function l_fpath {
          # omit the closing one.
          local t0="$TOKEN_NUM"
 
-         l_interpolation
-         l_advance # past the closing `}'
+         lexer:interpolation
+         lexer:advance # past the closing `}'
 
          # Only create the closing CONCAT token if there were contents to the
          # expression.

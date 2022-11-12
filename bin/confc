@@ -99,8 +99,9 @@ source "${LIBDIR}"/api.sh
 
 init_globals
 argparse "$@"
-do_parse
-do_compile
+
+utils:parse
+utils:eval
 
 #declare -f conf > "$DATA_OUT"
 [[ ${!_SKELLY_*} ]] && declare -p ${!_SKELLY_*} > "$DATA_OUT"  ||:

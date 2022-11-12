@@ -14,8 +14,8 @@ function setup {
 @test "throw invalid fstring" {
    declare -a FILES=( /dev/stdin )
 
-   init_scanner
-   run scan <<< 'f"{^str}"'
+   lexer:init
+   run lexer:scan <<< 'f"{^str}"'
 
    assert_output "Syntax Error: \`^' not valid in string interpolation."
    assert_equal  $status  "${EXIT_STATUS[invalid_interpolation_char]}"
@@ -25,8 +25,8 @@ function setup {
 @test "throw invalid fpath" {
    declare -a FILES=( /dev/stdin )
 
-   init_scanner
-   run scan <<< "f'{^str}'"
+   lexer:init
+   run lexer:scan <<< "f'{^str}'"
 
    assert_output "Syntax Error: \`^' not valid in string interpolation."
    assert_equal  $status  "${EXIT_STATUS[invalid_interpolation_char]}"
@@ -36,8 +36,8 @@ function setup {
 @test "throw unescaped brace, fstring" {
    declare -a FILES=( /dev/stdin )
 
-   init_scanner
-   run scan <<< 'f"}"'
+   lexer:init
+   run lexer:scan <<< 'f"}"'
 
    assert_output "Syntax Error: single \`}' not allowed in f-string."
    assert_equal  $status  "${EXIT_STATUS[unescaped_interpolation_brace]}"
@@ -47,8 +47,8 @@ function setup {
 @test "throw unescaped brace, fpath" {
    declare -a FILES=( /dev/stdin )
 
-   init_scanner
-   run scan <<< "f'}'"
+   lexer:init
+   run lexer:scan <<< "f'}'"
 
    assert_output "Syntax Error: single \`}' not allowed in f-string."
    assert_equal  $status  "${EXIT_STATUS[unescaped_interpolation_brace]}"

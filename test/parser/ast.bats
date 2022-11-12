@@ -18,11 +18,11 @@ function setup {
 @test "variable declaration, empty" {
    local -a FILES=( /dev/stdin )
 
-   init_scanner
-   scan <<< 'key;'
+   lexer:init
+   lexer:scan <<< 'key;'
 
-   init_parser
-   parse
+   parser:init
+   parser:parse
 
    local -A EXP=(
       [NODE_1]='identifier'
@@ -45,11 +45,11 @@ function setup {
 @test "variable declaration, type and value" {
    local -a FILES=( /dev/stdin )
 
-   init_scanner
-   scan <<< 'key (str): "value";'
+   lexer:init
+   lexer:scan <<< 'key (str): "value";'
 
-   init_parser
-   parse
+   parser:init
+   parser:parse
 
    local -A EXP=(
       [NODE_1]='identifier' 
@@ -74,11 +74,11 @@ function setup {
 @test "declaration w/ complex type" {
    local -a FILES=( /dev/stdin )
 
-   init_scanner
-   scan <<< 'key (array:str);'
+   lexer:init
+   lexer:scan <<< 'key (array:str);'
 
-   init_parser
-   parse
+   parser:init
+   parser:parse
 
    local -n typedef='NODE_7'
    local -n t_array="${typedef[kind]}"
@@ -93,11 +93,11 @@ function setup {
 @test "declaration w/ boolean" {
    local -a FILES=( /dev/stdin )
 
-   init_scanner
-   scan <<< "_: true;"
+   lexer:init
+   lexer:scan <<< "_: true;"
 
-   init_parser
-   parse
+   parser:init
+   parser:parse
 
    local -n node='NODE_6'
    assert_equal  "${node[value]}"     'true'
@@ -108,11 +108,11 @@ function setup {
 @test "declaration w/ integer" {
    local -a FILES=( /dev/stdin )
 
-   init_scanner
-   scan <<< '_: 100;'
+   lexer:init
+   lexer:scan <<< '_: 100;'
 
-   init_parser
-   parse
+   parser:init
+   parser:parse
 
    local -n node='NODE_6'
    assert_equal  "${node[value]}"     '100'
@@ -123,11 +123,11 @@ function setup {
 @test "declaration w/ string" {
    local -a FILES=( /dev/stdin )
 
-   init_scanner
-   scan <<< '_: "string";'
+   lexer:init
+   lexer:scan <<< '_: "string";'
 
-   init_parser
-   parse
+   parser:init
+   parser:parse
 
    local -n node='NODE_6'
    assert_equal  "${node[value]}"     'string'
@@ -138,11 +138,11 @@ function setup {
 @test "declaration w/ path" {
    local -a FILES=( /dev/stdin )
 
-   init_scanner
-   scan <<< "_: 'path';"
+   lexer:init
+   lexer:scan <<< "_: 'path';"
 
-   init_parser
-   parse
+   parser:init
+   parser:parse
 
    local -n node='NODE_6'
    assert_equal  "${node[value]}"     'path'
@@ -153,11 +153,11 @@ function setup {
 @test "declaration w/ fstring" {
    local -a FILES=( /dev/stdin )
 
-   init_scanner
-   scan <<< '_: f"before{}after";'
+   lexer:init
+   lexer:scan <<< '_: f"before{}after";'
 
-   init_parser
-   parse
+   parser:init
+   parser:parse
 
    local -n node='NODE_6'
    assert_equal  "${TYPEOF[NODE_6]}"  'string'
@@ -172,11 +172,11 @@ function setup {
 @test "declaration w/ fpath" {
    local -a FILES=( /dev/stdin )
 
-   init_scanner
-   scan <<< "_: f'before{}after';"
+   lexer:init
+   lexer:scan <<< "_: f'before{}after';"
 
-   init_parser
-   parse
+   parser:init
+   parser:parse
 
    local -n node='NODE_6'
    assert_equal  "${TYPEOF[NODE_6]}"  'path'
@@ -191,11 +191,11 @@ function setup {
 @test "declaration w/ array" {
    local -a FILES=( /dev/stdin )
 
-   init_scanner
-   scan <<< '_: [];'
+   lexer:init
+   lexer:scan <<< '_: [];'
 
-   init_parser
-   parse
+   parser:init
+   parser:parse
 
    local -n node='NODE_6'
    assert_equal  "${TYPEOF[NODE_6]}"  'array'
@@ -206,11 +206,11 @@ function setup {
 @test "declaration w/ unary" {
    local -a FILES=( /dev/stdin )
 
-   init_scanner
-   scan <<< '_: -1;'
+   lexer:init
+   lexer:scan <<< '_: -1;'
 
-   init_parser
-   parse
+   parser:init
+   parser:parse
 
    local -n node='NODE_6'
    assert_equal  "${TYPEOF[NODE_6]}"  'unary'
@@ -225,11 +225,11 @@ function setup {
 @test "declaration w/ identifier" {
    local -a FILES=( /dev/stdin )
 
-   init_scanner
-   scan <<< '_: foo;'
+   lexer:init
+   lexer:scan <<< '_: foo;'
 
-   init_parser
-   parse
+   parser:init
+   parser:parse
 
    local -n node='NODE_6'
    assert_equal  "${TYPEOF[NODE_6]}"  'identifier'
@@ -240,11 +240,11 @@ function setup {
 @test "declaration w/ environment variable" {
    local -a FILES=( /dev/stdin )
 
-   init_scanner
-   scan <<< '_: $ENV;'
+   lexer:init
+   lexer:scan <<< '_: $ENV;'
 
-   init_parser
-   parse
+   parser:init
+   parser:parse
 
    local -n node='NODE_6'
    assert_equal  "${TYPEOF[NODE_6]}"  'env_var'
@@ -255,11 +255,11 @@ function setup {
 @test "declaration w/ index" {
    local -a FILES=( /dev/stdin )
 
-   init_scanner
-   scan <<< '_: [0][0];'
+   lexer:init
+   lexer:scan <<< '_: [0][0];'
 
-   init_parser
-   parse
+   parser:init
+   parser:parse
 
    local -- node_name='NODE_8'
    local -n node="$node_name"
@@ -279,11 +279,11 @@ function setup {
 @test "declaration w/ typecast" {
    local -a FILES=( /dev/stdin )
 
-   init_scanner
-   scan <<< '_: "to path" -> path;'
+   lexer:init
+   lexer:scan <<< '_: "to path" -> path;'
 
-   init_parser
-   parse
+   parser:init
+   parser:parse
 
    local -- node_name='NODE_7'
    local -n node="$node_name"
@@ -299,11 +299,11 @@ function setup {
 @test "section declaration" {
    local -a FILES=( /dev/stdin )
 
-   init_scanner
-   scan <<< '_ { }'
+   lexer:init
+   lexer:scan <<< '_ { }'
 
-   init_parser
-   parse
+   parser:init
+   parser:parse
 
    local -- node_name='NODE_5'
    local -n node="$node_name"

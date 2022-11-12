@@ -10,11 +10,12 @@ function setup {
 }
 
 
-@test "function declarations all have \`l_\` prefix" {
+@test "function declarations all have \`lexer:\` prefix" {
    : 'The lib/lexer.sh and lib/parser.sh files have many common functions and
-      variables, whose names could stomp eachothers. For example: advance(), match(), $CURRENT, $PEEK.
-      To avoid name stomping, lexer functions are prefixed by `l_`. Ensure that
-      for every intended function, it contains the `l_` prefix.'
+      variables, whose names could stomp eachothers. For example: advance(),
+      match(), $CURRENT, $PEEK.  To avoid name stomping, lexer functions are
+      prefixed by `lexer:`. Ensure that for every intended function, it
+      contains the `lexer:` prefix.'
 
    # Awk regex pattern.
    pattern='/^[[:alpha:]_][[:alnum:]_]* \(\)/'
@@ -23,11 +24,9 @@ function setup {
    # polluting the results from the lexer function names. Filter them out.
    readarray -td $'\n' _fns < <(declare -f | awk "${pattern} {print \$1}")
 
+   # Lexer functions intentionally without a prefix.
    local -A filter=(
-      # Lexer functions intentionally without a prefix.
       [Token]='yes'
-      [init_scanner]='yes'
-      [scan]='yes'
    )
 
    for f in "${_fns[@]}" ; do
@@ -42,7 +41,7 @@ function setup {
 
    local -a missing_prefix=()
    for f in "${fns[@]}" ; do
-      if [[ ! "$f" =~ ^l_ ]] && [[ ! "${filter[$f]}" ]] ; then
+      if [[ ! "$f" =~ ^lexer: ]] && [[ ! "${filter[$f]}" ]] ; then
          missing_prefix+=( "$f" )
       fi
    done
@@ -51,23 +50,18 @@ function setup {
 }
 
 
-@test "function calls have intended \`l_\` prefix" {
-   : "Can be easy to forget to add the l_ prefix when calling simple functions
-      like advance() or munch(). Awk the full text to check."
-
+@test "function calls have intended \`lexer:\` prefix" {
    # Awk regex pattern for identifying function names in the `declare -f`
    # output.
-   pattern='/^[[:alpha:]_][[:alnum:]_]* \(\)/'
+   pattern='/^[[:alpha:]_][[:alnum:]_:]* \(\)/'
 
    # Get initial list of functions from the environment. Don't want these
    # polluting the results from the lexer function names. Filter them out.
    readarray -td $'\n' _fns < <(declare -f | awk "${pattern} {print \$1}")
 
+   # Lexer functions intentionally without a prefix.
    local -A filter=(
-      # Lexer functions intentionally without a prefix.
       [Token]='yes'
-      [init_scanner]='yes'
-      [scan]='yes'
    )
    for f in "${_fns[@]}" ; do
       filter["$f"]='yes'
@@ -86,28 +80,26 @@ function setup {
       fi
    done
 
-   _pattern=''
+   pattern=''
    for f in "${lexer_fns[@]}" ; do
-      _pattern+="${_pattern:+|}${f#l_}"
+      pattern+="${pattern:+|}${f#lexer:}"
    done
-   pattern="($_pattern)"
+   pattern="(${pattern})"
 
    while read -r line ; do
       # Skip declarations. Sometimes there's crossover between a function name
-      # (such as `l_number`) and a local variable (`number`).
+      # (such as `lexer:number`) and a local variable (`number`).
       [[ "$line" =~ ^(local|declare) ]] && continue
 
-      # Contains the name of a lexer function, minus the `l_` prefix. Could
+      # Contains the name of a lexer function, minus the `lexer:` prefix. Could
       # potentially be a variable. Quick and dirty test if it's a function:
       if [[ "$line" =~ $pattern ]] ; then
          match="${BASH_REMATCH[0]}"
 
-         # Mustn't have prefix,
-         # be a variable,
-         # or have any suffix
-         if [[ ! "$line"  =~  (^|[[:space:]]+)l_${match} ]] && \
-            [[ ! "$line"  =~  \$${match}                 ]] && \
-            [[   "$line"  =~  ${match}(\$|\;)            ]]
+         # Mustn't have prefix, be a variable, or have any suffix.
+         if [[ ! "$line"  =~  (^|[[:space:]]+)lexer:${match} ]] && \
+            [[ ! "$line"  =~  \$${match}                     ]] && \
+            [[   "$line"  =~  ${match}(\$|\;)                ]]
          then
             printf '%3s%s\n' '' "$line" 1>&3
             return 1

@@ -11,11 +11,11 @@ function setup {
    source "${LIBDIR}/errors.sh"
 
    function parse_from_str {
-      init_scanner
-      scan <<< "$1"
+      lexer:init
+      lexer:scan <<< "$1"
 
-      init_parser
-      parse
+      parser:init
+      parser:parse
    }
    export -f parse_from_str
 }

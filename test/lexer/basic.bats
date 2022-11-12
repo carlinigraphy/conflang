@@ -19,8 +19,8 @@ function setup {
    # a dedicated file.
    declare -a FILES=( /dev/stdin )
 
-   init_scanner
-   scan <<< '& ^ *'
+   lexer:init
+   lexer:scan <<< '& ^ *'
    # This may only be done with some form of redirection, a pipeline does not
    # work. I think it's something to do with how bats is running the tests.
 
@@ -50,8 +50,8 @@ function setup {
 @test "identify valid symbols" {
    declare -a FILES=( /dev/stdin )
 
-   init_scanner
-   scan <<< '., ;: $% ? -> - () [] {} #Comment'
+   lexer:init
+   lexer:scan <<< '., ;: $% ? -> - () [] {} #Comment'
 
    declare -A EXP_0=(  [type]="DOT"        [value]="."  )
    declare -A EXP_1=(  [type]="COMMA"      [value]=","  )
@@ -87,9 +87,9 @@ function setup {
 
 @test "identify valid literals" {
    declare -a FILES=( /dev/stdin )
-   init_scanner
+   lexer:init
 
-   scan << EOF
+   lexer:scan << EOF
       # Keywords.
       include
       constrain
@@ -151,9 +151,9 @@ EOF
 
 @test "identify fstring, fpath" {
    declare -a FILES=( /dev/stdin )
-   init_scanner
+   lexer:init
 
-   scan << EOF
+   lexer:scan << EOF
       f'before{\$HERE}after'
       f"before{\$HERE}after"
 

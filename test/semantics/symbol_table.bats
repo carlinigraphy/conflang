@@ -19,8 +19,8 @@ function setup {
    init_globals
    INPUT=/dev/stdin
 
-   do_parse <<< ''
-   do_compile
+   utils:parse <<< ''
+   utils:eval
 
    assert [ "${GLOBALS[%inline]}" ]
 
@@ -64,14 +64,14 @@ function setup {
    init_globals
    INPUT=/dev/stdin
 
-   do_parse <<< '
+   utils:parse <<< '
       _;
       int   (int);
       str   (str);
       bool  (bool);
       path  (path);
    '
-   do_compile
+   utils:eval
 
    declare -n s_inline="${GLOBALS[%inline]}"
    declare -n symtab="${s_inline[symtab]}"
@@ -104,11 +104,11 @@ function setup {
    init_globals
    INPUT=/dev/stdin
 
-   do_parse <<< '
+   utils:parse <<< '
       a1 (array:str);
       a2 (array:array:str);
    '
-   do_compile
+   utils:eval
 
    declare -n s_inline="${GLOBALS[%inline]}"
    xeclare -n symtab="${s_inline[symtab]}"
@@ -135,8 +135,8 @@ function setup {
    init_globals
    INPUT=/dev/stdin
 
-   do_parse <<< '_ (int:int);'
-   run do_compile
+   utils:parse <<< '_ (int:int);'
+   run utils:eval
 
    assert_failure
 }
@@ -148,8 +148,8 @@ function setup {
    init_globals
    INPUT=/dev/stdin
 
-   do_parse <<< '_ (str:int);'
-   run do_compile
+   utils:parse <<< '_ (str:int);'
+   run utils:eval
 
    assert_failure
 }
@@ -161,8 +161,8 @@ function setup {
    init_globals
    INPUT=/dev/stdin
 
-   do_parse <<< '_ (bool:int);'
-   run do_compile
+   utils:parse <<< '_ (bool:int);'
+   run utils:eval
 
    assert_failure
 }

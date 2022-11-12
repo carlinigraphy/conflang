@@ -20,7 +20,7 @@ function setup {
    init_globals
    INPUT=/dev/stdin
 
-   do_parse <<< '
+   utils:parse <<< '
       _str:  "string";
       _int:  1;
       _bool: true;
@@ -29,7 +29,7 @@ function setup {
       int_ref:  %_int;
       bool_ref: %_bool;
    '
-   do_compile
+   utils:eval
 
    # %inline container
    declare -n d1='_DATA_1'
@@ -48,14 +48,14 @@ function setup {
    init_globals
    INPUT=/dev/stdin
 
-   do_parse <<< '
+   utils:parse <<< '
       _array: [
          "string",
       ];
       array_ref:   %_array;
       array_ref_0: %_array.0;
    '
-   do_compile
+   utils:eval
 
    declare -n d1='_DATA_1'
    declare -n d2='_DATA_2'
@@ -75,7 +75,7 @@ function setup {
    init_globals
    INPUT=/dev/stdin
 
-   do_parse <<< '
+   utils:parse <<< '
       section {
          _array: [
             "string",
@@ -85,7 +85,7 @@ function setup {
       array_ref:   %section._array;
       array_ref_0: %section._array.0;
    '
-   do_compile
+   utils:eval
 
    declare -p ${!_DATA_*} 1>&3 ; skip
 
@@ -103,8 +103,8 @@ function setup {
    init_globals
    INPUT=/dev/stdin
 
-   do_parse <<< 'home: $HOME;'
-   do_compile
+   utils:parse <<< 'home: $HOME;'
+   utils:eval
 
    # %inline container
    declare -n d1='_DATA_1'
@@ -122,8 +122,8 @@ function setup {
    declare -- home="$HOME"
    declare -g HOME='beepboop'
 
-   do_parse <<< 'home: $HOME;'
-   do_compile
+   utils:parse <<< 'home: $HOME;'
+   utils:eval
 
    # %inline container
    declare -n d1='_DATA_1'
@@ -138,10 +138,10 @@ function setup {
    init_globals
    INPUT=/dev/stdin
 
-   do_parse <<< '
+   utils:parse <<< '
       _: $_92718c1730c3b90eb8ac688e47b14598;
    '
-   run do_compile
+   run utils:eval
 
    assert_failure
    assert_equal "$status"  "${EXIT_STATUS[missing_env_var]}"
@@ -152,8 +152,8 @@ function setup {
    init_globals
    INPUT=/dev/stdin
 
-   do_parse <<< 'n: -2;'
-   do_compile
+   utils:parse <<< 'n: -2;'
+   utils:eval
 
    # %inline container
    declare -n d1='_DATA_1'

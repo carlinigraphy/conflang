@@ -19,7 +19,7 @@ function setup {
 
 @test "fails with no input" {
    source "$lib_lexer"
-   run init_scanner
+   run lexer:init
 
    assert_equal  "$status" "${EXIT_STATUS[no_input]}"
    assert_output 'File Error: missing input file.'
@@ -33,8 +33,8 @@ function setup {
    declare -a FILES=( /dev/stdin )
    source "$lib_lexer"
 
-   init_scanner
-   scan <<< ''
+   lexer:init
+   lexer:scan <<< ''
 
    # Should have only an EOF token.
    assert [ ${#TOKENS[@]} -eq 1 ]

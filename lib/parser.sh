@@ -291,7 +291,7 @@ function mk_env_var {
 
 
 #═══════════════════════════════════╡ utils ╞═══════════════════════════════════
-function init_parser {
+function parser:init {
    declare -gi IDX=0
    declare -g  CURRENT=''  CURRENT_NAME=''
    # Calls to `advance' both globally set the name of the current/next node(s),
@@ -311,7 +311,7 @@ function init_parser {
 }
 
 
-function p_advance {
+function parser:advance {
    while [[ $IDX -lt ${#TOKENS[@]} ]] ; do
       declare -g  CURRENT_NAME=${TOKENS[$IDX]}
       declare -gn CURRENT=$CURRENT_NAME
@@ -327,16 +327,16 @@ function p_advance {
 }
 
 
-function p_check {
+function parser:check {
    # Allows for passing in something like: "L_BRACKET,STRING,INTEGER" to check
    # multiple tokens.
    [[ ,"$1", ==  *,${CURRENT[type]},* ]]
 }
 
 
-function p_match {
-   if p_check "$1" ; then
-      p_advance
+function parser:match {
+   if parser:check "$1" ; then
+      parser:advance
       return 0
    fi
 
@@ -344,28 +344,28 @@ function p_match {
 }
 
 
-function p_munch {
-   if ! p_check "$1" ; then
+function parser:munch {
+   if ! parser:check "$1" ; then
       raise munch_error  "$1"  "$CURRENT_NAME"  "$2"
    fi
 
-   p_advance
+   parser:advance
 }
 
 
-function parse {
+function parser:parse {
    # Realistically this should not happen, outside running the lexer & parser
    # independently. Though it's a prerequisite for all that follows.
    if [[ "${#TOKENS[0]}" -eq 0 ]] ; then
       raise parse_error "didn't receive tokens from lexer."
    fi
 
-   p_advance
-   p_program
+   parser:advance
+   parser:program
 }
 
 #═════════════════════════════╡ GRAMMAR FUNCTIONS ╞═════════════════════════════
-function p_program {
+function parser:program {
    # This is preeeeeeeeeeeeetty janky. I don't love it. Since this pseudo-
    # section doesn't actually exist in-code, it doesn't have any opening or
    # closing braces. So `section()` gets fucked up when trying to munch a
@@ -392,8 +392,8 @@ function p_program {
 
    node['name']=$nname
 
-   while ! p_check 'EOF' ; do
-      p_statement
+   while ! parser:check 'EOF' ; do
+      parser:statement
 
       # %include/%constrain are statements, but do not have an associated $NODE.
       # Need to avoid adding an empty string to the section.items[]
@@ -402,40 +402,40 @@ function p_program {
       fi
    done
 
-   p_munch 'EOF'
+   parser:munch 'EOF'
 }
 
 
-function p_statement {
-   if p_match 'PERCENT' ; then
-      p_parser_statement
+function parser:statement {
+   if parser:match 'PERCENT' ; then
+      parser:parser_statement
    else
-      p_declaration
+      parser:declaration
    fi
 }
 
 
-function p_parser_statement {
+function parser:parser_statement {
    # Saved node referencing the parent Section.
-   if   p_match 'INCLUDE'   ; then p_include
-   elif p_match 'CONSTRAIN' ; then p_constrain
-   elif p_match 'USE'       ; then p_use
+   if   parser:match 'INCLUDE'   ; then parser:include
+   elif parser:match 'CONSTRAIN' ; then parser:constrain
+   elif parser:match 'USE'       ; then parser:use
    else
       raise parse_error "${CURRENT[value]} is not a parser statement."
    fi
 
-   p_munch 'SEMI' "expecting \`;' after parser statement."
+   parser:munch 'SEMI' "expecting \`;' after parser statement."
 }
 
 
-function p_include {
+function parser:include {
    mk_include
    local -n include=$INCLUDE
 
-   # When used outside the `p_expression()` function, need to explicitly pass
-   # in a refernce to the current token.
-   p_path "$CURRENT_NAME"
-   p_munch 'PATH' "expecting path after %include."
+   # When used outside the `parser:expression()` function, need to explicitly
+   # pass in a refernce to the current token.
+   parser:path "$CURRENT_NAME"
+   parser:munch 'PATH' "expecting path after %include."
 
    local -n path=$NODE
    # shellcheck disable=SC2034 
@@ -449,7 +449,7 @@ function p_include {
 }
 
 
-function p_constrain {
+function parser:constrain {
    local -n section_ptr=$SECTION
    local -n name=${section_ptr[name]}
 
@@ -466,24 +466,24 @@ function p_constrain {
    fi
 
    # TODO: refactor
-   # This should probably just call `p_array`. Then we can pull the paths out
-   # from within it? Rearpb making it a special case. Or maybe just straight
-   # up call `p_expression`. Hmm.
-   p_munch 'L_BRACKET' "expecting \`[' to begin array of paths."
-   until p_check 'R_BRACKET' ; do
-      # When used outside the `p_expression()` function, need to explicitly
+   # This should probably just call `parser:array`. Then we can pull the paths
+   # out from within it? Rearpb making it a special case. Or maybe just
+   # straight up call `parser:expression`. Hmm.
+   parser:munch 'L_BRACKET' "expecting \`[' to begin array of paths."
+   until parser:check 'R_BRACKET' ; do
+      # When used outside the `parser:expression()` function, need to explicitly
       # pass in a refernce to the current token.
-      p_path "$CURRENT_NAME"
-      p_munch 'PATH' 'expecting an array of paths.'
+      parser:path "$CURRENT_NAME"
+      parser:munch 'PATH' 'expecting an array of paths.'
 
       local -n path=$NODE
       CONSTRAINTS+=( "${path[value]}" )
 
-      p_check 'R_BRACKET' && break
-      p_munch 'COMMA' "array elements must be separated by \`,'."
+      parser:check 'R_BRACKET' && break
+      parser:munch 'COMMA' "array elements must be separated by \`,'."
    done
 
-   p_munch 'R_BRACKET' "expecting \`]' after constrain block."
+   parser:munch 'R_BRACKET' "expecting \`]' after constrain block."
    declare -g NODE=
    # Section declarations loop & append $NODEs to their .items. `include`/
    # `constrain` directives are technically children of a section, but they do
@@ -491,7 +491,7 @@ function p_constrain {
 }
 
 
-#function p_use {
+#function parser:use {
 #   local -n section_ptr=$SECTION
 #   local -n name=${section_ptr[name]}
 #
@@ -503,13 +503,13 @@ function p_constrain {
 #   local -- save="$NODE"
 #   local -n use="$NODE"
 #
-#   p_path "$CURRENT_NAME"
-#   p_munch 'PATH' "expecting a module path."
+#   parser:path "$CURRENT_NAME"
+#   parser:munch 'PATH' "expecting a module path."
 #   local path="$NODE"
 #
-#   if p_match 'AS' ; then
-#      p_identifier "$CURRENT_NAME"
-#      p_munch 'IDENTIFIER'
+#   if parser:match 'AS' ; then
+#      parser:identifier "$CURRENT_NAME"
+#      parser:munch 'IDENTIFIER'
 #      local name="$NODE"
 #   fi
 #
@@ -520,19 +520,19 @@ function p_constrain {
 #}
 
 
-function p_declaration {
-   p_identifier "$CURRENT_NAME"
-   p_munch 'IDENTIFIER' "expecting variable declaration."
+function parser:declaration {
+   parser:identifier "$CURRENT_NAME"
+   parser:munch 'IDENTIFIER' "expecting variable declaration."
 
-   if p_match 'L_BRACE' ; then
-      p_decl_section
+   if parser:match 'L_BRACE' ; then
+      parser:decl_section
    else
-      p_decl_variable
+      parser:decl_variable
    fi
 }
 
 
-function p_decl_section {
+function parser:decl_section {
    local -- name=$NODE
    local -- sect=$SECTION
 
@@ -545,8 +545,8 @@ function p_decl_section {
    # shellcheck disable=SC2128 
    node['name']="$name"
 
-   while ! p_check 'R_BRACE' ; do
-      p_statement
+   while ! parser:check 'R_BRACE' ; do
+      parser:statement
 
       # %include/%constrain are statements, but do not have an associated $NODE.
       # Need to avoid adding an empty string to the section.items[]
@@ -555,13 +555,13 @@ function p_decl_section {
       fi
    done
 
-   p_munch 'R_BRACE' "expecting \`}' after section."
+   parser:munch 'R_BRACE' "expecting \`}' after section."
    declare -g NODE="$save"
    declare -g SECTION="$sect"
 }
 
 
-function p_decl_variable {
+function parser:decl_variable {
    # Variable declaration must be preceded by an identifier.
    local -- name=$NODE
 
@@ -574,9 +574,9 @@ function p_decl_variable {
    node['name']=$name
 
    # Typedefs.
-   if p_match 'L_PAREN' ; then
-      p_typedef
-      p_munch 'R_PAREN' "typedef must be closed by \`)'."
+   if parser:match 'L_PAREN' ; then
+      parser:typedef
+      parser:munch 'R_PAREN' "typedef must be closed by \`)'."
       node['type']=$NODE
    fi
 
@@ -590,21 +590,21 @@ function p_decl_variable {
    done
 
    # Expressions.
-   if p_match 'COLON' ; then
-      p_expression
+   if parser:match 'COLON' ; then
+      parser:expression
       node['expr']=$NODE
-   elif p_match "$expr_str" ; then
+   elif parser:match "$expr_str" ; then
       raise parse_error "expecting \`:' before expression."
    fi
 
-   p_munch 'SEMI' "expecting \`;' after declaration."
+   parser:munch 'SEMI' "expecting \`;' after declaration."
    declare -g NODE=$save
 }
 
 
-function p_typedef {
-   p_identifier "$CURRENT_NAME"
-   p_munch 'IDENTIFIER' 'type declarations must be identifiers.'
+function parser:typedef {
+   parser:identifier "$CURRENT_NAME"
+   parser:munch 'IDENTIFIER' 'type declarations must be identifiers.'
 
    local -- name=$NODE
 
@@ -616,8 +616,8 @@ function p_typedef {
    # shellcheck disable=SC2128
    type_['kind']=$name
 
-   while p_match 'COLON' ; do
-      p_typedef
+   while parser:match 'COLON' ; do
+      parser:typedef
       # shellcheck disable=SC2034
       type_['subtype']=$NODE
    done
@@ -643,15 +643,15 @@ declare -gA prefix_binding_power=(
    [MINUS]=5
 )
 declare -gA NUD=(
-   [MINUS]='p_unary'
-   [PATH]='p_path'
-   [TRUE]='p_boolean'
-   [FALSE]='p_boolean'
-   [STRING]='p_string'
-   [INTEGER]='p_integer'
-   [DOLLAR]='p_env_var'
-   [L_BRACKET]='p_array'
-   [IDENTIFIER]='p_identifier'
+   [MINUS]='parser:unary'
+   [PATH]='parser:path'
+   [TRUE]='parser:boolean'
+   [FALSE]='parser:boolean'
+   [STRING]='parser:string'
+   [INTEGER]='parser:integer'
+   [DOLLAR]='parser:env_var'
+   [L_BRACKET]='parser:array'
+   [IDENTIFIER]='parser:identifier'
 )
 
 
@@ -661,9 +661,9 @@ declare -gA infix_binding_power=(
    [CONCAT]=11
 )
 declare -gA LED=(
-   [ARROW]='p_typecast'
-   [DOT]='p_member'
-   [CONCAT]='p_concat'
+   [ARROW]='parser:typecast'
+   [DOT]='parser:member'
+   [CONCAT]='parser:concat'
 )
 
 
@@ -671,11 +671,11 @@ declare -gA postfix_binding_power=(
    [L_BRACKET]='7'
 )
 declare -gA RID=(
-   [L_BRACKET]='p_index'
+   [L_BRACKET]='parser:index'
 )
 
 
-function p_expression {
+function parser:expression {
    local -i min_bp=${1:-1}
 
    local op lhs
@@ -691,7 +691,7 @@ function p_expression {
       raise parse_error "not an expression: ${CURRENT[type],,}."
    fi
 
-   p_advance
+   parser:advance
    $fn "$token" ; lhs=$NODE
 
    while :; do
@@ -722,7 +722,7 @@ function p_expression {
          break
       fi
 
-      p_advance
+      parser:advance
 
       fn=${LED[$op_type]}
       if [[ ! $fn ]] ; then
@@ -737,7 +737,7 @@ function p_expression {
 }
 
 
-function p_unary {
+function parser:unary {
    local -n prev="$1"
    local -- op="${prev[type]}"
 
@@ -747,7 +747,7 @@ function p_unary {
    local -- save=$NODE
    local -n node=$NODE
 
-   p_expression "$rbp"
+   parser:expression "$rbp"
 
    node['op']="$op"
    node['right']="$NODE"
@@ -756,7 +756,7 @@ function p_unary {
 }
 
 
-function p_concat {
+function parser:concat {
    # String (and path) interpolation are parsed as a high left-associative
    # infix operator.
    #> first (str): "Marcus";
@@ -768,8 +768,8 @@ function p_concat {
    #>                   concat: str(value:  ".",
    #>                               concat: None)
 
-   # We can safely ignore $2. It's the operator, passed in from p_expression().
-   # We already know the operator is a CONCAT.
+   # We can safely ignore $2. It's the operator, passed in from
+   # parser:expression(). We already know the operator is a CONCAT.
    local lhs="$1"  _=$2  rbp="$3"
 
    # To simplify (I think) parsing string/path interpolation, instead of
@@ -781,14 +781,14 @@ function p_concat {
       local -n tail=${tail['concat']}
    done
 
-   p_expression "$rbp"
+   parser:expression "$rbp"
    tail['concat']=$NODE
 
    declare -g NODE="$lhs"
 }
 
 
-function p_typecast {
+function parser:typecast {
    # Typecasts are a infix operator. The previous lhs is passed in as the
    # 1st argument.
    #
@@ -808,7 +808,7 @@ function p_typecast {
    local -- save=$NODE
    local -n node=$NODE
 
-   p_typedef
+   parser:typedef
 
    node['expr']="$lhs"
    node['typedef']="$NODE"
@@ -817,32 +817,32 @@ function p_typecast {
 }
 
 
-function p_index {
+function parser:index {
    local lhs="$1"  _="$2"
-   p_advance # past L_BRACKET.
+   parser:advance # past L_BRACKET.
 
    mk_index
    local -- save="$NODE"
    local -n index="$NODE"
 
-   p_expression
+   parser:expression
    index['left']="$lhs"
    index['right']="$NODE"
 
-   p_munch 'R_BRACKET' "array must be closed by \`]'."
+   parser:munch 'R_BRACKET' "array must be closed by \`]'."
    declare -g NODE="$save"
 }
 
 
-function p_member {
+function parser:member {
    local lhs="$1"  _=$2  rbp="$3"
                     # ^-- ignore `.` operator
    mk_member
    local -- node="$NODE"
    local -n node_r="$NODE"
 
-   p_identifier "$CURRENT_NAME"
-   p_munch 'IDENTIFIER'
+   parser:identifier "$CURRENT_NAME"
+   parser:munch 'IDENTIFIER'
    # TODO(error reporting):
    # Include more helpful information. Check if it's an INTEGER, suggest they
    # instead use [int].
@@ -854,27 +854,27 @@ function p_member {
 }
 
 
-function p_array {
+function parser:array {
    mk_array
    local -- save=$NODE
    local -n node=$NODE
 
-   until p_check 'R_BRACKET' ; do
-      p_expression
+   until parser:check 'R_BRACKET' ; do
+      parser:expression
       node+=( "$NODE" )
 
-      p_check 'R_BRACKET' && break
-      p_munch 'COMMA' "array elements must be separated by \`,'."
+      parser:check 'R_BRACKET' && break
+      parser:munch 'COMMA' "array elements must be separated by \`,'."
    done
 
-   p_munch 'R_BRACKET' "array must be closed by \`]'."
+   parser:munch 'R_BRACKET' "array must be closed by \`]'."
    declare -g NODE=$save
 }
 
 
-function p_env_var {
+function parser:env_var {
    local -n token="$CURRENT_NAME"
-   p_advance # past DOLLAR.
+   parser:advance # past DOLLAR.
 
    mk_env_var
    local -n node=$NODE
@@ -886,7 +886,7 @@ function p_env_var {
 }
 
 
-function p_identifier {
+function parser:identifier {
    local -n token="$1"
 
    mk_identifier
@@ -899,7 +899,7 @@ function p_identifier {
 }
 
 
-function p_boolean {
+function parser:boolean {
    local -n token="$1"
 
    mk_boolean
@@ -912,7 +912,7 @@ function p_boolean {
 }
 
 
-function p_integer {
+function parser:integer {
    local -n token="$1"
 
    mk_integer
@@ -925,7 +925,7 @@ function p_integer {
 }
 
 
-function p_string {
+function parser:string {
    local -n token="$1"
 
    mk_string
@@ -941,7 +941,7 @@ function p_string {
 }
 
 
-function p_path {
+function parser:path {
    local -n token="$1"
 
    mk_path

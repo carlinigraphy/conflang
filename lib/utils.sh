@@ -162,18 +162,17 @@ function identify_constraint_file {
 }
 
 
-function _parse {
+function utils:parse_file {
    # Some elements of the scanner/parser need to be reset before every run.
    # Vars that hold file-specific information.
-
-   init_scanner
-   scan
+   lexer:init
+   lexer:scan
    # Exports:
    #  list  TOKENS[]
    #  dict  TOKEN_*
 
-   init_parser
-   parse
+   parser:init
+   parser:parse
    # Exports:
    #  str   ROOT
    #  dict  TYPEOF{}
@@ -181,15 +180,11 @@ function _parse {
 }
 
 
-function do_parse {
+function utils:parse {
    # Parse the top-level `base' file.
    add_file "$INPUT"
 
-   # TODO(issue#1): I've always thought it was stupid that `do_parse` calls
-   # `_parse` which calls `parse`. Should replace with something along the lines
-   # of:  parse() -> utils:parse_file() -> parser:parse().
-   #
-   _parse
+   utils:parse_file
    declare -g PARENT_ROOT=$ROOT
    merge_includes
    # Merge all (potentially nested) `%include` statements from the parent file.
@@ -197,7 +192,7 @@ function do_parse {
    if [[ $CONSTRAINTS ]] ; then
       identify_constraint_file 
 
-      _parse
+      utils:parse_file
       declare -g CHILD_ROOT=$ROOT
 
       merge_includes
@@ -208,7 +203,7 @@ function do_parse {
 }
 
 
-function do_compile {
+function utils:eval {
    # There may be both a parent and child ASTs, both of which have their own
    # symbol table. Until they're merged, we want a single point of reference
    # for any globally defined identifiers--currently typedefs. After the symbol
