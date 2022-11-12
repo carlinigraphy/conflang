@@ -22,7 +22,7 @@ function setup {
    source "$lib_parser"
 
    local -a TOKENS=()
-   run parse
+   run parser:parse
 
    assert_failure
    assert_output "Parse Error: didn't receive tokens from lexer."
@@ -39,7 +39,7 @@ function setup {
    local -A TOKEN_0=( [type]='EOF' [value]='' )
    local -a TOKENS=( 'TOKEN_0' )
 
-   run parse
+   run parser:parse
    assert_success
 }
 
@@ -55,7 +55,7 @@ function setup {
    lexer:init
 
    lexer:scan <<< ''
-   parse
+   parser:parse
 }
 
 
@@ -71,6 +71,6 @@ function setup {
 
    lexer:scan <<< 'this (str): "that";'
 
-   run parse
+   run parser:parse
    assert_success
 }

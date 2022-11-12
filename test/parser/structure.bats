@@ -13,14 +13,15 @@ function setup {
 }
 
 
-@test "function declarations all have \`p_\` prefix" {
+@test "function declarations all have \`parser:\` prefix" {
    : 'The lib/lexer.sh and lib/parser.sh files have many common functions and
-      variables, whose names could stomp eachothers. For example: advance(), match(), $CURRENT, $PEEK.
-      To avoid name stomping, parser functions are prefixed by `p_`. Ensure that
-      for every intended function, it contains the `p_` prefix.'
+      variables, whose names could stomp eachothers. For example: advance(),
+      match(), $CURRENT, $PEEK.  To avoid name stomping, parser functions are
+      prefixed by `parser:`. Ensure that for every intended function, it
+      contains the `parser:` prefix.'
 
    # Awk regex pattern.
-   pattern='/^[[:alpha:]_][[:alnum:]_]* \(\)/'
+   pattern='/^[[:alpha:]_][[:alnum:]_:]* \(\)/'
 
    # Get initial list of functions from the environment. Don't want these
    # polluting the results from the parser function names. Filter them out.
@@ -45,23 +46,21 @@ function setup {
       [mk_unary]='yes'
       [mk_env_var]='yes' 
       [mk_int_var]='yes' 
-      [init_parser]='yes'
-      [parse]='yes'
    )
 
    for f in "${_fns[@]}" ; do
       filter["$f"]='yes'
    done
 
-   # Source in the parser, compile list of function names. Iterating this,
-   # and filtering out anything defined previously, should give us only those
+   # Source in the parser, compile list of function names. Iterating this, and
+   # filtering out anything defined previously, should give us only those
    # created within the parse.
    source "$lib_parser"
    readarray -td $'\n' fns < <(declare -f | awk "${pattern} {print \$1}")
 
    local -a missing_prefix=()
    for f in "${fns[@]}" ; do
-      if [[ ! "$f" =~ ^p_ ]] && [[ ! "${filter[$f]}" ]] ; then
+      if [[ ! "$f" =~ ^parser: ]] && [[ ! "${filter[$f]}" ]] ; then
          missing_prefix+=( "$f" )
       fi
    done
@@ -70,13 +69,13 @@ function setup {
 }
 
 
-@test "function calls have intended \`p_\` prefix" {
-   : "Can be easy to forget to add the p_ prefix when calling simple functions
-      like advance() or munch(). Awk the full text to check"
+@test "function calls have intended \`parser:\` prefix" {
+   : "Can be easy to forget to add the parser: prefix when calling simple
+      functions like advance() or munch(). Awk the full text to check"
 
    # Awk regex pattern for identifying function names in the `declare -f`
    # output.
-   pattern='/^[[:alpha:]_][[:alnum:]_]* \(\)/'
+   pattern='/^[[:alpha:]_][[:alnum:]_:]* \(\)/'
 
    # Get initial list of functions from the environment. Don't want these
    # polluting the results from the lexer function names. Filter them out.
@@ -102,7 +101,6 @@ function setup {
       [mk_unary]='yes'
       [mk_env_var]='yes' 
       [mk_int_var]='yes' 
-      [parse]='yes'
    )
    for f in "${_fns[@]}" ; do
       filter["$f"]='yes'
@@ -123,17 +121,18 @@ function setup {
 
    _pattern=''
    for f in "${parser_fns[@]}" ; do
-      _pattern+="${_pattern:+|}${f#p_}"
+      _pattern+="${_pattern:+|}${f#parser:}"
    done
    pattern="($_pattern)"
 
    while read -r line ; do
       # Skip declarations. Sometimes there's crossover between a function name
-      # (such as `p_number`) and a local variable (`number`).
+      # (such as `parser:number`) and a local variable (`number`).
       [[ "$line" =~ ^(local|declare) ]] && continue
 
-      # Contains the name of a parser function, minus the `p_` prefix. Could
-      # potentially be a variable. Quick and dirty test if it's a function:
+      # Contains the name of a parser function, minus the `parser:` prefix.
+      # Could potentially be a variable. Quick and dirty test if it's a
+      # function:
       if [[ "$line" =~ $pattern ]] ; then
          match="${BASH_REMATCH[0]}"
 
@@ -141,10 +140,10 @@ function setup {
          # be a `class` mk_* function,
          # be a variable,
          # or have any suffix
-         if [[ ! "$line"  =~  (^|[[:space:]]+)p_${match} ]] && \
-            [[ ! "$line"  =~  \$${match}                 ]] && \
-            [[ ! "$line"  =~  mk_${match}                ]] && \
-            [[   "$line"  =~  ${match}(\$|\;)            ]]
+         if [[ ! "$line"  =~  (^|[[:space:]]+)parser:${match} ]] && \
+            [[ ! "$line"  =~  \$${match}                      ]] && \
+            [[ ! "$line"  =~  mk_${match}                     ]] && \
+            [[   "$line"  =~  ${match}(\$|\;)                 ]]
          then
             printf '%3s%s\n' '' "$line  --->  matched(${match})" 1>&3
             return 1

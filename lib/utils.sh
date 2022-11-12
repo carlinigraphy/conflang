@@ -71,7 +71,7 @@ function add_file {
    done
 
    # File must exist, and must be a file. Also stdin is always allowed.
-   if [[ ! -f "$fq_path" ]] || [[ "$fq_path" == /dev/stdin ]] ; then
+   if [[ ! -f "$fq_path" ]] && [[ "$fq_path" != /dev/stdin ]] ; then
       raise missing_file "$fq_path"
    fi
 

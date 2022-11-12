@@ -45,11 +45,14 @@ function setup {
    local -a FILES=( /dev/stdin )
 
    local -a expressions=(
-      [0]="_ 'path';"      [1]='_ "string";'
-      [2]='_ true;'        [3]='_ false;'
-      [4]='_ $env;'        [5]='_ %int;'
-      [6]='_ 1;'           [7]='_ -1;'
-      [8]='_ [ ];'
+      "_ 'path';"
+      '_ "string";'
+      '_ true;'
+      '_ false;'
+      '_ $env;'
+      '_ 1;'
+      '_ -1;'
+      '_ [ ];'
    )
 
    for expr in "${expressions[@]}" ; do
@@ -81,7 +84,6 @@ function setup {
 @test "raise parse_error on non-expression (NUD)" {
    local -a FILES=( /dev/stdin )
    local -a expressions=(
-      '_: s;'
       '_: ->'
       '_: ;'
       '_: #EOF'

@@ -79,7 +79,7 @@ function setup {
    lexer:scan <<< "$input"
 
    parser:init
-   parser:parse
+   run parser:parse
    assert_failure
 }
 
