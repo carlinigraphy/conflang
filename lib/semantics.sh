@@ -828,9 +828,6 @@ function semantics_decl_variable {
    symtab from "$NODE"
    symtab get "$name"
 
-   echo "[$name]"
-   echo " .node  : $(declare -p $NODE)"
-
    # Initially set a Type(ANY). If this is overwritten by walking the
    # expression, that sets the evaluated type.
    declare -g TYPE="$_ANY"
@@ -845,8 +842,6 @@ function semantics_decl_variable {
       walk_semantics "${node_r[type]}"
    fi
    local target="$TYPE"
-
-   echo " .type2 : $(declare -p $TYPE)"
 
    if ! type_equality  "$target"  "$actual" ; then
       raise type_error "${node_r[expr]}"
@@ -923,12 +918,14 @@ function semantics_member {
    fi
 
    local -n section_r="$SYMBOL"
-   local rv="${section_r[node]}"
 
    # Necessary for an expression using both member & index subscription. E.g.,
    #> _: a.b[0];
-   # Need to "return" the result of (a.b) so it can be subscripted by [0].
-   declare -g NODE="$rv"
+   #
+   # Need to "return" the result of (a.b) so it can be subscripted by [0]. The
+   # symbol holds a reference to the declaration. Need the expression itself.
+   local -n result_r="${section_r[node]}"
+   declare -g NODE="${result_r[expr]}"
 
    declare -g TYPE="${section_r[type]}"
    declare -g SYMTAB="$symtab"
@@ -936,20 +933,6 @@ function semantics_member {
 
 
 function semantics_index {
-   # THINKIES: the lhs of an index expression can be one of four things:
-   #  1. A raw array declaration:  zero: [0, 1][0];
-   #  2. A direct reference:       arr: [0, 1];       one: arr[1];
-   #  3. An index expression:      arr: [[0, 1]];     one: arr[0][1];
-   #  4. A member expression:      S { arr: [0, 1]; } one: S.arr[1];
-   # Must have $NODE set to the array node. Either the decl.expr.items, or
-   # the node itself directly.
-   #
-   # - What is "returned" by each fn() that can land here?
-   # - Does anything else use that return? Do we need to make it more universal,
-   #   or can everything point to the .items prop?
-   #
-   # CURRENT: it is late--finish this later.
-
    local -n node_r="$NODE"
 
    walk_semantics "${node_r[left]}"

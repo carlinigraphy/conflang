@@ -84,7 +84,7 @@ function walk_skelly {
 
 
 function skelly_decl_section {
-   local -- node="$NODE"
+   local node="$NODE"
    local -n node_r="$node"
 
    # Add mapping from _NODE_$n -> _SKELLY_$n. Need one level of indirection to
@@ -104,11 +104,11 @@ function skelly_decl_section {
    #           _SKELLY_2 :: dict_skelly
    #
    mk_skelly                                 #< _SKELLY_1
-   local -- middle_skelly="$SKELLY"
+   local middle_skelly="$SKELLY"
    local -n middle_skelly_r="$middle_skelly"
 
    mk_compile_dict                           #< _SKELLY_2
-   local -- dict_skelly="$SKELLY"
+   local dict_skelly="$SKELLY"
    local -n dict_skelly_r="$dict_skelly"
 
    middle_skelly_r="$dict_skelly"            #< _SKELLY_1="_SKELLY_2"
@@ -122,7 +122,7 @@ function skelly_decl_section {
    for var_decl in "${items_r[@]}"; do
       local -n var_decl_r="$var_decl"
       local -n name_r="${var_decl_r[name]}"
-      local -- name="${name_r[value]}"
+      local name="${name_r[value]}"
 
       walk_skelly "$var_decl"
       dict_skelly_r[$name]="$SKELLY"
@@ -233,7 +233,7 @@ function evaluate_array {
    local -n node_r="$NODE"
 
    mk_compile_array
-   local -- array="$DATA"
+   local array="$DATA"
    local -n array_r="$DATA"
 
    for ast_node in "${node_r[@]}"; do
@@ -259,7 +259,7 @@ function evaluate_integer {
 
 function evaluate_string {
    local -n node_r="$NODE"
-   local -- string="${node_r[value]}"
+   local string="${node_r[value]}"
 
    while [[ "${node_r[concat]}" ]] ; do
       walk_evaluate "${node_r[concat]}"
@@ -273,7 +273,7 @@ function evaluate_string {
 
 function evaluate_path {
    local -n node_r=$NODE
-   local -- path="${node_r[value]}"
+   local path="${node_r[value]}"
 
    while [[ "${node_r[concat]}" ]] ; do
       walk_evaluate "${node_r[concat]}"
@@ -287,7 +287,7 @@ function evaluate_path {
 
 function evaluate_env_var {
    local -n node_r="$NODE"
-   local -- ident="${node_r[value]}" 
+   local ident="${node_r[value]}" 
 
    if [[ ! "${SNAPSHOT[$ident]+_}" ]] ; then
       raise missing_env_var "$ident"
@@ -300,7 +300,7 @@ function evaluate_env_var {
 function evaluate_identifier {
    # Pull identifier's name out of the AST node.
    local -n node_r="$NODE"
-   local -- name="${node_r[value]}"
+   local name="${node_r[value]}"
 
    # Look up the AST node referred to by this identifier. Given:
    #
@@ -312,7 +312,7 @@ function evaluate_identifier {
    symtab from "$NODE"
    symtab get "$name"
    local -n symbol_r="$SYMBOL"
-   local -- ast_node="${symbol_r[node]}"
+   local ast_node="${symbol_r[node]}"
 
    # Resolve the reference in the EXPR_MAP. Given:
    #
