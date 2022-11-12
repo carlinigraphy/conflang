@@ -1,5 +1,5 @@
 = conflang
-:toc:                      left
+:toc:                      preamble
 :toclevels:                3
 :source-highlighter:       pygments
 :pygments-style:           algol_nu
@@ -33,10 +33,9 @@ Learning.
 Several years ago I began learning to write a "real" programming language.
 Turns out it's hard.
 I found myself consistently hitting conceptual sticking points.
-Approaching these in the context of something I already understand very well (bash) makes them easier to approach.
+Approaching these in the context of something I already understand very well (bash) is easier.
 
-Many of my recent projects were building towards this goal.
-This is the spiritual successor to `mkconf`, `conf`, and `shql`.
+Many of my recent projects (`mkconf`, `conf`, `shql`) were building towards this goal.
 
 I do not intend for anyone to actually use `conflang`, just as I didn't `shql`.
 Journey over destination and all that.
@@ -66,9 +65,9 @@ full_name (array:str): [
 .Types
 ----
 # (str)    Surrounded with double-quotes:  "this is a string"
+# (path)   Surrounded with single-quotes:  './relative', '~/relative', '/absolute'
 # (int)    Negative & positive integers:   -1, 0, 1, ...
 # (bool)   Boolean values:                 true, false
-# (path)   Surrounded with single-quotes:  './relative', '~/relative', '/absolute'
 # (array)  Arrays, allows mixed types:     [0, 1, 2],  ["one", 2, '~/three.txt']
 ----
 
@@ -80,8 +79,8 @@ configdir (path): $XDG_CONFIG_HOME;
 
 .Variables
 ----
-key1: "val1";
-key2: key1;
+key: "val";
+key2: key;
 
 Section {
    key: "val";
@@ -97,10 +96,10 @@ Section {
 .Sections
 ----
 # Sections.
-globals {
+section {
    scope: "outer";
 
-   sub-heading {
+   subsection {
       scope: "inner";
    }
 }
@@ -120,9 +119,9 @@ shell_level: $SHLVL -> int;
 ----
 common {
    colors (array:str) [
-      "#000000";
-      "#111111";
-      "#222222";
+      "#000000",
+      "#111111",
+      "#222222",
    ];
 }
 
@@ -237,8 +236,8 @@ required {
 }
 
 # Section & sub-section are both required, as variable (age) is required.
-required_1 {
-   required_2 {
+required {
+   required {
       age;
    }
 }
