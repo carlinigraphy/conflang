@@ -362,6 +362,12 @@ function symtab_typedef {
 }
 
 
+function symtab_typecast {
+   local -n node_r="$NODE"
+   walk_symtab "${node_r[expr]}"
+}
+
+
 function symtab_member {
    local -n node_r="$NODE"
    walk_symtab "${node_r[left]}"

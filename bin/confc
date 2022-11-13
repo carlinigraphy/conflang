@@ -1,7 +1,6 @@
 #!/bin/bash
 set -eo pipefail
-
-[[ $DEBUG ]] && trap '(( $? )) && traceback 2' EXIT
+[[ $CONFC_DEBUG ]] && trap '(( $? )) && traceback 2' EXIT
 
 # Current environment's variables. When the user queries an env var (e.g., PATH)
 # we need to make sure it isn't something that's been stomped on by a variable
@@ -13,6 +12,7 @@ while IFS= read -r -d '' line ; do
    val="${line#*=}"
    SNAPSHOT["$key"]="$val"
 done < <(env --null)
+
 
 function usage {
 cat <<EOF
