@@ -10,6 +10,7 @@ cat <<EOF
 
 commands
    run         Runs \`confc\`
+   rundb       Runs \`confc\` with debug flag(s)
    test        Run \`BATS\` tests
    cov         Run \`BATS\` tests with \`kcov\` coverage
    check       Run \`shellcheck\`
@@ -25,6 +26,9 @@ exit "$1"
 
 case "$1" in
    'run')   shift ; exec "${PROGDIR}"/bin/confc "$@"
+            ;;
+
+   'rundb') shift ; CONFC_DEBUG='t' exec "${PROGDIR}"/bin/confc "$@"
             ;;
 
    'test')  shift ; args=( "$@" )
@@ -85,7 +89,7 @@ case "$1" in
                "${PROGDIR}"/lib/{lexer,parser,semantics,compiler}.sh
                "${PROGDIR}"/lib/{errors,debug,ffi}.sh
             )
-            exec nvim "${order[@]}"
+            exec $EDITOR "${order[@]}"
             ;;
 
    *) usage 1 ;;
