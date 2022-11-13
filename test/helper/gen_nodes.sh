@@ -12,8 +12,8 @@ declare -ga FILES=( "${1?}" )
 source "${LIBDIR}"/errors.sh
 source "${LIBDIR}"/lexer.sh
 source "${LIBDIR}"/parser.sh
-init_scanner
-scan
-parse
+lexer:init
+lexer:scan
+parser:parse
 
 declare -p ROOT TYPEOF ${!NODE_*} | sort -V -k3

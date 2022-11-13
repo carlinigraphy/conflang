@@ -11,7 +11,7 @@ declare -ga FILES=( "${1?}" )
 
 source "${LIBDIR}"/errors.sh
 source "${LIBDIR}"/lexer.sh
-init_scanner
-scan
+lexer:init
+lexer:scan
 
 declare -p TOKENS ${!TOKEN_*} | sort -V -k3
