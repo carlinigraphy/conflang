@@ -9,7 +9,7 @@
 #═════════════════════════════════╡ AST NODES ╞═════════════════════════════════
 declare -gi  NODE_NUM=0
 declare -gi  INCLUDE_NUM=0
-declare -gi  USE_NUM=0
+#declare -gi USE_NUM=0
 
 # `include` & `constrain` directives are handled by the parser. They don't
 # create NODES_$n's.
@@ -35,107 +35,139 @@ function ast:new { _ast_new_"$1" ;}
 function _ast_new_decl_section {
    # 1) create parent
    (( ++NODE_NUM ))
-   local   --  nname="NODE_${NODE_NUM}"
-   declare -gA $nname
-   declare -g  NODE=$nname
-   local   -n  node=$nname
+   local node="NODE_${NODE_NUM}"
+   declare -gA "$node"
+   declare -g NODE="$node"
 
    # Set global SECTION pointer here for validating %constrain blocks, and
    # setting $target of %include's
-   declare -g SECTION=$nname
+   declare -g SECTION="$node"
 
    # 2) create list to hold the items within the section.
    (( ++NODE_NUM ))
-   local nname_items="NODE_${NODE_NUM}"
-   declare -ga $nname_items
+   local items="NODE_${NODE_NUM}"
+   declare -ga "$items"
 
    # 3) assign child node to parent.
-   node['name']=
-   node['items']=$nname_items
+   local -n node_r="$node"
+   node_r['name']=''
+   node_r['items']="$items"
+
+   # Leaf nodes (anything that may not *contain* another node) carries along the
+   # $LOCATION node from its parent $TOKEN. For debugging, non-leaf nodes
+   # needto pull their own .start_{ln,col} and .end_{ln,col} from their
+   # associated $TOKEN.
+   location:new
+   node_r['location']="$LOCATION"
 
    # 4) Meta information, for easier parsing.
-   TYPEOF[$nname]='decl_section'
+   TYPEOF["$node"]='decl_section'
 }
 
 
 function _ast_new_decl_variable {
    (( ++NODE_NUM ))
-   local   --  nname="NODE_${NODE_NUM}"
-   declare -gA $nname
-   declare -g  NODE=$nname
-   local   -n  node=$nname
+   local node="NODE_${NODE_NUM}"
+   declare -gA "$node"
+   declare -g NODE="$node"
 
-   node['name']=       # identifier
-   node['type']=       # type
-   node['expr']=       # section, array, int, str, bool, path
+   local -n node_r="$node"
+   node_r['name']=''                      # AST(identifier)
+   node_r['type']=''                      # AST(type)
+   node_r['expr']=''                      # AST(array, int, str, ...)
 
-   TYPEOF[$nname]='decl_variable'
+   location:new
+   node_r['location']="$LOCATION"
+
+   TYPEOF["$node"]='decl_variable'
 }
 
 
 function _ast_new_include {
    (( ++INCLUDE_NUM ))
-   local   --  iname="INCLUDE_${INCLUDE_NUM}"
-   declare -gA $iname
-   declare -g  INCLUDE=$iname
-   local   -n  include=$iname
+   local node="INCLUDE_${INCLUDE_NUM}"
+   declare -gA "$node"
+   declare -g INCLUDE="$node"
 
-   include['path']=
-   include['target']=
+   local -n node_r="$node"
+   node_r['path']=''
+   node_r['target']=''
 
-   INCLUDES+=( "$iname" )
+   # Copy from tokens during parsing.
+   location:new
+   node_r['location']="$LOCATION"
+
+   INCLUDES+=( "$node" )
 }
 
 
-function _ast_new_use {
-   (( ++USE_NUM ))
-   local   --  nname="NODE_${NODE_NUM}"
-   declare -gA $nname
-   declare -g  NODE=$nname
-   local   -n  node=$nname
-
-   node['path']=       # the 'path' to the module
-   node['name']=       # identifier, if using `as $ident;`
-
-   TYPEOF[$nname]='use'
-}
+# NYI
+#
+#function _ast_new_use {
+#   (( ++USE_NUM ))
+#   local node="NODE_${NODE_NUM}"
+#   declare -gA "$node"
+#   declare -g NODE="$node"
+#
+#   local -n node_r="$node"
+#   node_r['path']=       # the 'path' to the module
+#   node_r['name']=       # identifier, if using `as $ident;`
+#
+#   # Copy from tokens during parsing.
+#   location:new
+#   node_r['location']="$LOCATION"
+#
+#   TYPEOF["$node"]='use'
+#}
 
 
 function _ast_new_array {
    (( ++NODE_NUM ))
-   local   --  nname="NODE_${NODE_NUM}"
-   declare -ga $nname
-   declare -g  NODE=$nname
+   local node="NODE_${NODE_NUM}"
+   declare -ga "$node"
+   declare -g NODE="$node"
 
-   TYPEOF[$nname]='array'
+   # Copy from tokens during parsing.
+   location:new
+   node_r['location']="$LOCATION"
+
+   TYPEOF["$node"]='array'
 }
 
 
 function _ast_new_typedef {
    (( ++NODE_NUM ))
-   local nname="NODE_${NODE_NUM}"
-   declare -gA $nname
-   declare -g  NODE=$nname
+   local node="NODE_${NODE_NUM}"
+   declare -gA "$node"
+   declare -g NODE="$node"
 
-   local -n node=$nname
-   node['kind']=          # Primitive type
-   node['subtype']=       # Sub `Type' node
+   local -n node_r="$node"
+   node_r['kind']=''        # Primitive type
+   node_r['subtype']=''     # Sub `Type' node
 
-   TYPEOF[$nname]='typedef'
+   # Copy from tokens during parsing.
+   location:new
+   node_r['location']="$LOCATION"
+
+   TYPEOF["$node"]='typedef'
 }
 
 
 function _ast_new_typecast {
    (( ++NODE_NUM ))
-   local nname="NODE_${NODE_NUM}"
-   declare -gA $nname
-   declare -g  NODE=$nname
+   local node="NODE_${NODE_NUM}"
+   declare -gA "$node"
+   declare -g  NODE="$node"
 
-   local -n node=$nname
-   node['expr']=
-   node['typedef']=
+   local -n node_r="$node"
+   node_r['expr']=''
+   node_r['typedef']=''
 
-   TYPEOF[$nname]='typecast'
+   # Copy from tokens during parsing.
+   location:new
+   node_r['location']="$LOCATION"
+
+   TYPEOF["$node"]='typecast'
 }
 
 
@@ -143,15 +175,19 @@ function _ast_new_member {
    # Only permissible in accessing section keys. Not in array indices.
 
    (( ++NODE_NUM ))
-   local   --  nname="NODE_${NODE_NUM}"
+   local nname="NODE_${NODE_NUM}"
    declare -gA $nname
-   declare -g  NODE=$nname
-   local   -n  node=$nname
+   declare -g NODE=$nname
 
-   node['left']=
-   node['right']=
+   local -n node_r=$nname
+   node_r['left']=''
+   node_r['right']=''
 
-   TYPEOF[$nname]='member'
+   # Copy from tokens during parsing.
+   location:new
+   node_r['location']="$LOCATION"
+
+   TYPEOF["$node"]='member'
 }
 
 
@@ -159,139 +195,123 @@ function _ast_new_index {
    # Only permissible in accessing array indices. Not in sections.
 
    (( ++NODE_NUM ))
-   local   --  nname="NODE_${NODE_NUM}"
-   declare -gA $nname
-   declare -g  NODE=$nname
-   local   -n  node=$nname
+   local node="NODE_${NODE_NUM}"
+   declare -gA "$node"
+   declare -g NODE="$node"
 
-   node['left']=
-   node['right']=
+   local -n node_r="$node"
+   node_r['left']=''
+   node_r['right']=''
 
-   TYPEOF[$nname]='index'
+   # Copy from tokens during parsing.
+   location:new
+   node_r['location']="$LOCATION"
+
+   TYPEOF["$node"]='index'
 }
 
 
 function _ast_new_unary {
    (( ++NODE_NUM ))
-   local   --  nname="NODE_${NODE_NUM}"
-   declare -gA $nname
-   declare -g  NODE=$nname
-   local   -n  node=$nname
+   local node="NODE_${NODE_NUM}"
+   declare -gA "$node"
+   declare -g NODE="$node"
 
-   node['op']=
-   node['right']=
+   local -n node_r="$node"
+   node_r['op']=''
+   node_r['right']=''
 
-   TYPEOF[$nname]='unary'
+   # Copy from tokens during parsing.
+   location:new
+   node_r['location']="$LOCATION"
+
+   TYPEOF["$node"]='unary'
 }
 
 
 function _ast_new_boolean {
    (( ++NODE_NUM ))
-   local   -- nname="NODE_${NODE_NUM}"
-   declare -gA $nname
-   declare -g  NODE=$nname
-   local   -n  node=$nname
+   local node="NODE_${NODE_NUM}"
+   declare -gA "$node"
+   declare -g NODE="$node"
 
-   # Copied over, so we can ditch the raw tokens after the parser.
-   node['value']=
-   node['offset']=
-   node['lineno']=
-   node['colno']=
-   node['file']=
+   local -n node_r="$node"
+   node['value']=''
+   node['location']=''
 
-   TYPEOF[$nname]='boolean'
+   TYPEOF["$node"]='boolean'
 }
 
 
 function _ast_new_integer {
    (( ++NODE_NUM ))
-   local   --  nname="NODE_${NODE_NUM}"
-   declare -gA $nname
-   declare -g  NODE=$nname
-   local   -n  node=$nname
+   local node="NODE_${NODE_NUM}"
+   declare -gA "$node"
+   declare -g NODE="$node"
 
-   # Copied over, so we can ditch the raw tokens after the parser.
-   node['value']=
-   node['offset']=
-   node['lineno']=
-   node['colno']=
-   node['file']=
+   local -n node_r="$node"
+   node_r['value']=''
+   node_r['location']=''
 
-   TYPEOF[$nname]='integer'
+   TYPEOF["$node"]='integer'
 }
 
 
 function _ast_new_string {
    (( ++NODE_NUM ))
-   local   --  nname="NODE_${NODE_NUM}"
-   declare -gA $nname
-   declare -g  NODE=$nname
-   local   -n  node=$nname
+   local node="NODE_${NODE_NUM}"
+   declare -gA "$node"
+   declare -g NODE="$node"
 
-   # Copied over, so we can ditch the raw tokens after the parser.
-   node['value']=
-   node['offset']=
-   node['lineno']=
-   node['colno']=
-   node['file']=
+   local -n node_r="$node"
+   node_r['value']=''
+   node_r['location']=''
 
-   TYPEOF[$nname]='string'
+   TYPEOF["$node"]='string'
 }
 
 
 function _ast_new_path {
    (( ++NODE_NUM ))
-   local   -- nname="NODE_${NODE_NUM}"
-   declare -gA $nname
-   declare -g  NODE=$nname
-   local   -n  node=$nname
+   local node="NODE_${NODE_NUM}"
+   declare -gA "$node"
+   declare -g NODE="$node"
 
-   # Copied over, so we can ditch the raw tokens after the parser.
-   node['value']=
-   node['offset']=
-   node['lineno']=
-   node['colno']=
-   node['file']=
+   local -n node_r="$node"
+   node_r['value']=''
+   node_r['location']=''
 
-   TYPEOF[$nname]='path'
+   TYPEOF["$node"]='path'
 }
 
 
 function _ast_new_identifier {
    (( ++NODE_NUM ))
-   local   -- nname="NODE_${NODE_NUM}"
-   declare -gA $nname
-   declare -g  NODE=$nname
-   local   -n  node=$nname
+   local node="NODE_${NODE_NUM}"
+   declare -gA "$node"
+   declare -g NODE="$node"
 
-   # Copied over, so we can ditch the raw tokens after the parser.
-   node['value']=
-   node['offset']=
-   node['lineno']=
-   node['colno']=
-   node['file']=
+   local -n node_r="$node"
+   node_r['value']=''
+   node_r['location']=''
 
    # shellcheck disable=SC2034
-   TYPEOF[$nname]='identifier'
+   TYPEOF["$node"]='identifier'
 }
 
 
 function _ast_new_env_var {
    (( ++NODE_NUM ))
-   local   -- nname="NODE_${NODE_NUM}"
-   declare -gA $nname
-   declare -g  NODE=$nname
-   local   -n  node=$nname
+   local node="NODE_${NODE_NUM}"
+   declare -gA "$node"
+   declare -g NODE="$node"
 
-   # Copied over, so we can ditch the raw tokens after the parser.
-   node['value']=
-   node['offset']=
-   node['lineno']=
-   node['colno']=
-   node['file']=
+   local -n node_r="$node"
+   node_r['value']=''
+   node_r['location']=''
 
    # shellcheck disable=SC2034
-   TYPEOF[$nname]='env_var'
+   TYPEOF["$node"]='env_var'
 }
 
 
@@ -333,8 +353,7 @@ function parser:advance {
 
 
 function parser:check {
-   # Allows for passing in something like: "L_BRACKET,STRING,INTEGER" to check
-   # multiple tokens.
+   # Is $CURRENT one of a comma-delimited list of types.
    [[ ,"$1", ==  *,${CURRENT[type]},* ]]
 }
 
@@ -344,7 +363,6 @@ function parser:match {
       parser:advance
       return 0
    fi
-
    return 1
 }
 
@@ -353,7 +371,6 @@ function parser:munch {
    if ! parser:check "$1" ; then
       raise munch_error  "$1"  "$CURRENT_NAME"  "$2"
    fi
-
    parser:advance
 }
 
@@ -379,27 +396,28 @@ function parser:program {
    # Creates a default top-level `section', allowing top-level key:value pairs,
    # wout requiring a dict (take that, JSON).
    ast:new identifier
+   local ident="$NODE"
+   local -n ident_r="$ident"
+   ident_r['value']='%inline'
 
-   local -- nname=$NODE
-   local -n name=$nname
-   name['value']='%inline'
-   name['offset']=0
-   name['lineno']=0
-   name['colno']=0
-   name['file']="${FILE_IDX}"
+   location:new
+   local loc="$LOCATION"
+   local -n loc_r="$loc"
+   loc_r['start_ln']=0
+   loc_r['start_col']=0
+   loc_r['file']="${FILE_IDX}"
 
    ast:new decl_section
+   declare -g ROOT="$NODE"
+   local node="$NODE"
+   local -n node_r="$node"
+   local -n items=${node_r['items']}
 
-   # shellcheck disable=SC2034
-   declare -g ROOT=$NODE
-   local   -n node=$NODE
-   local   -n items=${node['items']}
-
-   node['name']=$nname
+   node_r['name']="$ident"
+   node_r['location']="$loc"
 
    while ! parser:check 'EOF' ; do
       parser:statement
-
       # %include/%constrain are statements, but do not have an associated $NODE.
       # Need to avoid adding an empty string to the section.items[]
       if [[ $NODE ]] ; then
@@ -408,6 +426,7 @@ function parser:program {
    done
 
    parser:munch 'EOF'
+   location:copy "$CURRENT_NAME"  "$node"  'end_ln'  'end_col'
 }
 
 
@@ -421,21 +440,20 @@ function parser:statement {
 
 
 function parser:parser_statement {
-   # Saved node referencing the parent Section.
    if   parser:match 'INCLUDE'   ; then parser:include
    elif parser:match 'CONSTRAIN' ; then parser:constrain
-   elif parser:match 'USE'       ; then parser:use
    else
-      raise parse_error "${CURRENT[value]} is not a parser statement."
+      raise parse_error "invalid directive: \`${CURRENT[value]}'."
    fi
 
-   parser:munch 'SEMI' "expecting \`;' after parser statement."
+   parser:munch 'SEMI' "expecting \`;' after directive."
 }
 
 
 function parser:include {
    ast:new include
-   local -n include=$INCLUDE
+   local include="$INCLUDE"
+   local -n include_r="$include"
 
    # When used outside the `parser:expression()` function, need to explicitly
    # pass in a refernce to the current token.
@@ -470,16 +488,10 @@ function parser:constrain {
       raise parse_error 'may not specify multiple constrain blocks.'
    fi
 
-   # TODO: refactor
-   # This should probably just call `parser:array`. Then we can pull the paths
-   # out from within it? Rearpb making it a special case. Or maybe just
-   # straight up call `parser:expression`. Hmm.
    parser:munch 'L_BRACKET' "expecting \`[' to begin array of paths."
    until parser:check 'R_BRACKET' ; do
-      # When used outside the `parser:expression()` function, need to explicitly
-      # pass in a refernce to the current token.
       parser:path "$CURRENT_NAME"
-      parser:munch 'PATH' 'expecting an array of paths.'
+      parser:munch 'PATH'
 
       local -n path=$NODE
       CONSTRAINTS+=( "${path[value]}" )
@@ -505,7 +517,7 @@ function parser:constrain {
 #   fi
 #
 #   ast:new use
-#   local -- save="$NODE"
+#   local save="$NODE"
 #   local -n use="$NODE"
 #
 #   parser:path "$CURRENT_NAME"
@@ -538,57 +550,57 @@ function parser:declaration {
 
 
 function parser:decl_section {
-   local -- name=$NODE
-   local -- sect=$SECTION
+   local ident="$NODE"
+   local sect="$SECTION"
 
    ast:new decl_section
-   local -- save=$NODE
-   local -n node=$NODE
-   local -n items=${node['items']}
+   local node="$NODE"
+   local -n node_r="$node"
+   node_r['name']="$ident"
 
-   #  ┌── incorrectly identified error by `shellcheck`.
-   # shellcheck disable=SC2128 
-   node['name']="$name"
-
+   local -n items_r="${node_r['items']}"
    while ! parser:check 'R_BRACE' ; do
       parser:statement
-
-      # %include/%constrain are statements, but do not have an associated $NODE.
-      # Need to avoid adding an empty string to the section.items[]
+      # Ignore %-directives, they generate an empty NODE.
       if [[ $NODE ]] ; then
-         items+=( "$NODE" )
+         items_r+=( "$NODE" )
       fi
    done
 
+   local close="$CURRENT_NAME"
    parser:munch 'R_BRACE' "expecting \`}' after section."
-   declare -g NODE="$save"
+
+   location:new
+   node_r['location']="$LOCATION"
+   location:copy "$ident"  "$node"  'start_ln'  'start_col'
+   location:copy "$close"  "$node"  'end_ln'    'end_col'
+
+   declare -g NODE="$node"
    declare -g SECTION="$sect"
 }
 
 
 function parser:decl_variable {
    # Variable declaration must be preceded by an identifier.
-   local -- name=$NODE
+   local ident="$NODE"
 
    ast:new decl_variable
-   local -- save=$NODE
-   local -n node=$NODE
+   local node="$NODE"
+   local -n node_r="$node"
 
    #  ┌── incorrectly identified error by `shellcheck`.
    # shellcheck disable=SC2128
-   node['name']=$name
+   node_r['name']="$ident"
 
    # Typedefs.
    if parser:match 'L_PAREN' ; then
       parser:typedef
       parser:munch 'R_PAREN' "typedef must be closed by \`)'."
-      node['type']=$NODE
+      node_r['type']=$NODE
    fi
 
-   # For better error reporting. If the user passes a token that begins an
-   # expression (literally defined in the pratt parsing section as a null
-   # denomination), throw error specifically indicating that they likely
-   # intended to precede with a colon.
+   # If current token is one that begins an expression, advise they likely
+   # indended a colon before it.
    local expr_str=''
    for expr in "${!NUD[@]}" ; do
       expr_str+="${expr_str:+,}${expr}"
@@ -597,24 +609,36 @@ function parser:decl_variable {
    # Expressions.
    if parser:match 'COLON' ; then
       parser:expression
-      node['expr']=$NODE
+      node_r['expr']=$NODE
    elif parser:match "$expr_str" ; then
       raise parse_error "expecting \`:' before expression."
+      # TODO: perhaps create a location node here for error reporting. Make all
+      # errors expect a LOCATION node to report error info.
    fi
 
+   local close="$CURRENT_NAME"
    parser:munch 'SEMI' "expecting \`;' after declaration."
-   declare -g NODE=$save
+
+   location:new
+   node_r['location']="$LOCATION"
+   location:copy "$ident"  "$node"  'start_ln'  'start_col'
+   location:copy "$close"  "$node"  'end_ln'    'end_col'
+
+   declare -g NODE="$node"
 }
 
+
+# TODO: continue updating nameref syntax, adding location information to
+# everything below.
 
 function parser:typedef {
    parser:identifier "$CURRENT_NAME"
    parser:munch 'IDENTIFIER' 'type declarations must be identifiers.'
 
-   local -- name=$NODE
+   local name=$NODE
 
    ast:new typedef
-   local -- save=$NODE
+   local save=$NODE
    local -n type_=$save
 
    #  ┌── incorrectly identified error by `shellcheck`.
@@ -770,23 +794,10 @@ function parser:unary {
 function parser:concat {
    # String (and path) interpolation are parsed as a high left-associative
    # infix operator.
-   #> first (str): "Marcus";
-   #> greet (str): "Hello {first}.";
-   #
-   # Parses to...
-   #> str(value:  "Hello ",
-   #>     concat: ident(value:  first,
-   #>                   concat: str(value:  ".",
-   #>                               concat: None)
 
-   # We can safely ignore $2. It's the operator, passed in from
-   # parser:expression(). We already know the operator is a CONCAT.
    local lhs="$1"  _=$2  rbp="$3"
+   #               ^-- ignore concat op
 
-   # To simplify (I think) parsing string/path interpolation, instead of
-   # creating a concatentation AST node or some such containing an array of the
-   # pieces, each part has a `.concat` key, with the value of the node to
-   # concatenate with.
    local -n tail="$lhs"
    until [[ ! ${tail['concat']} ]] ; do
       local -n tail=${tail['concat']}
@@ -832,7 +843,7 @@ function parser:index {
    parser:advance # past L_BRACKET.
 
    ast:new index
-   local -- save="$NODE"
+   local save="$NODE"
    local -n index="$NODE"
 
    parser:expression
@@ -848,7 +859,7 @@ function parser:member {
    local lhs="$1"  _=$2  rbp="$3"
                     # ^-- ignore `.` operator
    ast:new member
-   local -- node="$NODE"
+   local node="$NODE"
    local -n node_r="$NODE"
 
    parser:identifier "$CURRENT_NAME"
@@ -866,7 +877,7 @@ function parser:member {
 
 function parser:array {
    ast:new array
-   local -- save=$NODE
+   local save=$NODE
    local -n node=$NODE
 
    until parser:check 'R_BRACKET' ; do
@@ -887,12 +898,9 @@ function parser:env_var {
    parser:advance # past DOLLAR.
 
    ast:new env_var
-   local -n node=$NODE
-
-   # Copy over params from the token -> AST node.
-   for param in value offset lineno colno file ; do
-      node[$param]="${token[$param]}"
-   done
+   local -n node_r="$NODE"
+   node_r['value']="${token[value]}"
+   node_r['location']="${token[location]}"
 }
 
 
@@ -900,12 +908,9 @@ function parser:identifier {
    local -n token="$1"
 
    ast:new identifier
-   local -n node=$NODE
-
-   # Copy over params from the token -> AST node.
-   for param in value offset lineno colno file ; do
-      node[$param]="${token[$param]}"
-   done
+   local -n node_r="$NODE"
+   node_r['value']="${token[value]}"
+   node_r['location']="${token[location]}"
 }
 
 
@@ -913,12 +918,9 @@ function parser:boolean {
    local -n token="$1"
 
    ast:new boolean
-   local -n node=$NODE
-
-   # Copy over params from the token -> AST node.
-   for param in value offset lineno colno file ; do
-      node[$param]="${token[$param]}"
-   done
+   local -n node_r="$NODE"
+   node_r['value']="${token[value]}"
+   node_r['location']="${token[location]}"
 }
 
 
@@ -926,12 +928,9 @@ function parser:integer {
    local -n token="$1"
 
    ast:new integer
-   local -n node=$NODE
-
-   # Copy over params from the token -> AST node.
-   for param in value offset lineno colno file ; do
-      node[$param]="${token[$param]}"
-   done
+   local -n node_r="$NODE"
+   node_r['value']="${token[value]}"
+   node_r['location']="${token[location]}"
 }
 
 
@@ -939,15 +938,12 @@ function parser:string {
    local -n token="$1"
 
    ast:new string
-   local -n node=$NODE
-   node['concat']=''
+   local -n node_r="$NODE"
+   node_r['value']="${token[value]}"
+   node_r['location']="${token[location]}"
+   node_r['concat']=''
    # ^-- for string interpolation, concatenate with the subsequent node. This
    # will appear on each in the chain of linked interpolation nodes.
-
-   # Copy over params from the token -> AST node.
-   for param in value offset lineno colno file ; do
-      node[$param]="${token[$param]}"
-   done
 }
 
 
@@ -955,13 +951,10 @@ function parser:path {
    local -n token="$1"
 
    ast:new path
-   local -n node=$NODE
-   node['concat']=''
+   local -n node_r="$NODE"
+   node_r['value']="${token[value]}"
+   node_r['location']="${token[location]}"
+   node_r['concat']=''
    # ^-- for string interpolation, concatenate with the subsequent node. This
    # will appear on each in the chain of linked interpolation nodes.
-
-   # Copy over params from the token -> AST node.
-   for param in value offset lineno colno file ; do
-      node[$param]="${token[$param]}"
-   done
 }

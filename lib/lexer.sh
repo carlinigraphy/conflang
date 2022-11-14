@@ -12,10 +12,12 @@ declare -gi TOKEN_NUM=0
 declare -gA KEYWORD=(
    ['true']=true
    ['false']=true
-   #['use']=true
-   #['as']=true
    ['include']=true
    ['constrain']=true
+
+   # NYI
+   #['use']=true
+   #['as']=true
 )
 
 function lexer:init {
@@ -34,43 +36,37 @@ function lexer:init {
    declare -ga  CHARRAY=()
    declare -ga  TOKENS=()
    declare -gA  FREEZE CURSOR=(
-      [offset]=-1
+      [index]=-1
       [lineno]=1
       [colno]=0
    )
 }
 
 
-function Token {
-   # Effectively a Class. Creates instances of Token with information for
-   # the position in the file, as well as the character type/value.
-
+function token:new {
    local type=$1  value=$2
 
-   # Realistically we can just do "TOKEN_$(( ${#TOKEN_NUM[@]} + 1 ))". Feel like
-   # that add visual complexity here, despite removing slight complexity of yet
-   # another global variable.
-   local tname="TOKEN_${TOKEN_NUM}"
-   declare -gA "${tname}"
+   (( ++TOKEN_NUM ))
+   local token="TOKEN_${TOKEN_NUM}"
+   declare -gA "$token"
+   TOKENS+=( "$token" )
 
    # Nameref to newly created global token.
-   declare -n t="$tname"
+   declare -n t_r="$token"
 
    # Token data.
-   t['type']="$type"
-   t['value']="$value"
+   t_r['type']="$type"
+   t_r['value']="$value"
 
-   # Cursor information (position in file & line).
-   t['offset']=${FREEZE[offset]}
-   t['lineno']=${FREEZE[lineno]}
-   t['colno']=${FREEZE[colno]}
+   location:new
+   t_r['location']="$LOCATION"
 
-   # shellcheck disable=SC2034
-   # ^-- doesn't know this is used later.
-   t['file']="${FILE_IDX}"
-
-   TOKENS+=( "$tname" )
-   (( ++TOKEN_NUM ))
+   local -n loc_r="$LOCATION"
+   loc_r['file']="$FILE_IDX"
+   loc_r['start_ln']="${FREEZE[lineno]}"
+   loc_r['start_col']="${FREEZE[colno]}"
+   loc_r['end_ln']="${CURSOR[lineno]}"
+   loc_r['end_col']="${CURSOR[colno]}"
 }
 
                                      
@@ -84,12 +80,12 @@ function lexer:advance {
    #> (( 2 )) ; echo $?    #  0
    #> (( 0 )) ; echo $?    #  1
    # So the stupid way around this... add an `or true`. This is the short form:
-   (( ++CURSOR['offset'] )) ||:
+   (( ++CURSOR['index'] )) ||:
    (( ++CURSOR['colno']  ))
 
    # This is a real dumb use of bash's confusing array indexing.
-   CURRENT=${CHARRAY[CURSOR['offset']]}
-   PEEK=${CHARRAY[CURSOR['offset']+1]}
+   CURRENT=${CHARRAY[CURSOR['index']]}
+   PEEK=${CHARRAY[CURSOR['index']+1]}
 
    if [[ $CURRENT == $'\n' ]] ; then
       ((CURSOR['lineno']++))
@@ -105,11 +101,11 @@ function lexer:scan {
       CHARRAY+=( "$character" )
    done < "${FILES[-1]}"
 
-   while [[ ${CURSOR[offset]} -lt ${#CHARRAY[@]} ]] ; do
-      lexer:advance ; [[ -z "$CURRENT" ]] && break
+   while (( "${CURSOR[index]}" < ${#CHARRAY[@]} )) ; do
+      lexer:advance ; [[ ! "$CURRENT" ]] && break
 
       # Save current cursor information.
-      FREEZE['offset']=${CURSOR['offset']}
+      FREEZE['index']=${CURSOR['index']}
       FREEZE['lineno']=${CURSOR['lineno']}
       FREEZE['colno']=${CURSOR['colno']}
 
@@ -125,22 +121,22 @@ function lexer:scan {
 
       # Symbols.
       case $CURRENT in
-         '.')  Token        'DOT' "$CURRENT"  ; continue ;;
-         ',')  Token      'COMMA' "$CURRENT"  ; continue ;;
-         ';')  Token       'SEMI' "$CURRENT"  ; continue ;;
-         ':')  Token      'COLON' "$CURRENT"  ; continue ;;
-         '$')  Token     'DOLLAR' "$CURRENT"  ; continue ;;
-         '%')  Token    'PERCENT' "$CURRENT"  ; continue ;;
-         '?')  Token   'QUESTION' "$CURRENT"  ; continue ;;
+         '.')  token:new        'DOT' "$CURRENT"  ; continue ;;
+         ',')  token:new      'COMMA' "$CURRENT"  ; continue ;;
+         ';')  token:new       'SEMI' "$CURRENT"  ; continue ;;
+         ':')  token:new      'COLON' "$CURRENT"  ; continue ;;
+         '$')  token:new     'DOLLAR' "$CURRENT"  ; continue ;;
+         '%')  token:new    'PERCENT' "$CURRENT"  ; continue ;;
+         '?')  token:new   'QUESTION' "$CURRENT"  ; continue ;;
 
-         '(')  Token    'L_PAREN' "$CURRENT"  ; continue ;;
-         ')')  Token    'R_PAREN' "$CURRENT"  ; continue ;;
+         '(')  token:new    'L_PAREN' "$CURRENT"  ; continue ;;
+         ')')  token:new    'R_PAREN' "$CURRENT"  ; continue ;;
 
-         '[')  Token  'L_BRACKET' "$CURRENT"  ; continue ;;
-         ']')  Token  'R_BRACKET' "$CURRENT"  ; continue ;;
+         '[')  token:new  'L_BRACKET' "$CURRENT"  ; continue ;;
+         ']')  token:new  'R_BRACKET' "$CURRENT"  ; continue ;;
 
-         '{')  Token    'L_BRACE' "$CURRENT"  ; continue ;;
-         '}')  Token    'R_BRACE' "$CURRENT"  ; continue ;;
+         '{')  token:new    'L_BRACE' "$CURRENT"  ; continue ;;
+         '}')  token:new    'R_BRACE' "$CURRENT"  ; continue ;;
       esac
 
       # Typecast, or minus.
@@ -148,9 +144,9 @@ function lexer:scan {
          # If subsequent `>', is an arrow for typecast.
          if [[ $PEEK == '>' ]] ; then
             lexer:advance
-            Token 'ARROW' '->'
+            token:new 'ARROW' '->'
          else
-            Token 'MINUS' '-'
+            token:new 'MINUS' '-'
          fi
 
          continue
@@ -195,10 +191,10 @@ function lexer:scan {
 
       # Can do a dedicated error pass, scanning for error tokens, and assembling
       # the context to print useful debug messages.
-      Token 'ERROR' "$CURRENT"
+      token:new 'ERROR' "$CURRENT"
    done
 
-   Token 'EOF'
+   token:new 'EOF'
 }
 
 
@@ -220,9 +216,9 @@ function lexer:identifier {
    done
 
    if [[ ${KEYWORD[$buffer]} ]] ; then
-      Token "${buffer^^}" "$buffer"
+      token:new "${buffer^^}" "$buffer"
    else
-      Token 'IDENTIFIER' "$buffer"
+      token:new 'IDENTIFIER' "$buffer"
    fi
 }
 
@@ -253,7 +249,7 @@ function lexer:string {
    done
 
    # Create token.
-   Token 'STRING' "$join"
+   token:new 'STRING' "$join"
 }
 
 
@@ -283,7 +279,7 @@ function lexer:path {
    done
 
    # Create token.
-   Token 'PATH' "$join"
+   token:new 'PATH' "$join"
 }
 
 
@@ -294,12 +290,12 @@ function lexer:number {
       lexer:advance ; number+="$CURRENT"
    done
 
-   Token 'INTEGER' "$number"
+   token:new 'INTEGER' "$number"
 }
 
 
 function lexer:interpolation {
-   while [[ ${CURSOR[offset]} -lt ${#CHARRAY[@]} ]] ; do
+   while [[ "${CURSOR[index]}" -lt ${#CHARRAY[@]} ]] ; do
       # String interpolation ends upon a closing R_BRACE token, or if there's
       # no current character.
       if [[ ! $CURRENT ]] || [[ $PEEK == '}' ]] ; then
@@ -314,12 +310,12 @@ function lexer:interpolation {
       fi
 
       # Save current cursor information.
-      FREEZE['offset']=${CURSOR['offset']}
+      FREEZE['index']=${CURSOR['index']}
       FREEZE['lineno']=${CURSOR['lineno']}
       FREEZE['colno']=${CURSOR['colno']}
 
       if [[ $CURRENT == '$' ]] ; then
-         Token  'DOLLAR'  "$CURRENT"
+         token:new  'DOLLAR'  "$CURRENT"
          continue
       fi
 
@@ -377,8 +373,8 @@ function lexer:fstring {
          done
          buffer=()
 
-         Token 'STRING'  "$join"
-         Token 'CONCAT'  ''
+         token:new 'STRING'  "$join"
+         token:new 'CONCAT'  ''
 
          # TODO: refactor
          # This may be a little janky. If the user has an empty expression...
@@ -398,7 +394,7 @@ function lexer:fstring {
          # expression.
          local t1="$TOKEN_NUM"
          if [[ ! "$t0" -eq "$t1" ]] ; then
-            Token 'CONCAT'  ''
+            token:new 'CONCAT'  ''
          fi
 
          continue
@@ -413,7 +409,7 @@ function lexer:fstring {
    done
 
    # Create token.
-   Token 'STRING' "$join"
+   token:new 'STRING' "$join"
 }
 
 
@@ -461,8 +457,8 @@ function lexer:fpath {
          done
          buffer=()
 
-         Token 'PATH'    "$join"
-         Token 'CONCAT'  ''
+         token:new 'PATH'    "$join"
+         token:new 'CONCAT'  ''
 
          # TODO: refactor
          # This may be a little janky. If the user has an empty expression...
@@ -482,7 +478,7 @@ function lexer:fpath {
          # expression.
          local t1="$TOKEN_NUM"
          if [[ ! "$t0" -eq "$t1" ]] ; then
-            Token 'CONCAT'  ''
+            token:new 'CONCAT'  ''
          fi
 
          continue
@@ -497,5 +493,5 @@ function lexer:fpath {
    done
 
    # Create token.
-   Token 'PATH' "$join"
+   token:new 'PATH' "$join"
 }

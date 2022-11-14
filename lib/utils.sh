@@ -20,6 +20,12 @@ function init_globals {
    # The root of the compiled output.
    declare -g _SKELLY_ROOT=
 
+   # Location nodes are created in both the lexer & parser. Not a great place
+   # for these. Utils make sense, as they're shared, and referenced in many
+   # places.
+   declare -g  LOCATION=
+   declare -gi LOC_NUM=0
+
    # Shouldn't code file names/paths into the generated output. If the user has
    # the same file *data*, but it's in a different place, we shouldn't have to
    # re-compile the output.  An array of files allows us to map a static file
@@ -36,6 +42,39 @@ function init_globals {
    # Take the contents of INCLUDE_ROOT[0].items, and drop them into
    # INCLUDES[0].target.items.
    declare -ga INCLUDE_ROOT=()  INCLUDES=()
+}
+
+
+function location:new {
+   (( ++LOC_NUM ))
+   local loc="LOC_${LOC_NUM}"
+   declare -gA "$loc"
+   declare -g  LOCATION="$loc"
+
+   # Without a value, this isn't glob matched by a ${!_LOC_*}
+   local -n l="$loc" ; l=()
+}
+
+
+function location:copy {
+   # Copies the properties from $1's location node to $2's. If no properties are
+   # specified, copies all of them. May only operate on TOKENs and NODEs.
+   local -n from_r="$1" ; shift
+   local -n to_r="$1"   ; shift
+   local -a props=( "$@" )
+
+   local -n from_loc_r="${from_r[location]}"
+   local -n to_loc_r="${to_r[location]}"
+
+   if (( ! ${#props[@]} )) ; then
+      props=( "${!from[@]}" )
+   fi
+
+   local k v
+   for k in "${props[@]}" ; do
+      v="${from_loc_r[$k]}"
+      to_loc_r["$k"]="$v"
+   done
 }
 
 

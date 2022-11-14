@@ -1059,3 +1059,6 @@ function semantics_integer { declare -g TYPE="$_INTEGER" ;}
 
 # shellcheck disable=SC2154
 function semantics_string  { declare -g TYPE="$_STRING"  ;}
+
+# shellcheck disable=SC2154
+function semantics_env_var { declare -g TYPE="$_ANY"     ;}
