@@ -251,6 +251,7 @@ function symtab_decl_section {
    node_r['symtab']="$SYMTAB"
 
    local -n items_r="${node_r[items]}"
+   declare -p "${node_r[items]}"
    for ast_node in "${items_r[@]}"; do
       walk_symtab "$ast_node"
    done

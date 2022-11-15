@@ -50,12 +50,12 @@ function _ast_new_decl_section {
 
    # 3) assign child node to parent.
    local -n node_r="$node"
-   node_r['name']=''
    node_r['items']="$items"
+   node_r['name']=''
 
-   # Leaf nodes (anything that may not *contain* another node) carries along the
-   # $LOCATION node from its parent $TOKEN. For debugging, non-leaf nodes
-   # needto pull their own .start_{ln,col} and .end_{ln,col} from their
+   # Leaf nodes (anything that may not *contain* another node) carries along
+   # the $LOCATION node from its parent $TOKEN. For debugging, non-leaf nodes
+   # need to pull their own .start_{ln,col} and .end_{ln,col} from their
    # associated $TOKEN.
    location:new
    node_r['location']="$LOCATION"
@@ -128,6 +128,7 @@ function _ast_new_array {
    declare -g NODE="$node"
 
    # Copy from tokens during parsing.
+   local -n node_r="$node"
    location:new
    node_r['location']="$LOCATION"
 
@@ -175,11 +176,11 @@ function _ast_new_member {
    # Only permissible in accessing section keys. Not in array indices.
 
    (( ++NODE_NUM ))
-   local nname="NODE_${NODE_NUM}"
-   declare -gA $nname
-   declare -g NODE=$nname
+   local node="NODE_${NODE_NUM}"
+   declare -gA "$node"
+   declare -g NODE="$node"
 
-   local -n node_r=$nname
+   local -n node_r="$node"
    node_r['left']=''
    node_r['right']=''
 
@@ -236,8 +237,8 @@ function _ast_new_boolean {
    declare -g NODE="$node"
 
    local -n node_r="$node"
-   node['value']=''
-   node['location']=''
+   node_r['value']=''
+   node_r['location']=''
 
    TYPEOF["$node"]='boolean'
 }
