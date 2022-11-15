@@ -342,10 +342,10 @@ function undead_yoga {
       local skelly="${src_r[$key]}"
       local -n skelly_r="$skelly"
 
-      # TODO: need to add a [[ $skelly_r ]] or somethign to this test. Can fail
-      # if the result is an empty string. Can't subscript an array with an empty
-      # string.
-      if [[ ${IS_SECTION[$skelly_r]} ]] ; then
+      # `$skelly` may be pointing to either to an explicitly declared empty
+      # string, or an empty declaration:  `a: "";`  or  `a;`. Can't subscript
+      # an array with an empty string, bash explodes.
+      if [[ $skelly_r && ${IS_SECTION[$skelly_r]} ]] ; then
          undead_yoga "$skelly_r"
       fi
 

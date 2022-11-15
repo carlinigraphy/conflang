@@ -93,7 +93,6 @@ function _ast_new_include {
    node_r['path']=''
    node_r['target']=''
 
-   # Copy from tokens during parsing.
    location:new
    node_r['location']="$LOCATION"
 
@@ -113,7 +112,6 @@ function _ast_new_include {
 #   node_r['path']=       # the 'path' to the module
 #   node_r['name']=       # identifier, if using `as $ident;`
 #
-#   # Copy from tokens during parsing.
 #   location:new
 #   node_r['location']="$LOCATION"
 #
@@ -127,10 +125,13 @@ function _ast_new_array {
    declare -ga "$node"
    declare -g NODE="$node"
 
-   # Copy from tokens during parsing.
    local -n node_r="$node"
-   location:new
-   node_r['location']="$LOCATION"
+
+   # TODO: arrays can't themselves can't be arrays. Need associative array with
+   # a .items and .location props.
+   #
+   #location:new
+   #node_r['location']="$LOCATION"
 
    TYPEOF["$node"]='array'
 }
@@ -146,7 +147,6 @@ function _ast_new_typedef {
    node_r['kind']=''        # Primitive type
    node_r['subtype']=''     # Sub `Type' node
 
-   # Copy from tokens during parsing.
    location:new
    node_r['location']="$LOCATION"
 
@@ -164,7 +164,6 @@ function _ast_new_typecast {
    node_r['expr']=''
    node_r['typedef']=''
 
-   # Copy from tokens during parsing.
    location:new
    node_r['location']="$LOCATION"
 
@@ -184,7 +183,6 @@ function _ast_new_member {
    node_r['left']=''
    node_r['right']=''
 
-   # Copy from tokens during parsing.
    location:new
    node_r['location']="$LOCATION"
 
@@ -204,7 +202,6 @@ function _ast_new_index {
    node_r['left']=''
    node_r['right']=''
 
-   # Copy from tokens during parsing.
    location:new
    node_r['location']="$LOCATION"
 
@@ -222,7 +219,6 @@ function _ast_new_unary {
    node_r['op']=''
    node_r['right']=''
 
-   # Copy from tokens during parsing.
    location:new
    node_r['location']="$LOCATION"
 
@@ -401,22 +397,24 @@ function parser:program {
    local -n ident_r="$ident"
    ident_r['value']='%inline'
 
-   location:new
-   local loc="$LOCATION"
-   local -n loc_r="$loc"
+   local -n loc_r="$LOCATION"
    loc_r['start_ln']=0
    loc_r['start_col']=0
    loc_r['file']="${FILE_IDX}"
 
+   # Section declaration itself.
    ast:new decl_section
    declare -g ROOT="$NODE"
    local node="$NODE"
    local -n node_r="$node"
-   local -n items=${node_r['items']}
-
    node_r['name']="$ident"
-   node_r['location']="$loc"
 
+   local -n loc_r="$LOCATION"
+   loc_r['start_ln']=0
+   loc_r['start_col']=0
+   loc_r['file']="${FILE_IDX}"
+
+   local -n items=${node_r['items']}
    while ! parser:check 'EOF' ; do
       parser:statement
       # %include/%constrain are statements, but do not have an associated $NODE.
@@ -571,8 +569,6 @@ function parser:decl_section {
    local close="$CURRENT_NAME"
    parser:munch 'R_BRACE' "expecting \`}' after section."
 
-   location:new
-   node_r['location']="$LOCATION"
    location:copy "$ident"  "$node"  'start_ln'  'start_col'
    location:copy "$close"  "$node"  'end_ln'    'end_col'
 
@@ -594,9 +590,12 @@ function parser:decl_variable {
    node_r['name']="$ident"
 
    # Typedefs.
+   #
+   # For error reporting, pass the location of the L_PAREN in for the Typedef
+   # LOCATION node.
+   local _paren="$CURRENT_NAME"
    if parser:match 'L_PAREN' ; then
-      parser:typedef
-      parser:munch 'R_PAREN' "typedef must be closed by \`)'."
+      parser:typedef  "$_paren"
       node_r['type']=$NODE
    fi
 
@@ -620,8 +619,6 @@ function parser:decl_variable {
    local close="$CURRENT_NAME"
    parser:munch 'SEMI' "expecting \`;' after declaration."
 
-   location:new
-   node_r['location']="$LOCATION"
    location:copy "$ident"  "$node"  'start_ln'  'start_col'
    location:copy "$close"  "$node"  'end_ln'    'end_col'
 
@@ -630,6 +627,9 @@ function parser:decl_variable {
 
 
 function parser:typedef {
+   # For error reporting, pass in the opening `(` node.
+   local open="$1"
+
    parser:identifier "$CURRENT_NAME"
    parser:munch 'IDENTIFIER' 'type declarations must be identifiers.'
    local ident="$NODE"
@@ -644,13 +644,10 @@ function parser:typedef {
       node_r['subtype']="$NODE"
    done
 
-   # If there's a subtype, use it's end location. Else it's the last character
-   # of the type identifier.
-   local close="${node_r[subtype]:-$ident}"
+   local close="$CURRENT_NAME"
+   parser:munch 'R_PAREN' "typedef must be closed by \`)'."
 
-   location:new
-   node_r['location']="$LOCATION"
-   location:copy "$ident"  "$node"  'start_ln'  'start_col'
+   location:copy "$open"   "$node"  'start_ln'  'start_col'
    location:copy "$close"  "$node"  'end_ln'    'end_col'
 
    declare -g NODE="$node"
@@ -791,8 +788,6 @@ function parser:unary {
    node_r['op']="$op"
    node_r['right']="$NODE"
 
-   location:new
-   node_r['location']="$LOCATION"
    location:copy "$prev"   "$node"  'start_ln'  'start_col'
    location:copy "$NODE"   "$node"  'end_ln'    'end_col'
 
@@ -815,8 +810,6 @@ function parser:concat {
    parser:expression "$rbp"
    node_r['concat']=$NODE
 
-   location:new
-   node_r['location']="$LOCATION"
    location:copy "$lhs"   "$node"  'start_ln'  'start_col'
    location:copy "$NODE"  "$node"  'end_ln'    'end_col'
 
@@ -848,8 +841,6 @@ function parser:typecast {
    node_r['expr']="$lhs"
    node_r['typedef']="$NODE"
 
-   location:new
-   node_r['location']="$LOCATION"
    location:copy "$lhs"   "$node"  'start_ln'  'start_col'
    location:copy "$NODE"  "$node"  'end_ln'    'end_col'
 
@@ -874,20 +865,12 @@ function parser:index {
    local close="$CURRENT_NAME"
    parser:munch 'R_BRACKET' "index must be closed by \`]'."
 
-   location:new
-   node_r['location']="$LOCATION"
    location:copy "$lhs"    "$node"  'start_ln'  'start_col'
    location:copy "$close"  "$node"  'end_ln'    'end_col'
 
    declare -g NODE="$save"
 }
 
-
-# TODO(CURRENT):
-# I clearly broke something in the parser, as by the time the following...
-#> S { a; }
-#> _: S.a;
-#...it calls a non-member node and gets very confused.
 
 function parser:member {
    local lhs="$1"  _=$2  rbp="$3"
@@ -905,8 +888,6 @@ function parser:member {
    node_r['left']="$lhs"
    node_r['right']="$NODE"
 
-   location:new
-   node_r['location']="$LOCATION"
    location:copy "$lhs"   "$node"  'start_ln'  'start_col'
    location:copy "$NODE"  "$node"  'end_ln'    'end_col'
 
@@ -915,71 +896,83 @@ function parser:member {
 
 
 function parser:array {
+   # The opening `[` Token, for LOCATION informatino.
+   local open="$1"
+
    ast:new array
-   local save=$NODE
-   local -n node=$NODE
+   local node="$NODE"
+   local -n node_r="$node"
 
    until parser:check 'R_BRACKET' ; do
       parser:expression
-      node+=( "$NODE" )
+      node_r+=( "$NODE" )
 
       parser:check 'R_BRACKET' && break
       parser:munch 'COMMA' "array elements must be separated by \`,'."
    done
 
+   local close="$CURRENT_NAME"
    parser:munch 'R_BRACKET' "array must be closed by \`]'."
-   declare -g NODE=$save
+
+   # TODO: need to turn AST(Array) into an associative array with .items prop.
+   # No way to assign location information as it stands.
+   #
+   #location:copy "$open"   "$node"  'start_ln'  'start_col'
+   #location:copy "$close"  "$node"  'end_ln'    'end_col'
+
+   declare -g NODE="$node"
 }
 
 
 function parser:env_var {
-   local -n token="$CURRENT_NAME"
+   local -n token_r="$CURRENT_NAME"
    parser:advance # past DOLLAR.
 
    ast:new env_var
    local -n node_r="$NODE"
-   node_r['value']="${token[value]}"
-   node_r['location']="${token[location]}"
+   node_r['value']="${token_r[value]}"
+   node_r['location']="${token_r[location]}"
 }
 
 
 function parser:identifier {
    local -n token="$1"
+   local -n token_r="$CURRENT_NAME"
 
    ast:new identifier
    local -n node_r="$NODE"
-   node_r['value']="${token[value]}"
-   node_r['location']="${token[location]}"
+   node_r['value']="${token_r[value]}"
+   node_r['location']="${token_r[location]}"
 }
 
 
 function parser:boolean {
-   local -n token="$1"
+   local -n token_r="$1"
 
    ast:new boolean
    local -n node_r="$NODE"
-   node_r['value']="${token[value]}"
-   node_r['location']="${token[location]}"
+   node_r['value']="${token_r[value]}"
+   node_r['location']="${token_r[location]}"
 }
 
 
 function parser:integer {
-   local -n token="$1"
+   local -n token_r="$1"
 
    ast:new integer
    local -n node_r="$NODE"
-   node_r['value']="${token[value]}"
-   node_r['location']="${token[location]}"
+   node_r['value']="${token_r[value]}"
+   node_r['location']="${token_r[location]}"
 }
 
 
 function parser:string {
-   local -n token="$1"
+   local -n token_r="$1"
 
    ast:new string
    local -n node_r="$NODE"
-   node_r['value']="${token[value]}"
-   node_r['location']="${token[location]}"
+   node_r['value']="${token_r[value]}"
+   node_r['location']="${token_r[location]}"
    node_r['concat']=''
    # ^-- for string interpolation, concatenate with the subsequent node. This
    # will appear on each in the chain of linked interpolation nodes.
@@ -987,12 +980,12 @@ function parser:string {
 
 
 function parser:path {
-   local -n token="$1"
+   local -n token_r="$1"
 
    ast:new path
    local -n node_r="$NODE"
-   node_r['value']="${token[value]}"
-   node_r['location']="${token[location]}"
+   node_r['value']="${token_r[value]}"
+   node_r['location']="${token_r[location]}"
    node_r['concat']=''
    # ^-- for string interpolation, concatenate with the subsequent node. This
    # will appear on each in the chain of linked interpolation nodes.
