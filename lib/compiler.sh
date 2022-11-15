@@ -264,7 +264,7 @@ function evaluate_string {
    while [[ "${node_r[concat]}" ]] ; do
       walk_evaluate "${node_r[concat]}"
       string+="$DATA"
-      local -n node="${node_r[concat]}"
+      local -n node_r="${node_r[concat]}"
    done
 
    declare -g DATA="$string"
@@ -342,6 +342,9 @@ function undead_yoga {
       local skelly="${src_r[$key]}"
       local -n skelly_r="$skelly"
 
+      # TODO: need to add a [[ $skelly_r ]] or somethign to this test. Can fail
+      # if the result is an empty string. Can't subscript an array with an empty
+      # string.
       if [[ ${IS_SECTION[$skelly_r]} ]] ; then
          undead_yoga "$skelly_r"
       fi

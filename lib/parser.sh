@@ -628,30 +628,31 @@ function parser:decl_variable {
 }
 
 
-# TODO: continue updating nameref syntax, adding location information to
-# everything below.
-
 function parser:typedef {
    parser:identifier "$CURRENT_NAME"
    parser:munch 'IDENTIFIER' 'type declarations must be identifiers.'
-
-   local name=$NODE
+   local ident="$NODE"
 
    ast:new typedef
-   local save=$NODE
-   local -n type_=$save
-
-   #  ┌── incorrectly identified error by `shellcheck`.
-   # shellcheck disable=SC2128
-   type_['kind']=$name
+   local node="$NODE"
+   local -n node_r="$node"
+   node_r['kind']="$ident"
 
    while parser:match 'COLON' ; do
       parser:typedef
-      # shellcheck disable=SC2034
-      type_['subtype']=$NODE
+      node_r['subtype']="$NODE"
    done
 
-   declare -g NODE=$save
+   # If there's a subtype, use it's end location. Else it's the last character
+   # of the type identifier.
+   local close="${node_r[subtype]:-$ident}"
+
+   location:new
+   node_r['location']="$LOCATION"
+   location:copy "$ident"  "$node"  'start_ln'  'start_col'
+   location:copy "$close"  "$node"  'end_ln'    'end_col'
+
+   declare -g NODE="$node"
 }
 
 
@@ -774,7 +775,9 @@ function parser:grouping {
 
 
 function parser:unary {
-   local -n prev_r="$1"
+   local prev="$1"
+
+   local -n prev_r="$prev"
    local op="${prev_r[type]}"
    local rbp="${prefix_binding_power[$op]}"
 
@@ -787,6 +790,11 @@ function parser:unary {
    node_r['op']="$op"
    node_r['right']="$NODE"
 
+   location:new
+   node_r['location']="$LOCATION"
+   location:copy "$prev"   "$node"  'start_ln'  'start_col'
+   location:copy "$NODE"   "$node"  'end_ln'    'end_col'
+
    declare -g NODE="$node"
 }
 
@@ -796,15 +804,20 @@ function parser:concat {
    # infix operator.
 
    local lhs="$1"  _=$2  rbp="$3"
-   #               ^-- ignore concat op
+                    # ^-- ignore operator
 
-   local -n tail="$lhs"
-   until [[ ! ${tail['concat']} ]] ; do
-      local -n tail=${tail['concat']}
+   local -n node_r="$lhs"
+   until [[ ! "${node_r[concat]}" ]] ; do
+      local -n node_r="${node_r[concat]}"
    done
 
    parser:expression "$rbp"
-   tail['concat']=$NODE
+   node_r['concat']=$NODE
+
+   location:new
+   node_r['location']="$LOCATION"
+   location:copy "$lhs"   "$node"  'start_ln'  'start_col'
+   location:copy "$NODE"  "$node"  'end_ln'    'end_col'
 
    declare -g NODE="$lhs"
 }
@@ -834,12 +847,19 @@ function parser:typecast {
    node_r['expr']="$lhs"
    node_r['typedef']="$NODE"
 
+   location:new
+   node_r['location']="$LOCATION"
+   location:copy "$lhs"   "$node"  'start_ln'  'start_col'
+   location:copy "$NODE"  "$node"  'end_ln'    'end_col'
+
    declare -g NODE="$node"
 }
 
 
 function parser:index {
    local lhs="$1"  _="$2"
+                     # ^-- ignore rbp
+
    parser:advance # past L_BRACKET.
 
    ast:new index
@@ -850,17 +870,30 @@ function parser:index {
    index['left']="$lhs"
    index['right']="$NODE"
 
-   parser:munch 'R_BRACKET' "array must be closed by \`]'."
+   local close="$CURRENT_NAME"
+   parser:munch 'R_BRACKET' "index must be closed by \`]'."
+
+   location:new
+   node_r['location']="$LOCATION"
+   location:copy "$lhs"    "$node"  'start_ln'  'start_col'
+   location:copy "$close"  "$node"  'end_ln'    'end_col'
+
    declare -g NODE="$save"
 }
 
+
+# TODO(CURRENT):
+# I clearly broke something in the parser, as by the time the following...
+#> S { a; }
+#> _: S.a;
+#...it calls a non-member node and gets very confused.
 
 function parser:member {
    local lhs="$1"  _=$2  rbp="$3"
                     # ^-- ignore `.` operator
    ast:new member
    local node="$NODE"
-   local -n node_r="$NODE"
+   local -n node_r="$node"
 
    parser:identifier "$CURRENT_NAME"
    parser:munch 'IDENTIFIER'
@@ -870,6 +903,11 @@ function parser:member {
 
    node_r['left']="$lhs"
    node_r['right']="$NODE"
+
+   location:new
+   node_r['location']="$LOCATION"
+   location:copy "$lhs"   "$node"  'start_ln'  'start_col'
+   location:copy "$NODE"  "$node"  'end_ln'    'end_col'
 
    declare -g NODE="$node"
 }
