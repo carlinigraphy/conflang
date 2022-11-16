@@ -122,16 +122,21 @@ function _ast_new_include {
 function _ast_new_array {
    (( ++NODE_NUM ))
    local node="NODE_${NODE_NUM}"
-   declare -ga "$node"
+   declare -gA "$node"
    declare -g NODE="$node"
 
-   local -n node_r="$node"
+   # Similar to sections, arrays need a .items property to hold their values.
+   (( ++NODE_NUM ))
+   local items="NODE_${NODE_NUM}"
+   declare -ga "$items"
 
-   # TODO: arrays can't themselves can't be arrays. Need associative array with
-   # a .items and .location props.
-   #
-   #location:new
-   #node_r['location']="$LOCATION"
+   # Assign .items node.
+   local -n node_r="$node"
+   node_r['items']="$items"
+
+   # Assign .location node.
+   location:new
+   node_r['location']="$LOCATION"
 
    TYPEOF["$node"]='array'
 }
@@ -593,10 +598,16 @@ function parser:decl_variable {
    #
    # For error reporting, pass the location of the L_PAREN in for the Typedef
    # LOCATION node.
-   local _paren="$CURRENT_NAME"
+   local _open="$CURRENT_NAME"
    if parser:match 'L_PAREN' ; then
-      parser:typedef  "$_paren"
-      node_r['type']=$NODE
+      parser:typedef
+      node_r['type']="$NODE"
+
+      local _close="$CURRENT_NAME"
+      parser:munch 'R_PAREN' "typedef must be closed by \`)'."
+
+      location:copy "$_open"   "$node"  'start_ln'  'start_col'
+      location:copy "$_close"  "$node"  'end_ln'    'end_col'
    fi
 
    # If current token is one that begins an expression, advise they likely
@@ -627,9 +638,6 @@ function parser:decl_variable {
 
 
 function parser:typedef {
-   # For error reporting, pass in the opening `(` node.
-   local open="$1"
-
    parser:identifier "$CURRENT_NAME"
    parser:munch 'IDENTIFIER' 'type declarations must be identifiers.'
    local ident="$NODE"
@@ -640,15 +648,9 @@ function parser:typedef {
    node_r['kind']="$ident"
 
    while parser:match 'COLON' ; do
-      parser:typedef
+      parser:typedef "$open"
       node_r['subtype']="$NODE"
    done
-
-   local close="$CURRENT_NAME"
-   parser:munch 'R_PAREN' "typedef must be closed by \`)'."
-
-   location:copy "$open"   "$node"  'start_ln'  'start_col'
-   location:copy "$close"  "$node"  'end_ln'    'end_col'
 
    declare -g NODE="$node"
 }
@@ -902,10 +904,11 @@ function parser:array {
    ast:new array
    local node="$NODE"
    local -n node_r="$node"
+   local -n items_r="${node_r[items]}"
 
    until parser:check 'R_BRACKET' ; do
       parser:expression
-      node_r+=( "$NODE" )
+      items_r+=( "$NODE" )
 
       parser:check 'R_BRACKET' && break
       parser:munch 'COMMA' "array elements must be separated by \`,'."
@@ -914,11 +917,8 @@ function parser:array {
    local close="$CURRENT_NAME"
    parser:munch 'R_BRACKET' "array must be closed by \`]'."
 
-   # TODO: need to turn AST(Array) into an associative array with .items prop.
-   # No way to assign location information as it stands.
-   #
-   #location:copy "$open"   "$node"  'start_ln'  'start_col'
-   #location:copy "$close"  "$node"  'end_ln'    'end_col'
+   location:copy "$open"   "$node"  'start_ln'  'start_col'
+   location:copy "$close"  "$node"  'end_ln'    'end_col'
 
    declare -g NODE="$node"
 }

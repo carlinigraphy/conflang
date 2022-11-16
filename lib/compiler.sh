@@ -231,12 +231,13 @@ function evaluate_unary {
 
 function evaluate_array {
    local -n node_r="$NODE"
+   local -n items_r="${node_r[items]}"
 
    mk_compile_array
    local array="$DATA"
    local -n array_r="$DATA"
 
-   for ast_node in "${node_r[@]}"; do
+   for ast_node in "${items_r[@]}"; do
       walk_evaluate "$ast_node"
       array_r+=( "$DATA" )
    done

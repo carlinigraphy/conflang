@@ -251,7 +251,6 @@ function symtab_decl_section {
    node_r['symtab']="$SYMTAB"
 
    local -n items_r="${node_r[items]}"
-   declare -p "${node_r[items]}"
    for ast_node in "${items_r[@]}"; do
       walk_symtab "$ast_node"
    done
@@ -391,7 +390,8 @@ function symtab_unary {
 
 function symtab_array {
    local -n node_r="$NODE"
-   for ast_node in "${node_r[@]}" ; do
+   local -n items_r="${node_r[items]}"
+   for ast_node in "${items_r[@]}" ; do
       walk_symtab "$ast_node"
    done
 }
@@ -663,28 +663,29 @@ function flatten_typecast {
 
 
 function flatten_member {
-   local -n node_r=$NODE
+   local -n node_r="$NODE"
    walk_flatten "${node_r[left]}"
    walk_flatten "${node_r[right]}"
 }
 
 
 function flatten_index {
-   local -n node_r=$NODE
+   local -n node_r="$NODE"
    walk_flatten "${node_r[left]}"
    walk_flatten "${node_r[right]}"
 }
 
 
 function flatten_unary {
-   local -n node_r=$NODE
+   local -n node_r="$NODE"
    walk_flatten "${node_r[right]}"
 }
 
 
 function flatten_array {
-   local -n node_r=$NODE
-   for ast_node in "${node_r[@]}"; do
+   local -n node_r="$NODE"
+   local -n items_r="${node_r[items]}"
+   for ast_node in "${items_r[@]}"; do
       walk_flatten "$ast_node"
    done
 }
@@ -964,7 +965,8 @@ function semantics_index {
    fi
 
    local index="${rhs_r[value]}"
-   local rv="${lhs_r[$index]}"
+   local -n items_r="${node_r[items]}"
+   local rv="${items_r[$index]}"
 
    if [[ ! "$rv" ]] ; then
       raise index_error "$index"
@@ -994,6 +996,7 @@ function semantics_unary {
 
 function semantics_array {
    local -n node_r="$NODE"
+   local -n items_r="${node_r[items]}"
 
    # shellcheck disable=SC2154
    copy_type "$_ARRAY"
@@ -1003,7 +1006,7 @@ function semantics_array {
    # If the target type is specific (e.g., array:str), the actual type must
    # conform to that.
    local -A types_found=()
-   for ast_node in "${node_r[@]}" ; do
+   for ast_node in "${items_r[@]}" ; do
       walk_semantics "$ast_node"
       local -n subtype_r=$TYPE
       local subtype="${subtype_r[kind]}"
