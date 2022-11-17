@@ -58,14 +58,14 @@ function raise {
 
    # Many errors will not require both a start & end location, however this
    # makes it available as an option.
-   local start_loc_node  end_loc_node
+   local origin  caught
    local -a args
 
    while (( $# )) ; do
       case "$1" in
-         --start)    shift ; start_loc_node="$1" ;;
-         --end)      shift ; end_loc_node="$1"   ;;
-         *)          args+=( "$1" ) ; shift      ;;
+         --origin)   shift ; origin="$1" ; shift  ;;
+         --caught)   shift ; caught="$1" ; shift  ;;
+         *)          args+=( "$1" )      ; shift  ;;
       esac
    done
 
@@ -76,40 +76,61 @@ function raise {
       args=( "no such error $type" )
    fi
 
-   print_"${type}" "${args[@]}" 1>&2
+   print_"${type}"  "$status"  "$origin"  "$caught"  "${args[@]}" 1>&2
    exit "$status"
 }
 
+
 function print_idiot_programmer {
+   shift 2  # No location information, ignore origin/caught
    printf 'Idiot Programmer Error: %s'  "$1"
 }
 
-
 #───────────────────────────────( I/O errors )──────────────────────────────────
 function print_no_input {
-   printf 'File Error: missing input file.\n'
+   printf 'File Error(%s): missing input.\n'  "$1"
 }
+
 
 function print_missing_file {
-   printf 'File Error: missing or unreadable source file %s.\n'  "$1"
+   local status="$1"
+   shift 2  # No location information, ignore origin/caught
+
+   printf 'File Error(%s): '  "$status"
+   printf 'missing or unreadable source file %s.\n'  "$1"
 }
+
 
 function print_missing_constraint {
-   printf 'File Error: no file matches %%constrain list.\n'
+   printf 'File Error(%s): no file matches %%constrain list.\n'  "$1"
 }
+
 
 function print_circular_import {
-   printf 'Import Error: cannot source %s, circular import.\n'  "$1"
+   local status="$1"
+   shift 2  # No location information, ignore origin/caught
+
+   printf 'Import Error(%s): '  "$status"
+   printf 'cannot source %s, circular import.\n'  "$1"
 }
 
+
+# TODO: need way more information than "failed to source". Did it not exist,
+# was it not valid bash, etc.
 function print_source_failure {
-   printf 'File Error: failed to source user-defined function %s.\n'  "$1"
+   local status="$1"
+   shift 2  # No location information, ignore origin/caught
+
+   printf 'File Error(%s):'  "$status"
+   printf 'failed to source user-defined function %s.\n'  "$1"
 }
 
 #──────────────────────────────( syntax errors )────────────────────────────────
 function print_syntax_error {
-   local -n node="$1"
-   local -- msg="$2"
+   local status="$1"  origin="$2"  caught="$3"
+
+   local -n node="$4"
+   local msg="$5"
 
    printf "Syntax Error: [%d:%d] \`%s'\n" \
       "${node[lineno]}" \
@@ -117,20 +138,77 @@ function print_syntax_error {
       "${node[value]}"
 }
 
+
+# TODO: oof, definitely need to wrap a bunch of these in helper functions.
+#       There's a lot of boilerplate here. Don't know how much I can abstract
+#       away though. Need to reduce the number of edge cases. Gotta treat multi
+#       line, multi file, and single character errors all have the same output.
+#       Multi-file probably can't. It has a different output format. Pretty sure
+#       only the symtab & typechecking phases can have errors occuring across
+#       files.
+#
+# @arg $1 (int)       Error code
+# @arg $2 (LOCATION)  Origin location 
+# @arg $3 (LOCATION)  Caught location 
+# @arg $4 (str)       The invalid character
 function print_invalid_interpolation_char {
-   printf "Syntax Error: \`%s' not valid in string interpolation.\n"  "$1"
+   local status="$1"
+   local -n caught_r="$3"
+   local character="$4"
+
+   local -i file_idx="${caught_r[file]}"
+   local file="${FILES[$file_idx]}"
+
+   local -n file_lines_r="FILE_${file_idx}_LINES"
+   local -i lineno="${caught_r[start_ln]}"
+   local line="${file_lines_r[$lineno -1]}"
+
+   local -i start_col="${caught_r[start_col]}"
+   local -i end_col="${caught_r[end_col]}"
+
+   printf 'Syntax Error(%s): '  "$status"
+   printf "\`%s' not valid in string interpolation.\n"  "$character"
+
+   local -i offset=3
+
+   local filler=''
+   for (( i=(end_col + 1); i>0; --i )) ; do
+      filler+='-'
+   done
+
+   printf '   in %s\n'   "$file"
+   printf "%${offset}s"   ''
+   printf 'origin %s.\n'  "$filler"
+   printf '   %6s | %s'  "$lineno"  "$line"
+
+   local filler=''
+   for (( i=(end_col + 1); i>0; --i )) ; do
+      filler+='-'
+   done
+
+   printf "%${offset}s"   ''
+   printf 'caught %s^\n'  "$filler"
 }
 
 function print_unescaped_interpolation_brace {
+   local origin="$1" ; shift
+   local caught="$1" ; shift
+
    printf "Syntax Error: single \`}' not allowed in f-string.\n"
 }
 
 #───────────────────────────────( parse errors )────────────────────────────────
 function print_parse_error {
+   local origin="$1" ; shift
+   local caught="$1" ; shift
+
    printf 'Parse Error: %s\n'  "$1"
 }
 
 function print_munch_error {
+   local origin="$1" ; shift
+   local caught="$1" ; shift
+
    local -- expect="$1"
    local -n got="$2"
    local -- msg="$3"
@@ -146,6 +224,9 @@ function print_munch_error {
 
 #───────────────────────────────( type errors )─────────────────────────────────
 function print_type_error {
+   local origin="$1" ; shift
+   local caught="$1" ; shift
+
    local -- _loc="$1"
    local -- msg="$2"
 
@@ -161,6 +242,9 @@ function print_type_error {
 }
 
 function print_undefined_type {
+   local origin="$1" ; shift
+   local caught="$1" ; shift
+
    local -- loc="$1"
    local -- msg="$2"
 
@@ -174,6 +258,9 @@ function print_undefined_type {
 }
 
 function print_not_a_type {
+   local origin="$1" ; shift
+   local caught="$1" ; shift
+
    local -- loc="$1"
    local -- msg="$2"
 
@@ -187,6 +274,9 @@ function print_not_a_type {
 }
 
 function print_symbol_mismatch {
+   local origin="$1" ; shift
+   local caught="$1" ; shift
+
    #local fq_name=''
    #for part in "${FQ_LOCATION[@]}" ; do
    #   fq_name+="${fq_name:+.}${part}"
@@ -203,22 +293,41 @@ function print_symbol_mismatch {
 
 #────────────────────────────────( key errors )─────────────────────────────────
 function print_index_error {
+   local origin="$1" ; shift
+   local caught="$1" ; shift
+
    printf "Index Error: \`%s' not found.\n"  "$1"
 }
 
+
 function print_name_collision {
+   local origin="$1" ; shift
+   local caught="$1" ; shift
+
    printf "Name Error: \`%s' already defined in this scope.\n"  "$1"
 }
 
+
 function print_missing_env_var {
+   local origin="$1" ; shift
+   local caught="$1" ; shift
+
    printf "Name Error: env variable \`%s' is not defined.\n"  "$1"
 }
 
+
 function print_missing_var {
+   local origin="$1" ; shift
+   local caught="$1" ; shift
+
    printf "Name Error: variable \`%s' is not defined.\n"  "$1"
 }
 
+
 function print_missing_required {
+   local origin="$1" ; shift
+   local caught="$1" ; shift
+
    local fq_name=''
    for part in "${FQ_LOCATION[@]}" ; do
       fq_name+="${fq_name:+.}${part}"
@@ -229,6 +338,9 @@ function print_missing_required {
 
 #───────────────────────────────( misc. errors)───────────────────────────────
 function print_invalid_positional_arguments {
+   local origin="$1" ; shift
+   local caught="$1" ; shift
+
    local arguments=( "$@" )
    local arguments=( "${arguments[@]:1:${#arguments[@]}-1}" )
 
@@ -239,6 +351,9 @@ function print_invalid_positional_arguments {
 
 
 function print_argument_order_error {
+   local origin="$1" ; shift
+   local caught="$1" ; shift
+
    local argument="$1"
    local message="$2"
 

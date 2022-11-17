@@ -26,13 +26,10 @@ function init_globals {
    declare -g  LOCATION=
    declare -gi LOC_NUM=0
 
-   # Shouldn't code file names/paths into the generated output. If the user has
-   # the same file *data*, but it's in a different place, we shouldn't have to
-   # re-compile the output.  An array of files allows us to map a static file
-   # INDEX (stored in the output data), to the possibly dynamic path to the
-   # file.
+   # Push each absolute file path to the FILES[] stack as we hit an %include or
+   # %constrain statement.
    declare -ga FILES=()
-   declare -gi FILE_IDX=
+   declare -gi FILE_IDX
 
    # Stores the $ROOT after each `parse()`. The idx of a root node here should
    # correspond to it's matching INCLUDE_$n from the INCLUDES[] array. Example:

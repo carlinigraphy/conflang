@@ -324,10 +324,9 @@ function parser:init {
    # Calls to `advance' both globally set the name of the current/next node(s),
    # e.g., `TOKEN_1', as well as declaring a nameref to the variable itself.
 
-   # Should be reset on every run, as it's unique to this instance of the parser.
-   declare -g  ROOT=''  # Solely used to indicate the root of the AST.
-   declare -g  NODE=''
-   declare -g  INCLUDE=''
+   declare -g  ROOT=''        #< Root of this tree
+   declare -g  NODE=''        #< Last generated AST node
+   declare -g  INCLUDE=''     #< 
 
    # Need to take note of the section.
    # `%include` blocks must reference the target Section to include any included
@@ -345,7 +344,7 @@ function parser:advance {
 
       if [[ ${CURRENT[type]} == 'ERROR' ]] ; then
          e=( syntax_error
-            --start "$CURRENT_NAME"
+            --origin "$CURRENT_NAME"
             "$CURRENT_NAME"
          ); raise "${e[@]}"
       else
@@ -375,7 +374,7 @@ function parser:match {
 function parser:munch {
    if ! parser:check "$1" ; then
       e=( munch_error
-         --start "$CURRENT_NAME"    #< start loc
+         --origin "$CURRENT_NAME"    #< start loc
          "$1"                       #< expecting
          "$CURRENT_NAME"            #< got
          "$2"                       #< message
@@ -413,7 +412,7 @@ function parser:program {
    local -n loc_r="$LOCATION"
    loc_r['start_ln']=0
    loc_r['start_col']=0
-   loc_r['file']="${FILE_IDX}"
+   loc_r['file']="$FILE_IDX"
 
    # Section declaration itself.
    ast:new decl_section
@@ -425,7 +424,7 @@ function parser:program {
    local -n loc_r="$LOCATION"
    loc_r['start_ln']=0
    loc_r['start_col']=0
-   loc_r['file']="${FILE_IDX}"
+   loc_r['file']="$FILE_IDX"
 
    local -n items=${node_r['items']}
    while ! parser:check 'EOF' ; do
@@ -456,7 +455,7 @@ function parser:parser_statement {
    elif parser:match 'CONSTRAIN' ; then parser:constrain
    else
       e=( parse_error
-         --start "$CURRENT_NAME"
+         --origin "$CURRENT_NAME"
          "invalid directive: \`${CURRENT[value]}'."
       ); raise "${e[@]}"
    fi
@@ -466,6 +465,8 @@ function parser:parser_statement {
 
 
 function parser:include {
+   # TODO(refactor): this shouldn't be an `ast:__` fn. Include statements don't
+   # go onto the AST.
    ast:new include
    local include="$INCLUDE"
    local -n include_r="$include"
@@ -475,10 +476,10 @@ function parser:include {
    parser:path "$CURRENT_NAME"
    parser:munch 'PATH' "expecting path after %include."
 
-   local -n path=$NODE
+   local -n path="$NODE"
    # shellcheck disable=SC2034
-   include['path']=${path[value]}
-   include['target']=$SECTION
+   include['path']="${path[value]}"
+   include['target']="$SECTION"
 
    declare -g NODE=
    # Section declarations loop & append $NODEs to their .items. `include`/
@@ -493,21 +494,21 @@ function parser:constrain {
 
    if [[ ${name[value]} != '%inline' ]] ; then
       e=( parse_error
-         --start "$CURRENT_NAME"
+         --origin "$CURRENT_NAME"
          '%constrain may not occur in a section.'
       ); raise "${e[@]}"
    fi
 
    if [[ ${name[file]} -ne 0 ]] ; then
       e=( parse_error
-         --start "$CURRENT_NAME"
+         --origin "$CURRENT_NAME"
          '%constrain may not occur in a sub-file.'
       ); raise "${e[@]}"
    fi
 
    if [[ "${#CONSTRAINTS[@]}" -gt 0 ]] ; then
       e=( parse_error
-         --start "$CURRENT_NAME"
+         --origin "$CURRENT_NAME"
          'may not specify multiple constrain blocks.'
       ); raise "${e[@]}"
    fi
@@ -643,8 +644,8 @@ function parser:decl_variable {
       node_r['expr']=$NODE
    elif parser:match "$expr_types" ; then
       e=( parse_error
-         --start "$node"
-         --end   "$CURRENT_NAME"
+         --origin "$node"
+         --caught "$CURRENT_NAME"
          "expecting \`:' before expression."
       ); raise "${e[@]}"
    fi

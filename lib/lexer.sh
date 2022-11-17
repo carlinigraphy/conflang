@@ -24,13 +24,12 @@ function lexer:init {
    # Some variables need to be reset at the start of every run. They hold
    # information that should not be carried from file to file.
 
-   # Reset global vars prior to each run.
-   (( FILE_IDX = ${#FILES[@]} - 1 )) ||:
-
    # Fail if no file.
    if [[ "${#FILES[@]}" -eq 0 ]] ; then
       raise no_input
    fi
+
+   (( FILE_IDX = ${#FILES[@]} - 1 )) ||:
 
    declare -g   CURRENT=''  PEEK=''
    declare -ga  CHARRAY=()
@@ -95,6 +94,14 @@ function lexer:advance {
 
 
 function lexer:scan {
+   local file_lines="FILE_${FILE_IDX}_LINES"
+   declare -ga "$file_lines"
+
+   # For later error reporting. Easier to report errors by line number if we
+   # have them in lines... by number...
+   local -n file_lines_r="$file_lines"
+   mapfile file_lines_r < "${FILES[-1]}"
+
    # For easier lookahead, read all characters first into an array. Allows us
    # to seek/index very easily.
    while read -rN1 character ; do
@@ -324,8 +331,10 @@ function lexer:interpolation {
          lexer:identifier ; continue
       fi
 
+      token:new 'ERROR'
+      local -n t_r="${TOKENS[-1]}"
       e=( invalid_interpolation_char
-          --start "$CURRENT"
+          --caught "${t_r[location]}"
           "$CURRENT"
       ); raise "${e[@]}"
    done
@@ -356,8 +365,10 @@ function lexer:fstring {
             buffer+=( "$CURRENT" )
             continue
          else
-            e=( unescaped_interpolation_brace
-               --start "$CURRENT"
+            token:new 'ERROR'
+            local -n t_r="${TOKENS[-1]}"
+            e=( invalid_interpolation_char
+               --caught "${t_r[location]}"
                "$CURRENT"
             ); raise "${e[@]}"
          fi
@@ -444,7 +455,7 @@ function lexer:fpath {
             continue
          else
             e=( unescaped_interpolation_brace
-               --start "$CURRENT"
+               --origin "$CURRENT"
                "$CURRENT"
             ); raise "${e[@]}"
          fi
