@@ -13,12 +13,12 @@ disable=SC1003
 #     backslash character as '\'.
 #
 
-disable=SC2034
+#disable=SC2034
 #  "... appears unused"
 #     This is almost always in the context of a nameref initializing attributes
 #     of a Token, Node, or some pseudo-class.
 
-disable=SC2053
+#disable=SC2053
 #  "Quote the right-hand side of [[ ... ]]"
 #     This is always done intentionally when the quotes are missing. Either I
 #     know it will only expand to a NODE_*, TYPE_*, or primitive type such as
@@ -29,7 +29,7 @@ disable=SC2059
 #     Sometimes it saves space, and is faster. Particularly when I need to
 #     double-quote the format string so I can use a backtick for: `...'
 
-disable=SC2086
+#disable=SC2086
 #  "Double quote to prevent globbing"
 #     This is always done intentionally when the quotes are missing. Either I
 #     know it will only expand to a NODE_*, TYPE_*, or primitive type such as

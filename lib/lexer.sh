@@ -69,7 +69,7 @@ function token:new {
    loc_r['end_col']="${CURSOR[colno]}"
 }
 
-                                     
+
 function lexer:advance {
    # Advance cursor position, pointing to each sequential character. Also incr.
    # the column number indicator. If we go to a new line, it's reset to 0.
@@ -324,7 +324,10 @@ function lexer:interpolation {
          lexer:identifier ; continue
       fi
 
-      raise invalid_interpolation_char "$CURRENT"
+      e=( invalid_interpolation_char
+          --start "$CURRENT"
+          "$CURRENT"
+      ); raise "${e[@]}"
    done
 }
 
@@ -353,7 +356,10 @@ function lexer:fstring {
             buffer+=( "$CURRENT" )
             continue
          else
-            raise unescaped_interpolation_brace
+            e=( unescaped_interpolation_brace
+               --start "$CURRENT"
+               "$CURRENT"
+            ); raise "${e[@]}"
          fi
       fi
 
@@ -437,7 +443,10 @@ function lexer:fpath {
             buffer+=( "$CURRENT" )
             continue
          else
-            raise unescaped_interpolation_brace
+            e=( unescaped_interpolation_brace
+               --start "$CURRENT"
+               "$CURRENT"
+            ); raise "${e[@]}"
          fi
       fi
 

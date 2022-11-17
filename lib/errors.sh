@@ -18,33 +18,56 @@ function traceback {
 
 
 declare -gA EXIT_STATUS=(
+   # I/O errors
    [no_input]=1
-   [syntax_error]=2
-   [parse_error]=3
-   [type_error]=4
-   [undefined_type]=5
-   [not_a_type]=6
-   [symbol_mismatch]=7
-   [index_error]=8
-   [circular_import]=9
-   [name_collision]=10
-   [missing_file]=11
-   [missing_constraint]=12
-   [source_failure]=13
-   [missing_env_var]=14
-   [missing_var]=15
-   [invalid_interpolation_char]=16
-   [unescaped_interpolation_brace]=17
-   [munch_error]=18
+   [missing_file]=2
+   [missing_constraint]=3
+   [circular_import]=4
+   [source_failure]=5
+
+   # Syntax errors
+   [syntax_error]=6
+   [invalid_interpolation_char]=7
+   [unescaped_interpolation_brace]=8
+
+   # Parse errors
+   [parse_error]=9
+   [munch_error]=10
+
+   # Type errors
+   [type_error]=11
+   [undefined_type]=12
+   [not_a_type]=13
+   [symbol_mismatch]=14
+
+   # Key errors
+   [index_error]=15
+   [name_collision]=16
+   [missing_env_var]=17
+   [missing_var]=18
    [missing_required]=19
-   [too_many_arguments]=20
-   [invalid_positional_arguments]=21
+
+   # Misc. errors
+   [invalid_positional_arguments]=20
    [idiot_programmer]=255
 )
 
+
 function raise {
-   local -- type="$1" ; shift
-   local -a args=( "$@" )
+   local type="$1" ; shift
+
+   # Many errors will not require both a start & end location, however this
+   # makes it available as an option.
+   local start_loc_node  end_loc_node
+   local -a args
+
+   while (( $# )) ; do
+      case "$1" in
+         --start)    shift ; start_loc_node="$1" ;;
+         --end)      shift ; end_loc_node="$1"   ;;
+         *)          args+=( "$1" ) ; shift      ;;
+      esac
+   done
 
    status="${EXIT_STATUS[$type]}"
    if [[ ! $status ]] ; then
@@ -60,61 +83,6 @@ function raise {
 function print_idiot_programmer {
    printf 'Idiot Programmer Error: %s'  "$1"
 }
-
-#────────────────────────────( find expr location )─────────────────────────────
-# When receiving an expression, we may not directly have a node with a .lineno
-# and .colno properties. Example: typecast nodes, or nested expressions. Must
-# walk to provide the "root" of the expression.
-
-declare -ga LOC
-
-function walk_location {
-   declare -g LOC="$1"
-   location_${TYPEOF[$LOC]}
-}
-
-
-function location_typedef {
-   local -n node="$LOC"
-   walk_location "${node[kind]}"
-}
-
-
-function location_typecast {
-   local -n node="$LOC"
-   walk_location "${node[expr]}"
-}
-
-
-function location_index {
-   local -n node="$LOC"
-   walk_location "${node[left]}"
-}
-
-
-function location_member {
-   local -n node="$LOC"
-   walk_location "${node[left]}"
-}
-
-
-function location_array {
-   local -n node="$LOC"
-   walk_location "${node[0]}"
-}
-
-
-function semantics_unary {
-   local -n node="$LOC"
-   walk_location "${node[right]}"
-}
-
-# Non-complex nodes, no ability to descend further. Stop here.
-function location_path       { :; }
-function location_boolean    { :; }
-function location_integer    { :; }
-function location_string     { :; }
-function location_identifier { :; }
 
 
 #───────────────────────────────( I/O errors )──────────────────────────────────
@@ -158,6 +126,10 @@ function print_unescaped_interpolation_brace {
 }
 
 #───────────────────────────────( parse errors )────────────────────────────────
+function print_parse_error {
+   printf 'Parse Error: %s\n'  "$1"
+}
+
 function print_munch_error {
    local -- expect="$1"
    local -n got="$2"
@@ -171,8 +143,21 @@ function print_munch_error {
       "${msg^}"
 }
 
-function print_parse_error {
-   printf 'Parse Error: %s\n'  "$1"
+
+#───────────────────────────────( type errors )─────────────────────────────────
+function print_type_error {
+   local -- _loc="$1"
+   local -- msg="$2"
+
+   walk_location "$_loc"
+   local -n loc="$LOC"
+
+   printf 'Type Error: [%s:%s] invalid type.%s\n' \
+      "${loc[lineno]}" \
+      "${loc[colno]}"  \
+      "${msg:+ ${msg^}}"
+      # Passing in a message is not required. If supplied, capitalize the first
+      # word and prefix with a leading space.
 }
 
 function print_undefined_type {
@@ -199,21 +184,6 @@ function print_not_a_type {
          "${loc_r[lineno]}" \
          "${loc_r[colno]}"  \
          "$msg"
-}
-
-function print_type_error {
-   local -- _loc="$1"
-   local -- msg="$2"
-
-   walk_location "$_loc"
-   local -n loc="$LOC"
-
-   printf 'Type Error: [%s:%s] invalid type.%s\n' \
-      "${loc[lineno]}" \
-      "${loc[colno]}"  \
-      "${msg:+ ${msg^}}"
-      # Passing in a message is not required. If supplied, capitalize the first
-      # word and prefix with a leading space.
 }
 
 function print_symbol_mismatch {

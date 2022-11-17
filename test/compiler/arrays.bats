@@ -16,6 +16,8 @@ function setup {
 
 
 @test 'empty array -> empty indexed array' {
+   skip "Arrays now have .items prop. Rework this test."
+
    init_globals
    INPUT=/dev/stdin
 
@@ -31,12 +33,14 @@ function setup {
 
    declare -n d2='_DATA_2'
    type_d2=$( declare -p _DATA_2 | awk '{print $2}' )
-   assert_equal "$type_d2"   '-a'
+   assert_equal "$type_d2"   '-A'
    assert_equal "${#d2[@]}"  0
 }
 
 
 @test 'nested array -> nested indexed array' {
+   skip "Arrays now have .items prop. Rework this test."
+
    init_globals
    INPUT=/dev/stdin
 
@@ -52,12 +56,12 @@ function setup {
 
    declare -n d2='_DATA_2'
    type_d2=$( declare -p _DATA_2 | awk '{print $2}' )
-   assert_equal "$type_d2"   '-a'
+   assert_equal "$type_d2"   '-A'
    assert_equal "${#d2[@]}"  1
    assert_equal "${d2[@]}"   '_DATA_3'
 
    declare -n d3='_DATA_3'
    type_d3=$( declare -p _DATA_3 | awk '{print $2}' )
-   assert_equal "$type_d3"  '-a'
+   assert_equal "$type_d3"  '-A'
    assert_equal "${#d3[@]}"  0
 }

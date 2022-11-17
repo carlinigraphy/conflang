@@ -16,7 +16,7 @@ commands
    check       Run \`shellcheck\`
    wc          Lines of bash
    wc-tests    Lines of BATS
-   edit        Opens src files in \$EDITOR
+   edit        Opens src files in vim
 
 EOF
 
@@ -89,7 +89,7 @@ case "$1" in
                "${PROGDIR}"/lib/{lexer,parser,semantics,compiler}.sh
                "${PROGDIR}"/lib/{errors,debug,ffi}.sh
             )
-            exec $EDITOR "${order[@]}"
+            exec nvim -O3 "${order[@]}"
             ;;
 
    *) usage 1 ;;

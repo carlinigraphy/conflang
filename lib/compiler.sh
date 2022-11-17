@@ -13,7 +13,7 @@
 # Abstract away all the stuff below.
 function walk_compiler {
    walk_skelly "$1"
-   
+
    for ast_node in "${ORDERED_DEPS[@]}" ; do
       local -n dst="${EXPR_MAP[$ast_node]}"
       walk_evaluate "$ast_node"
@@ -73,7 +73,7 @@ function mk_skelly {
 
    # Allows us to clean up after ourselves. After evaluating everything, these
    # will be dead references, pointing to nothing.
-   DISPOSABLE_SKELETONS+=( "$skelly" ) 
+   DISPOSABLE_SKELETONS+=( "$skelly" )
 }
 
 
@@ -118,7 +118,7 @@ function skelly_decl_section {
    local symtab="$SYMTAB"
    symtab from "$node"
 
-   local -n items_r="${node_r[items]}" 
+   local -n items_r="${node_r[items]}"
    for var_decl in "${items_r[@]}"; do
       local -n var_decl_r="$var_decl"
       local -n name_r="${var_decl_r[name]}"
@@ -166,7 +166,7 @@ function walk_evaluate {
 
 function evaluate_decl_section {
    local -n node_r="$NODE"
-   local -n items_r="${node_r[items]}" 
+   local -n items_r="${node_r[items]}"
    for ast_node in "${items_r[@]}"; do
       walk_evaluate "$ast_node"
    done
@@ -183,7 +183,7 @@ function evaluate_decl_variable {
 
 function evaluate_typecast {
    local -n node_r="$NODE"
-   walk_evaluate "${node_r[expr]}" 
+   walk_evaluate "${node_r[expr]}"
 }
 
 
@@ -193,7 +193,7 @@ function evaluate_member {
    #    .right  identifier
    local -n node_r="$NODE"
 
-   walk_evaluate "${node_r[left]}" 
+   walk_evaluate "${node_r[left]}"
    local -n left_r="$DATA"
 
    local -n right_r="${node_r[right]}"
@@ -212,7 +212,7 @@ function evaluate_index {
    #    .right  integer
    local -n node_r="$NODE"
 
-   walk_evaluate "${node_r[left]}" 
+   walk_evaluate "${node_r[left]}"
    local -n left_r="$DATA"
 
    local -n right_r="${node_r[right]}"
@@ -288,7 +288,7 @@ function evaluate_path {
 
 function evaluate_env_var {
    local -n node_r="$NODE"
-   local ident="${node_r[value]}" 
+   local ident="${node_r[value]}"
 
    if [[ ! "${SNAPSHOT[$ident]+_}" ]] ; then
       raise missing_env_var "$ident"
@@ -329,7 +329,7 @@ function evaluate_identifier {
 }
 
 #─────────────────────────────( skeleton to data )──────────────────────────────
-# Folds around the intermediate SKELLY nodes, resulting in the raw data. 
+# Folds around the intermediate SKELLY nodes, resulting in the raw data.
 #
 # _SKELLY_1="_SKELLY_2" ; _SKELLY_2="value"
 #             o< ---snip-snip--- >o                <-- these are scissors

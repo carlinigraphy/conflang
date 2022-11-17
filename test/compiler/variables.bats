@@ -16,7 +16,7 @@ function setup {
 }
 
 
-@test 'resolve primitive internal variable' {
+@test 'resolve primitive identifier' {
    init_globals
    INPUT=/dev/stdin
 
@@ -25,9 +25,9 @@ function setup {
       _int:  1;
       _bool: true;
 
-      str_ref:  %_str;
-      int_ref:  %_int;
-      bool_ref: %_bool;
+      str_ref:  _str;
+      int_ref:  _int;
+      bool_ref: _bool;
    '
    utils:eval
 
@@ -44,7 +44,7 @@ function setup {
 }
 
 
-@test 'resolve complex internal variable' {
+@test 'resolve complex identifier' {
    init_globals
    INPUT=/dev/stdin
 
@@ -52,8 +52,8 @@ function setup {
       _array: [
          "string",
       ];
-      array_ref:   %_array;
-      array_ref_0: %_array.0;
+      array_ref:   _array;
+      array_ref_0: _array[0];
    '
    utils:eval
 
@@ -71,7 +71,7 @@ function setup {
 }
 
 
-@test 'resolve nested internal variable' {
+@test 'resolve nested identifier' {
    init_globals
    INPUT=/dev/stdin
 
@@ -82,8 +82,8 @@ function setup {
          ];
       }
 
-      array_ref:   %section._array;
-      array_ref_0: %section._array.0;
+      array_ref:   section._array;
+      array_ref_0: section._array[0];
    '
    utils:eval
 

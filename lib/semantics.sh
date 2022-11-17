@@ -636,7 +636,7 @@ function flatten_decl_section {
    local symtab="$SYMTAB"
    symtab from "$node"
 
-   local -n items_r="${node_r[items]}" 
+   local -n items_r="${node_r[items]}"
    for var_decl in "${items_r[@]}"; do
       walk_flatten "$var_decl"
    done
@@ -658,7 +658,7 @@ function flatten_decl_variable {
 
 function flatten_typecast {
    local -n node_r="$NODE"
-   walk_flatten "${node_r[expr]}" 
+   walk_flatten "${node_r[expr]}"
 }
 
 
@@ -700,7 +700,7 @@ function flatten_identifier {
    local -n symbol_r="$SYMBOL"
 
    # Add variable target as a dependency.
-   local target="${symbol_r[node]}" 
+   local target="${symbol_r[node]}"
    local -n dep="$DEPENDENCY"
    dep+=( "$target" )
 
@@ -814,7 +814,7 @@ function semantics_decl_section {
 
    symtab get "${name_r[value]}"
 
-   # Need to "return" the resulting 
+   # Need to "return" the resulting
    local -n symbol_r="$SYMBOL"
    declare -g TYPE="${symbol_r[type]}"
 }

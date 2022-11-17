@@ -84,7 +84,7 @@ function utils:add_file {
    local file="$1"
 
    # The full, absolute path to the file.
-   local fq_path 
+   local fq_path
    local parent
 
    if [[ "${#FILES[@]}" -eq 0 ]] ; then
@@ -191,7 +191,7 @@ function identify_constraint_file {
 
    for f in "${FILES[@]}" ; do
       if [[ "$f" == "$last_found" ]] ; then
-         raise parse_error "\`$f' may not be both a %constrain and %include"  
+         raise parse_error "\`$f' may not be both a %constrain and %include"
       fi
    done
 
@@ -230,7 +230,7 @@ function utils:parse {
    # Merge all (potentially nested) `%include` statements from the parent file.
 
    if [[ $CONSTRAINTS ]] ; then
-      identify_constraint_file 
+      identify_constraint_file
 
       utils:parse_file
       declare -g CHILD_ROOT=$ROOT
@@ -274,7 +274,7 @@ function utils:eval {
    for key in "${!global_r[@]}" ; do
       symtab_r[$key]="${global_r[$key]}"
    done
-   
+
    walk_flatten "$PARENT_ROOT"
    dependency_to_map
    dependency_sort
@@ -284,4 +284,4 @@ function utils:eval {
    done
 
    walk_compiler  "$PARENT_ROOT"
-} 
+}

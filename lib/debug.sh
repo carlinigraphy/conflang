@@ -28,7 +28,7 @@ function pprint_symtab {
          printf '\n'
          pprint_symtab "${symbol[symtab]}"
       else
-         echo 
+         echo
       fi
    done
 
@@ -74,7 +74,7 @@ function pprint_decl_section {
 
    (( INDENTATION++ ))
 
-   local -n items="${node[items]}" 
+   local -n items="${node[items]}"
    for nname in "${items[@]}"; do
       walk_pprint "$nname"
    done
@@ -127,9 +127,9 @@ function pprint_typedef {
 
 function pprint_typecast {
    local -n node="$NODE"
-   walk_pprint "${node[expr]}" 
+   walk_pprint "${node[expr]}"
    printf ' -> '
-   walk_pprint "${node[typedef]}" 
+   walk_pprint "${node[typedef]}"
 }
 
 
@@ -225,7 +225,7 @@ function pprint_identifier {
 
 function pprint_env_var {
    local -n node=$NODE
-   local -- var_name="${node[value]}" 
+   local -- var_name="${node[value]}"
 
    if [[ ! "${SNAPSHOT[$var_name]+_}" ]] ; then
       raise missing_env_var "$var_name"
@@ -237,7 +237,7 @@ function pprint_env_var {
 
 function pprint_int_var {
    local -n node=$NODE
-   local -- var="${node[value]}" 
+   local -- var="${node[value]}"
 
    # Internal vars are absolute paths, always beginning at the root of the
    # symbol table.
@@ -264,7 +264,7 @@ function pprint_int_var {
 function pprint_index {
    local -n node=$NODE
 
-   walk_pprint "${node[left]}" 
+   walk_pprint "${node[left]}"
 
    printf '.'
    walk_pprint "${node[right]}"

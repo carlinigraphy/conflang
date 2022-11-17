@@ -25,7 +25,7 @@ declare -ga  INCLUDES=() CONSTRAINTS=()
 
 # Saves us from a get_type() function call, or some equivalent.
 declare -gA  TYPEOF=()
- 
+
 
 # Wrapper around the below functions. Just for convenience. Little easier to
 # read as well perhaps.
@@ -344,7 +344,10 @@ function parser:advance {
       declare -gn CURRENT=$CURRENT_NAME
 
       if [[ ${CURRENT[type]} == 'ERROR' ]] ; then
-         raise syntax_error "$CURRENT_NAME"
+         e=( syntax_error
+            --start "$CURRENT_NAME"
+            "$CURRENT_NAME"
+         ); raise "${e[@]}"
       else
          break
       fi
@@ -371,7 +374,12 @@ function parser:match {
 
 function parser:munch {
    if ! parser:check "$1" ; then
-      raise munch_error  "$1"  "$CURRENT_NAME"  "$2"
+      e=( munch_error
+         --start "$CURRENT_NAME"    #< start loc
+         "$1"                       #< expecting
+         "$CURRENT_NAME"            #< got
+         "$2"                       #< message
+      ); raise "${e[@]}"
    fi
    parser:advance
 }
@@ -447,7 +455,10 @@ function parser:parser_statement {
    if   parser:match 'INCLUDE'   ; then parser:include
    elif parser:match 'CONSTRAIN' ; then parser:constrain
    else
-      raise parse_error "invalid directive: \`${CURRENT[value]}'."
+      e=( parse_error
+         --start "$CURRENT_NAME"
+         "invalid directive: \`${CURRENT[value]}'."
+      ); raise "${e[@]}"
    fi
 
    parser:munch 'SEMI' "expecting \`;' after directive."
@@ -465,7 +476,7 @@ function parser:include {
    parser:munch 'PATH' "expecting path after %include."
 
    local -n path=$NODE
-   # shellcheck disable=SC2034 
+   # shellcheck disable=SC2034
    include['path']=${path[value]}
    include['target']=$SECTION
 
@@ -481,15 +492,24 @@ function parser:constrain {
    local -n name=${section_ptr[name]}
 
    if [[ ${name[value]} != '%inline' ]] ; then
-      raise parse_error '%constrain may not occur in a section.'
+      e=( parse_error
+         --start "$CURRENT_NAME"
+         '%constrain may not occur in a section.'
+      ); raise "${e[@]}"
    fi
 
    if [[ ${name[file]} -ne 0 ]] ; then
-      raise parse_error '%constrain may not occur in a sub-file.'
+      e=( parse_error
+         --start "$CURRENT_NAME"
+         '%constrain may not occur in a sub-file.'
+      ); raise "${e[@]}"
    fi
 
    if [[ "${#CONSTRAINTS[@]}" -gt 0 ]] ; then
-      raise parse_error 'may not specify multiple constrain blocks.'
+      e=( parse_error
+         --start "$CURRENT_NAME"
+         'may not specify multiple constrain blocks.'
+      ); raise "${e[@]}"
    fi
 
    parser:munch 'L_BRACKET' "expecting \`[' to begin array of paths."
@@ -606,25 +626,27 @@ function parser:decl_variable {
       local _close="$CURRENT_NAME"
       parser:munch 'R_PAREN' "typedef must be closed by \`)'."
 
-      location:copy "$_open"   "$node"  'start_ln'  'start_col'
-      location:copy "$_close"  "$node"  'end_ln'    'end_col'
+      location:copy "$_open"   "$NODE"  'start_ln'  'start_col'
+      location:copy "$_close"  "$NODE"  'end_ln'    'end_col'
    fi
 
    # If current token is one that begins an expression, advise they likely
    # indended a colon before it.
-   local expr_str=''
+   local expr_types=''
    for expr in "${!NUD[@]}" ; do
-      expr_str+="${expr_str:+,}${expr}"
+      expr_types="${expr_str:+,}${expr}"
    done
 
    # Expressions.
    if parser:match 'COLON' ; then
       parser:expression
       node_r['expr']=$NODE
-   elif parser:match "$expr_str" ; then
-      raise parse_error "expecting \`:' before expression."
-      # TODO: perhaps create a location node here for error reporting. Make all
-      # errors expect a LOCATION node to report error info.
+   elif parser:match "$expr_types" ; then
+      e=( parse_error
+         --start "$node"
+         --end   "$CURRENT_NAME"
+         "expecting \`:' before expression."
+      ); raise "${e[@]}"
    fi
 
    local close="$CURRENT_NAME"

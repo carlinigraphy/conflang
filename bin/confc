@@ -61,7 +61,7 @@ function argparse {
    if [[ "${positional[0]}" == '-' ]] ; then
       INPUT=/dev/stdin
    else
-      INPUT="${positional[0]}" 
+      INPUT="${positional[0]}"
    fi
 }
 
