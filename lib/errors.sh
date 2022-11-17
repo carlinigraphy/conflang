@@ -147,6 +147,39 @@ function print_syntax_error {
 #       only the symtab & typechecking phases can have errors occuring across
 #       files.
 #
+#       Formatting the header should be fairly universal. If they can all be
+#       consolidated to a format string and a single argument, it can be built
+#       separately. Largely to move the $status and $args out of the print_
+#       functions below.
+#
+#       Globally declaring an ERROR{} associative array, and passing in the
+#       --origin and --caught LOCATION nodes can flatten those out, and remove
+#       the need for all the namerefs. Pretty much make a:
+#       ERRORS: {
+#           origin_file_name;
+#           origin_start_col;
+#           origin_start_ln;
+#           origin_end_col;
+#           origin_end_ln;
+#           caught_file_name;
+#           caught_start_col;
+#           caught_start_ln;
+#           caught_end_col;
+#           caught_end_ln;
+#       }
+#
+#       Then the file lines themselves can be thrown into two arrays:
+#       ORIGIN_LINES and CAUGHT_LINES, based upon the start/end lines of their
+#       respective locations. The array indices will be the matching line
+#       numbers from the file. Arrays don't need to have elements that start
+#       from `0`.
+#
+#       Can pull lines with something like the following.
+#       > ORIGIN_LINES=${FILE_LINES[@]:$startln:$startln-$endln}
+#
+#       If the origin and caught files are the same, need to make a choice as
+#       to which to consistently use.
+#
 # @arg $1 (int)       Error code
 # @arg $2 (LOCATION)  Origin location 
 # @arg $3 (LOCATION)  Caught location 
