@@ -76,8 +76,51 @@ function raise {
       args=( "no such error $type" )
    fi
 
-   print_"${type}"  "$status"  "$origin"  "$caught"  "${args[@]}" 1>&2
+   collect_error_info  "$origin"  "$caught"
+
+   print_"${type}"  "$status"  "${args[@]}" 1>&2
    exit "$status"
+}
+
+
+# TODO: more thinkies :: the `origin` realistically is only useful in cases
+# where the error began in a different file. Might want to change the
+# terminology here. We're already passing in a start/end position with a
+# single LOCATION node. Passing in a second would only be a case in which the
+# start position cannot come from the same node. Kinda just in semantic
+# analysis.
+#
+# Need to come up with better terms to more clearly express things. When type
+# checking, there may be a distance between the type declaration, and the
+# expression. Potentially spanning files. Though errors can occur within
+# variable/section declarations themselves, so it doesn't make a lot of sense
+# to use a `--expression` and `--declaration` flag. Maybe `--error-loc` and
+# `--context`?
+#
+# Turns out naming things is hard.
+#
+# An inability to succinctly name this is kinda indicativve of not having a
+# great understanding of this.
+#
+#
+
+declare -A ERRORS=()
+declare -a FILE_CTX=()        # Context in which the error occurred.
+declare -a DECL_CTX=()        # If declaration occured outside of the file ctx.
+
+# @arg $1 (LOCATION) Origin location
+# @arg $2 (LOCATION) Caught location
+function collect_error_info {
+   [[ "$1" ]] && _collect_error_info  "$1"  'origin'
+   [[ "$2" ]] && _collect_error_info  "$2"  'caught'
+}
+
+function _collect_error_info {
+   local loc="$1"
+   local prefix="$2"
+   local -n loc_r="$loc"
+
+
 }
 
 
@@ -181,13 +224,10 @@ function print_syntax_error {
 #       to which to consistently use.
 #
 # @arg $1 (int)       Error code
-# @arg $2 (LOCATION)  Origin location 
-# @arg $3 (LOCATION)  Caught location 
 # @arg $4 (str)       The invalid character
 function print_invalid_interpolation_char {
    local status="$1"
-   local -n caught_r="$3"
-   local character="$4"
+   local character="$2"
 
    local -i file_idx="${caught_r[file]}"
    local file="${FILES[$file_idx]}"
