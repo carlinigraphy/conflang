@@ -338,21 +338,22 @@ function parser:init {
 
 
 function parser:advance {
-   while [[ $IDX -lt ${#TOKENS[@]} ]] ; do
-      declare -g  CURRENT_NAME=${TOKENS[$IDX]}
-      declare -gn CURRENT=$CURRENT_NAME
+   if (( $IDX -lt ${#TOKENS[@]} )) ; then
+      declare -g  CURRENT_NAME="${TOKENS[$IDX]}"
+      declare -gn CURRENT="$CURRENT_NAME"
 
-      if [[ ${CURRENT[type]} == 'ERROR' ]] ; then
-         e=( syntax_error
-            --origin "$CURRENT_NAME"
-            "$CURRENT_NAME"
-         ); raise "${e[@]}"
-      else
-         break
-      fi
-   done
+      (( ++IDX ))
 
-   (( ++IDX ))
+      if [[ ${CURRENT[type]} == ERROR ]] ; do
+         parser:advance
+      done
+   fi
+}
+
+
+declare -g PANICKING=false
+function parser:calmate {
+   
 }
 
 
@@ -374,10 +375,9 @@ function parser:match {
 function parser:munch {
    if ! parser:check "$1" ; then
       e=( munch_error
-         --origin "$CURRENT_NAME"    #< start loc
-         "$1"                       #< expecting
-         "$CURRENT_NAME"            #< got
-         "$2"                       #< message
+         --origin "$CURRENT_NAME"
+         --caught "$CURRENT_NAME"
+         "expecting [$1], got [${CURRENT[type],,}], $2"
       ); raise "${e[@]}"
    fi
    parser:advance
@@ -455,8 +455,9 @@ function parser:parser_statement {
    elif parser:match 'CONSTRAIN' ; then parser:constrain
    else
       e=( parse_error
+         --caught "$CURRENT_NAME"
          --origin "$CURRENT_NAME"
-         "invalid directive: \`${CURRENT[value]}'."
+         "invalid directive [${CURRENT[value]}]"
       ); raise "${e[@]}"
    fi
 
@@ -494,22 +495,25 @@ function parser:constrain {
 
    if [[ ${name[value]} != '%inline' ]] ; then
       e=( parse_error
+         --caught "$CURRENT_NAME"
          --origin "$CURRENT_NAME"
-         '%constrain may not occur in a section.'
+         '%constrain may not occur in a section'
       ); raise "${e[@]}"
    fi
 
    if [[ ${name[file]} -ne 0 ]] ; then
       e=( parse_error
+         --caught "$CURRENT_NAME"
          --origin "$CURRENT_NAME"
-         '%constrain may not occur in a sub-file.'
+         '%constrain may not occur in a sub-file'
       ); raise "${e[@]}"
    fi
 
    if [[ "${#CONSTRAINTS[@]}" -gt 0 ]] ; then
       e=( parse_error
+         --caught "$CURRENT_NAME"
          --origin "$CURRENT_NAME"
-         'may not specify multiple constrain blocks.'
+         'may not specify multiple constrain blocks'
       ); raise "${e[@]}"
    fi
 
@@ -646,7 +650,7 @@ function parser:decl_variable {
       e=( parse_error
          --origin "$node"
          --caught "$CURRENT_NAME"
-         "expecting \`:' before expression."
+         "expecting \`:' before expression"
       ); raise "${e[@]}"
    fi
 
@@ -740,9 +744,11 @@ function parser:expression {
 
    local fn="${NUD[$type]}"
    if [[ -z $fn ]] ; then
-      # TODO: error reporting
-      # This has got to be one of the least helpful error messages here. Woof.
-      raise parse_error "not an expression: ${CURRENT[type],,}."
+      e=( parse_error
+         --origin "$token"
+         --caught "$token"
+         "not an expression [${CURRENT[type],,}]"
+      ); raise "${e[@]}"
    fi
 
    parser:advance
@@ -759,7 +765,11 @@ function parser:expression {
          fn="${RID[${CURRENT[type]}]}"
 
          if [[ ! $fn ]] ; then
-            raise parse_error "not a postfix expression: ${CURRENT[type],,}."
+            e=( parse_error
+               --origin "$token"
+               --caught "$token"
+               "not a postfix expression [${CURRENT[type],,}]"
+            ); raise "${e[@]}"
          fi
 
          $fn "$lhs" "$rbp"
@@ -780,7 +790,11 @@ function parser:expression {
 
       fn=${LED[$op_type]}
       if [[ ! $fn ]] ; then
-         raise parse_error "not an infix expression: ${CURRENT[type],,}."
+         e=( parse_error
+            --origin "$token"
+            --caught "$token"
+            "not an infix expression [${CURRENT[type],,}]"
+         ); raise "${e[@]}"
       fi
 
       $fn  "$lhs"  "$op_type"  "$rbp"

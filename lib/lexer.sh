@@ -196,9 +196,13 @@ function lexer:scan {
          lexer:number ; continue
       fi
 
-      # Can do a dedicated error pass, scanning for error tokens, and assembling
-      # the context to print useful debug messages.
-      token:new 'ERROR' "$CURRENT"
+      token:new 'ERROR'
+      local -n t_r="${TOKENS[-1]}"
+      e=( invalid_interpolation_char
+          --origin "${t_r[location]}"
+          --caught "${t_r[location]}"
+          "$CURRENT"
+      ); raise "${e[@]}"
    done
 
    token:new 'EOF'
@@ -334,6 +338,7 @@ function lexer:interpolation {
       token:new 'ERROR'
       local -n t_r="${TOKENS[-1]}"
       e=( invalid_interpolation_char
+          --origin "${t_r[location]}"
           --caught "${t_r[location]}"
           "$CURRENT"
       ); raise "${e[@]}"
@@ -368,6 +373,7 @@ function lexer:fstring {
             token:new 'ERROR'
             local -n t_r="${TOKENS[-1]}"
             e=( invalid_interpolation_char
+               --origin "${t_r[location]}"
                --caught "${t_r[location]}"
                "$CURRENT"
             ); raise "${e[@]}"
@@ -454,9 +460,11 @@ function lexer:fpath {
             buffer+=( "$CURRENT" )
             continue
          else
+            token:new 'ERROR'
+            local -n t_r="${TOKENS[-1]}"
             e=( unescaped_interpolation_brace
-               --origin "$CURRENT"
-               "$CURRENT"
+               --origin "${t_r[location]}"
+               --caught "${t_r[location]}"
             ); raise "${e[@]}"
          fi
       fi
