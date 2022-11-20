@@ -24,12 +24,11 @@ function lexer:init {
    # Some variables need to be reset at the start of every run. They hold
    # information that should not be carried from file to file.
 
-   # Fail if no file.
-   if [[ "${#FILES[@]}" -eq 0 ]] ; then
-      raise no_input
-   fi
-
    (( FILE_IDX = ${#FILES[@]} - 1 )) ||:
+
+   local lines="FILE_${FILE_IDX}_LINES"
+   declare -ga "$lines"
+   declare -g  FILE_LINES="$lines"
 
    declare -g   CURRENT=''  PEEK=''
    declare -ga  CHARRAY=()
@@ -94,13 +93,10 @@ function lexer:advance {
 
 
 function lexer:scan {
-   local file_lines="FILE_${FILE_IDX}_LINES"
-   declare -ga "$file_lines"
-
    # For later error reporting. Easier to report errors by line number if we
    # have them in lines... by number...
-   local -n file_lines_r="$file_lines"
-   mapfile file_lines_r < "${FILES[-1]}"
+   local -n file_lines_r="$FILE_LINES"
+   mapfile -t -O1 file_lines_r < "${FILES[-1]}"
 
    # For easier lookahead, read all characters first into an array. Allows us
    # to seek/index very easily.
@@ -197,14 +193,15 @@ function lexer:scan {
       fi
 
       token:new 'ERROR'
-      local -n t_r="${TOKENS[-1]}"
-      e=( invalid_interpolation_char
-          --origin "${t_r[location]}"
-          --caught "${t_r[location]}"
-          "$CURRENT"
+      e=( syntax_error
+          --origin "${TOKENS[-1]}"
+          --caught "${TOKENS[-1]}"
+          "invalid character [$CURRENT]"
       ); raise "${e[@]}"
    done
 
+   FREEZE[lineno]="${CURSOR[lineno]}"
+   FREEZE[colno]="${CURSOR[colno]}"
    token:new 'EOF'
 }
 
@@ -336,11 +333,10 @@ function lexer:interpolation {
       fi
 
       token:new 'ERROR'
-      local -n t_r="${TOKENS[-1]}"
       e=( invalid_interpolation_char
-          --origin "${t_r[location]}"
-          --caught "${t_r[location]}"
-          "$CURRENT"
+          --origin "${TOKENS[-1]}"
+          --caught "${TOKENS[-1]}"
+          "invalid character in fstring [$CURRENT]"
       ); raise "${e[@]}"
    done
 }
@@ -371,11 +367,9 @@ function lexer:fstring {
             continue
          else
             token:new 'ERROR'
-            local -n t_r="${TOKENS[-1]}"
-            e=( invalid_interpolation_char
-               --origin "${t_r[location]}"
-               --caught "${t_r[location]}"
-               "$CURRENT"
+            e=( unescaped_interpolation_brace
+               --origin "${TOKENS[-1]}"
+               --caught "${TOKENS[-1]}"
             ); raise "${e[@]}"
          fi
       fi
@@ -461,10 +455,9 @@ function lexer:fpath {
             continue
          else
             token:new 'ERROR'
-            local -n t_r="${TOKENS[-1]}"
             e=( unescaped_interpolation_brace
-               --origin "${t_r[location]}"
-               --caught "${t_r[location]}"
+               --origin "${TOKENS[-1]}"
+               --caught "${TOKENS[-1]}"
             ); raise "${e[@]}"
          fi
       fi

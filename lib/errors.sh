@@ -111,7 +111,12 @@ function raise {
    local code="${ERROR_CODE[$type]%%,*}"
    local category="${ERROR_CODE[$type]##*,}"
 
-   build_error_info  "$category"  "$code"  "$origin"  "$caught"
+   local -n origin_r="$origin"
+   local -n caught_r="$caught"
+   local origin_loc="${origin_r[location]}"
+   local caught_loc="${caught_r[location]}"
+
+   build_error_info  "$category"  "$code"  "$origin_loc"  "$caught_loc"
    _"${type}"  "${args[@]}"  1>&2
 
    if [[ $kill ]] ; then
@@ -136,15 +141,18 @@ function build_error_info {
    error_r[category]="$category"
    error_r[code]="$code"
 
-   error_r[origin_file_name]="${FILES[${origin[file]}]}"
+   error_r[origin_file_name]="${FILES[${origin_r[file]}]}"
    error_r[origin_file_lines]="FILE_${origin_r[file]}_LINES"
    error_r[origin_ln]="${origin_r[start_ln]}"
    error_r[origin_col]="${origin_r[start_col]}"
 
-   error_r[caught_file_name]="${FILES[${caught[file]}]}"
+   error_r[caught_file_name]="${FILES[${caught_r[file]}]}"
    error_r[caught_file_lines]="FILE_${caught_r[file]}_LINES"
    error_r[caught_ln]="${caught_r[start_ln]}"
    error_r[caught_col]="${caught_r[start_col]}"
+
+   # TODO: CURRENT: somewhere our LOC_8 is changing. Don't know where. The
+   # start column/line are being set to 0. Need to find.
 }
 
 
@@ -168,37 +176,41 @@ function error:print {
    printf '%s\n'      "${e_r[msg]}"
 
    # Originating file name.
-   printf '%3sin %s\n'   ''   "${e_r[origin_file_name]}"
+   local file="${e_r[origin_file_name]/$HOME/\~}"
+   printf '%3sin %s\n'   ''  "$file"
 
-   if [[ "${e_r[origin_file_name]}" != "${e_r[caught_file_name]}" ]] ; then
-      error:_multi_file_context "$1"
-   else
+   if [[ "${e_r[origin_file_name]}" == "${e_r[caught_file_name]}" ]] ; then
       error:_single_file_context "$1"
+   else
+      error:_multi_file_context "$1"
    fi
 
-   local filler=''
-   for (( i=(end_col + 1); i>0; --i )) ; do
+   local filler='' ; local -i max
+   (( max = ${e_r[caught_col]} + 1 ))
+   for (( i=0; i<max ; ++i )) ; do
       filler+='-'
    done
    printf '%3scaught %s^\n'  ''  "$filler"
+   printf '\n'
 }
 
 
 function error:_single_file_context {
    local -n e_r="$1"
 
-   local filler=''
-   for (( i=0; i <= ${e_r[origin_col]}; ++i )) ; do
+   local filler='' ; local -i max
+   (( max = ${e_r[origin_col]} + 1 ))
+   for (( i=0; i<max ; ++i )) ; do
       filler+='-'
    done
 
-   printf "%${offset}s"  ''
-   printf '%3sorigin %s.\n'  ''  "$filler"
+   printf '%3sorigin %s,\n'  ''  "$filler"
 
    # Print context lines.
    local -i start="${e_r[origin_ln]}"
    local -i end="${e_r[caught_ln]}"
    local -n origin_file_lines_r="${e_r[origin_file_lines]}"
+
    for (( i=start; i <= end; ++i )) ; do
       printf '%3s%6s | %s\n'  ''   "$i"   "${origin_file_lines_r[$i]}"
    done
@@ -266,7 +278,7 @@ function _parse_error {
 
 function _munch_error {
    local -n error_r="$ERROR"
-   error_r[msg]="expected [${1}], received [${2}]"
+   error_r[msg]="expected [${1}], received [${2}]: $3"
 }
 
 

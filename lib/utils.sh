@@ -280,7 +280,7 @@ function utils:eval {
       walk_semantics "$ast_node"
    done
 
-   if (( ${ALL_ERRORS[@]} )) ; then
+   if (( ${#ALL_ERRORS[@]} )) ; then
       error:print_all
       exit 1
    fi

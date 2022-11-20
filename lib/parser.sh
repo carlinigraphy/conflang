@@ -337,27 +337,27 @@ function parser:init {
 }
 
 
-function parser:advance {
-   if (( $IDX -lt ${#TOKENS[@]} )) ; then
+function parser:_advance {
+   if (( $IDX < ${#TOKENS[@]} )) ; then
       declare -g  CURRENT_NAME="${TOKENS[$IDX]}"
       declare -gn CURRENT="$CURRENT_NAME"
-
       (( ++IDX ))
-
-      if [[ ${CURRENT[type]} == ERROR ]] ; do
-         parser:advance
-      done
    fi
+}
 
-   if [[ $PANICKING != true ]] ; then
-      return
-   fi
 
-   # TODO: rethink this section, slammed it out right now for notes.
-   until [[ ${CURRENT[type]} == SEMI ]] ; do
+function parser:advance {
+   parser:_advance
+   while [[ ${CURRENT[type]} == ERROR ]] ; do
+      parser:_advance
+   done
+}
+
+
+function parser:synchronize {
+   until parser:check 'SEMI,EOF' ; do
       parser:advance
    done
-   declare -g PANICKING=false
 }
 
 
@@ -377,24 +377,20 @@ function parser:match {
 
 
 function parser:munch {
-   if ! parser:check "$1" ; then
+   if parser:check "$1" ; then
+      parser:advance
+   else
       e=( munch_error
          --origin "$CURRENT_NAME"
          --caught "$CURRENT_NAME"
-         "expecting [$1], got [${CURRENT[type],,}], $2"
+         "${1,,}"  "${CURRENT[type],,}"  "$2"
       ); raise "${e[@]}"
+      parser:synchronize
    fi
-   parser:advance
 }
 
 
 function parser:parse {
-   # Realistically this should not happen, outside running the lexer & parser
-   # independently. Though it's a prerequisite for all that follows.
-   if [[ "${#TOKENS[0]}" -eq 0 ]] ; then
-      raise parse_error "didn't receive tokens from lexer."
-   fi
-
    parser:advance
    parser:program
 }
@@ -747,12 +743,14 @@ function parser:expression {
    local type="${CURRENT[type]}"
 
    local fn="${NUD[$type]}"
-   if [[ -z $fn ]] ; then
+   if [[ ! $fn ]] ; then
+      local -n token_r="$token"
       e=( parse_error
          --origin "$token"
          --caught "$token"
          "not an expression [${CURRENT[type],,}]"
       ); raise "${e[@]}"
+      parser:synchronize ; return
    fi
 
    parser:advance
