@@ -348,12 +348,16 @@ function parser:advance {
          parser:advance
       done
    fi
-}
 
+   if [[ $PANICKING != true ]] ; then
+      return
+   fi
 
-declare -g PANICKING=false
-function parser:calmate {
-   
+   # TODO: rethink this section, slammed it out right now for notes.
+   until [[ ${CURRENT[type]} == SEMI ]] ; do
+      parser:advance
+   done
+   declare -g PANICKING=false
 }
 
 
