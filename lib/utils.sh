@@ -75,6 +75,18 @@ function location:copy {
 }
 
 
+function location:cursor {
+   # Convenience function to create a location at the current cursor's position.
+   # Cleans up otherwise messy and repetitive code in the lexer.
+   location:new
+   local -n loc_r="$LOCATION"
+   loc_r[start_ln]="${CURSOR[lineno]}"
+   loc_r[start_col]="${CURSOR[colno]}"
+   loc_r[end_ln]="${CURSOR[lineno]}"
+   loc_r[end_col]="${CURSOR[colno]}"
+}
+
+
 function utils:add_file {
    # Serves to both ensure we don't have circular imports, as well as resolving
    # relative paths to their fully qualified path.

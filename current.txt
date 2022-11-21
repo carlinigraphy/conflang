@@ -1,0 +1,4 @@
+2022-11-20
+   Adding locations to all error.
+   Working from lexer -> compiler, make everything throw the correct error,
+   display accurate location information.

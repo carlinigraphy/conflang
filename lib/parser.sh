@@ -24,7 +24,11 @@ declare -ga  INCLUDES=() CONSTRAINTS=()
 #> CONSTRAINTS=('./subfile1.conf', './subfile2.conf')
 
 # Saves us from a get_type() function call, or some equivalent.
-declare -gA  TYPEOF=()
+declare -gA TYPEOF=()
+
+# Drops anchor at the start of a declaration, expression, etc. For error
+# reporting.
+declare -g ANCHOR=
 
 
 # Wrapper around the below functions. Just for convenience. Little easier to
@@ -358,6 +362,7 @@ function parser:synchronize {
    until parser:check 'SEMI,EOF' ; do
       parser:advance
    done
+   declare -g PANICKING=
 }
 
 
@@ -381,11 +386,10 @@ function parser:munch {
       parser:advance
    else
       e=( munch_error
-         --origin "$CURRENT_NAME"
-         --caught "$CURRENT_NAME"
+         --anchor "$ANCHOR"
+         --caught "${CURRENT[location]}"
          "${1,,}"  "${CURRENT[type],,}"  "$2"
       ); raise "${e[@]}"
-      parser:synchronize
    fi
 }
 
@@ -409,6 +413,7 @@ function parser:program {
    local -n ident_r="$ident"
    ident_r['value']='%inline'
 
+   location:new
    local -n loc_r="$LOCATION"
    loc_r['start_ln']=0
    loc_r['start_col']=0
@@ -421,6 +426,7 @@ function parser:program {
    local -n node_r="$node"
    node_r['name']="$ident"
 
+   location:new
    local -n loc_r="$LOCATION"
    loc_r['start_ln']=0
    loc_r['start_col']=0
@@ -455,8 +461,8 @@ function parser:parser_statement {
    elif parser:match 'CONSTRAIN' ; then parser:constrain
    else
       e=( parse_error
-         --caught "$CURRENT_NAME"
-         --origin "$CURRENT_NAME"
+         --anchor "${CURRENT[location]}"
+         --caught "${CURRENT[location]}"
          "invalid directive [${CURRENT[value]}]"
       ); raise "${e[@]}"
    fi
@@ -493,26 +499,28 @@ function parser:constrain {
    local -n section_ptr=$SECTION
    local -n name=${section_ptr[name]}
 
+   declare -g ANCHOR="${CURRENT[location]}"
+
    if [[ ${name[value]} != '%inline' ]] ; then
       e=( parse_error
-         --caught "$CURRENT_NAME"
-         --origin "$CURRENT_NAME"
+         --anchor "$ANCHOR"
+         --caught "${CURRENT[location]}"
          '%constrain may not occur in a section'
       ); raise "${e[@]}"
    fi
 
    if [[ ${name[file]} -ne 0 ]] ; then
       e=( parse_error
-         --caught "$CURRENT_NAME"
-         --origin "$CURRENT_NAME"
+         --anchor "$ANCHOR"
+         --caught "${CURRENT[location]}"
          '%constrain may not occur in a sub-file'
       ); raise "${e[@]}"
    fi
 
    if [[ "${#CONSTRAINTS[@]}" -gt 0 ]] ; then
       e=( parse_error
-         --caught "$CURRENT_NAME"
-         --origin "$CURRENT_NAME"
+         --anchor "$ANCHOR"
+         --caught "${CURRENT[location]}"
          'may not specify multiple constrain blocks'
       ); raise "${e[@]}"
    fi
@@ -567,6 +575,8 @@ function parser:constrain {
 
 
 function parser:declaration {
+   declare -g ANCHOR="${CURRENT[location]}"
+
    parser:identifier "$CURRENT_NAME"
    parser:munch 'IDENTIFIER' "expecting variable declaration."
 
@@ -648,8 +658,8 @@ function parser:decl_variable {
       node_r['expr']=$NODE
    elif parser:match "$expr_types" ; then
       e=( parse_error
-         --origin "$node"
-         --caught "$CURRENT_NAME"
+         --anchor "${node_r[location]}"
+         --caught "${CURRENT[location]}"
          "expecting \`:' before expression"
       ); raise "${e[@]}"
    fi
@@ -746,11 +756,11 @@ function parser:expression {
    if [[ ! $fn ]] ; then
       local -n token_r="$token"
       e=( parse_error
-         --origin "$token"
-         --caught "$token"
+         --anchor "${token_r[location]}"
+         --caught "${token_r[location]}"
          "not an expression [${CURRENT[type],,}]"
       ); raise "${e[@]}"
-      parser:synchronize ; return
+      return
    fi
 
    parser:advance
@@ -768,8 +778,8 @@ function parser:expression {
 
          if [[ ! $fn ]] ; then
             e=( parse_error
-               --origin "$token"
-               --caught "$token"
+               --anchor "${token_r[location]}"
+               --caught "${token_r[location]}"
                "not a postfix expression [${CURRENT[type],,}]"
             ); raise "${e[@]}"
          fi
@@ -793,8 +803,8 @@ function parser:expression {
       fn=${LED[$op_type]}
       if [[ ! $fn ]] ; then
          e=( parse_error
-            --origin "$token"
-            --caught "$token"
+            --anchor "${token_r[location]}"
+            --caught "${token_r[location]}"
             "not an infix expression [${CURRENT[type],,}]"
          ); raise "${e[@]}"
       fi

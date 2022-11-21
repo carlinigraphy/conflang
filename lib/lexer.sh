@@ -193,9 +193,10 @@ function lexer:scan {
       fi
 
       token:new 'ERROR'
+      local -n t_r="${TOKENS[-1]}"
       e=( syntax_error
-          --origin "${TOKENS[-1]}"
-          --caught "${TOKENS[-1]}"
+         --anchor "${t_r[location]}"
+         --caught "${t_r[location]}"
           "invalid character [$CURRENT]"
       ); raise "${e[@]}"
    done
@@ -333,10 +334,11 @@ function lexer:interpolation {
       fi
 
       token:new 'ERROR'
+      local -n t_r="${TOKENS[-1]}"
       e=( invalid_interpolation_char
-          --origin "${TOKENS[-1]}"
-          --caught "${TOKENS[-1]}"
-          "invalid character in fstring [$CURRENT]"
+         --anchor "${t_r[location]}"
+         --caught "${t_r[location]}"
+         "invalid character in fstring [$CURRENT]"
       ); raise "${e[@]}"
    done
 }
@@ -367,9 +369,12 @@ function lexer:fstring {
             continue
          else
             token:new 'ERROR'
+            local -n t_r="${TOKENS[-1]}"
+
+            location:cursor
             e=( unescaped_interpolation_brace
-               --origin "${TOKENS[-1]}"
-               --caught "${TOKENS[-1]}"
+               --anchor "${t_r[location]}"
+               --caught "$LOCATION"
             ); raise "${e[@]}"
          fi
       fi
@@ -455,9 +460,11 @@ function lexer:fpath {
             continue
          else
             token:new 'ERROR'
+            local -n t_r="${TOKENS[-1]}"
+            location:cursor
             e=( unescaped_interpolation_brace
-               --origin "${TOKENS[-1]}"
-               --caught "${TOKENS[-1]}"
+               --anchor "${t_r[location]}"
+               --caught "$LOCATION"
             ); raise "${e[@]}"
          fi
       fi

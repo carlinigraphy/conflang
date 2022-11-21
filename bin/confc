@@ -53,9 +53,9 @@ function argparse {
    done
 
    if [[ ! $positional ]] ; then
-      raise --kill no_input
+      raise no_input
    elif [[ ${#positional[@]} -gt 1 ]] ; then
-      raise --kill argument_error "${positional[@]}"
+      raise argument_error "${positional[@]}"
    fi
 
    if [[ "${positional[0]}" == '-' ]] ; then
