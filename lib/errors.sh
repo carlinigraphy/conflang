@@ -24,29 +24,28 @@ declare -gA ERROR_CODE=(
    [missing_file]='12,File Error'
    [missing_constraint]='13,File Error'
    [circular_import]='14,File Error'
-   [source_failure]='15,File Error'
 
    # Syntax errors
-   [syntax_error]='16,Syntax Error'
-   [invalid_interpolation_char]='17,Syntax Error'
-   [unescaped_interpolation_brace]='18,Syntax Error'
+   [syntax_error]='15,Syntax Error'
+   [invalid_interpolation_char]='16,Syntax Error'
+   [unescaped_interpolation_brace]='17,Syntax Error'
 
    # Parse errors
-   [parse_error]='19,Parse Error'
-   [munch_error]='20,Parse Error'
+   [parse_error]='18,Parse Error'
+   [munch_error]='19,Parse Error'
 
    # Type errors
-   [type_error]='21,Type Error'
-   [undefined_type]='22,Type Error'
-   [not_a_type]='23,Type Error'
-   [symbol_mismatch]='24,Type Error'
+   [type_error]='20,Type Error'
+   [undefined_type]='21,Type Error'
+   [not_a_type]='22,Type Error'
+   [symbol_mismatch]='23,Type Error'
 
    # Key errors
-   [index_error]='25,Name Error'
-   [name_collision]='26,Name Error'
-   [missing_env_var]='27,Name Error'
-   [missing_var]='28,Name Error'
-   [missing_required]='29,Name Error'
+   [index_error]='24,Name Error'
+   [name_collision]='25,Name Error'
+   [missing_env_var]='26,Name Error'
+   [missing_var]='27,Name Error'
+   [missing_required]='28,Name Error'
 
    # Misc. errors
    [idiot_programmer]='255,Idiot Programmer Error'
@@ -54,7 +53,6 @@ declare -gA ERROR_CODE=(
 
 
 declare -g  ERROR=''
-declare -ga ALL_ERRORS=()
 declare -gi ERROR_NUM=0
 
 function error:new {
@@ -62,8 +60,6 @@ function error:new {
    local err="ERROR_${ERROR_NUM}"
    declare -gA "$err"
    declare -g  ERROR="$err"
-
-   ALL_ERRORS+=( "$err" )
 
    # Without a value, this isn't glob matched by a ${!_LOC_*}
    local -n e="$err" ; e=()
@@ -98,7 +94,10 @@ function raise {
    error_r[category]="$category"
    error_r[code]="e${code}"
 
-   build_error_location  "$anchor"  "$caught"
+   if [[ $anchor && $caught ]] ; then
+      build_error_location  "$anchor"  "$caught"
+   fi
+
    _"${type}"  "${args[@]}"
 
    error:print  "$ERROR"
@@ -106,8 +105,14 @@ function raise {
 }
 
 
-# @arg $1 (LOCATION)  Node for the `start_ln` and `start_col`
-# @arg $2 (LOCATION)  Node for the `end_ln` and `end_col`
+# build_error_location()
+#
+# @description
+#  Compiles the start line/column of the anchor & caught positions into a single
+#  ERROR{} object.
+#
+# @arg $1 LOCATION  Node for the `start_ln` and `start_col`
+# @arg $2 LOCATION  Node for the `end_ln` and `end_col`
 function build_error_location {
    local -n anchor_r="$1"
    local -n caught_r="$2"
@@ -133,6 +138,10 @@ function error:print {
    printf '%s(%s): '  "${e_r[category]}"  "${e_r[code]}"
    printf '%s\n'      "${e_r[msg]}"
 
+   if [[ ! ${e_r[anchor_file_name]} ]] ; then
+      return
+   fi
+
    # Anchor file name.
    local file="${e_r[anchor_file_name]/$HOME/\~}"
    printf '%3sin %s\n'   ''  "$file"
@@ -148,7 +157,7 @@ function error:print {
    for (( i=0; i<max ; ++i )) ; do
       filler+='-'
    done
-   printf '%3scaught %s^\n'  ''  "$filler"
+   printf '%3scaught %s|\n'  ''  "$filler"
    printf '\n'
 }
 
@@ -162,7 +171,7 @@ function error:_single_file_context {
       filler+='-'
    done
 
-   printf '%3sanchor %s,\n'  ''  "$filler"
+   printf '%3sanchor %s|\n'  ''  "$filler"
 
    # Print context lines.
    local -i start="${e_r[anchor_ln]}"
@@ -182,13 +191,13 @@ function error:_multi_file_context {
 #───────────────────────────────( I/O errors )──────────────────────────────────
 function _no_input {
    local -n error_r="$ERROR"
-   error_r[msg]='missing input'
+   error_r[msg]='no input file'
 }
 
 
 function _missing_file {
    local -n error_r="$ERROR"
-   error_r[msg]= "missing or unreadable source file [${1}]"
+   error_r[msg]= "missing or unreadable source file [${1##*/}]"
 }
 
 
@@ -200,15 +209,7 @@ function _missing_constraint {
 
 function _circular_import {
    local -n error_r="$ERROR"
-   error_r[msg]="cannot source [${1}], circular import"
-}
-
-
-# TODO: need way more information than "failed to source". Did it not exist,
-# was it not valid bash, etc.
-function _source_failure {
-   local -n error_r="$ERROR"
-   error_r[msg]"failed to source user-defined function [${1}]"
+   error_r[msg]="cannot source [${1##*/}], circular import"
 }
 
 #──────────────────────────────( syntax errors )────────────────────────────────
@@ -236,7 +237,7 @@ function _parse_error {
 
 function _munch_error {
    local -n error_r="$ERROR"
-   error_r[msg]="expected [${1}], received [${2}]: $3"
+   error_r[msg]="expected [${1}], received [${2}], $3"
 }
 
 

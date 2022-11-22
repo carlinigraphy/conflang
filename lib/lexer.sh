@@ -14,10 +14,6 @@ declare -gA KEYWORD=(
    ['false']=true
    ['include']=true
    ['constrain']=true
-
-   # NYI
-   #['use']=true
-   #['as']=true
 )
 
 function lexer:init {
@@ -304,6 +300,9 @@ function lexer:number {
 
 
 function lexer:interpolation {
+   location:cursor
+   local anchor="$LOCATION"
+
    while [[ "${CURSOR[index]}" -lt ${#CHARRAY[@]} ]] ; do
       # String interpolation ends upon a closing R_BRACE token, or if there's
       # no current character.
@@ -323,10 +322,12 @@ function lexer:interpolation {
       FREEZE['lineno']=${CURSOR['lineno']}
       FREEZE['colno']=${CURSOR['colno']}
 
-      if [[ $CURRENT == '$' ]] ; then
-         token:new  'DOLLAR'  "$CURRENT"
-         continue
-      fi
+      case $CURRENT in
+         '.')  token:new        'DOT' "$CURRENT"  ; continue ;;
+         '$')  token:new     'DOLLAR' "$CURRENT"  ; continue ;;
+         '[')  token:new  'L_BRACKET' "$CURRENT"  ; continue ;;
+         ']')  token:new  'R_BRACKET' "$CURRENT"  ; continue ;;
+      esac
 
       # Identifiers.
       if [[ $CURRENT =~ [[:alpha:]_] ]] ; then
@@ -336,7 +337,7 @@ function lexer:interpolation {
       token:new 'ERROR'
       local -n t_r="${TOKENS[-1]}"
       e=( invalid_interpolation_char
-         --anchor "${t_r[location]}"
+         --anchor "$anchor"
          --caught "${t_r[location]}"
          "invalid character in fstring [$CURRENT]"
       ); raise "${e[@]}"
@@ -352,10 +353,8 @@ function lexer:fstring {
 
       if [[ $CURRENT == '"' ]] ; then
          # shellcheck disable=SC1003
-         # ^-- mistakenly thinks I'm trying to escape a single quote 1j.
-         if [[ $buffer && ${buffer[-1]} == '\' ]] ; then
-            # shellcheck disable=SC2184
-            unset buffer[-1]
+         if [[ $buffer && ("${buffer[-1]}" == '\') ]] ; then
+            unset 'buffer[-1]'
          else
             break
          fi
@@ -370,7 +369,6 @@ function lexer:fstring {
          else
             token:new 'ERROR'
             local -n t_r="${TOKENS[-1]}"
-
             location:cursor
             e=( unescaped_interpolation_brace
                --anchor "${t_r[location]}"
@@ -396,10 +394,9 @@ function lexer:fstring {
          buffer=()
 
          token:new 'STRING'  "$join"
-         token:new 'CONCAT'  ''
+         token:new 'CONCAT'
 
-         # TODO: refactor
-         # This may be a little janky. If the user has an empty expression...
+         # In the case of an empty expression...
          #> _: f'{}';
          #...there will be two subsequent concat tokens, with nothing between.
          #> path('') CAT CAT path('')
@@ -415,8 +412,8 @@ function lexer:fstring {
          # Only create the closing CONCAT token if there were contents to the
          # expression.
          local t1="$TOKEN_NUM"
-         if [[ ! "$t0" -eq "$t1" ]] ; then
-            token:new 'CONCAT'  ''
+         if (( $t0 != $t1 )) ; then
+            token:new 'CONCAT'
          fi
 
          continue
@@ -443,10 +440,8 @@ function lexer:fpath {
 
       if [[ $CURRENT == "'" ]] ; then
          # shellcheck disable=SC1003
-         # ^-- mistakenly thinks I'm trying to escape a single quote 1j.
-         if [[ $buffer && ${buffer[-1]} == '\' ]] ; then
-            # shellcheck disable=SC2184
-            unset buffer[-1]
+         if [[ $buffer && ("${buffer[-1]}" == '\') ]] ; then
+            unset 'buffer[-1]'
          else
             break
          fi
@@ -485,11 +480,10 @@ function lexer:fpath {
          done
          buffer=()
 
-         token:new 'PATH'    "$join"
-         token:new 'CONCAT'  ''
+         token:new 'PATH'  "$join"
+         token:new 'CONCAT'
 
-         # TODO: refactor
-         # This may be a little janky. If the user has an empty expression...
+         # In the case of an empty expression...
          #> _: f'{}';
          #...there will be two subsequent concat tokens, with nothing between.
          #> path('') CAT CAT path('')
@@ -505,8 +499,8 @@ function lexer:fpath {
          # Only create the closing CONCAT token if there were contents to the
          # expression.
          local t1="$TOKEN_NUM"
-         if [[ ! "$t0" -eq "$t1" ]] ; then
-            token:new 'CONCAT'  ''
+         if (( $t0 != $t1 )) ; then
+            token:new 'CONCAT'
          fi
 
          continue

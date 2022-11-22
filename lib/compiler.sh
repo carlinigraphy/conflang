@@ -279,7 +279,7 @@ function evaluate_path {
    while [[ "${node_r[concat]}" ]] ; do
       walk_evaluate "${node_r[concat]}"
       path+="$DATA"
-      local -n node="${node_r[concat]}"
+      local -n node_r="${node_r[concat]}"
    done
 
    declare -g DATA="$path"

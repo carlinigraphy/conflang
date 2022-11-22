@@ -26,6 +26,10 @@ function init_globals {
    declare -g  LOCATION=
    declare -gi LOC_NUM=0
 
+   # Drops anchor at the start of a declaration, expression, etc. For error
+   # reporting.
+   declare -g  ANCHOR=''
+
    # Push each absolute file path to the FILES[] stack as we hit an %include or
    # %constrain statement.
    declare -ga FILES=()
@@ -80,10 +84,11 @@ function location:cursor {
    # Cleans up otherwise messy and repetitive code in the lexer.
    location:new
    local -n loc_r="$LOCATION"
-   loc_r[start_ln]="${CURSOR[lineno]}"
-   loc_r[start_col]="${CURSOR[colno]}"
-   loc_r[end_ln]="${CURSOR[lineno]}"
-   loc_r[end_col]="${CURSOR[colno]}"
+   loc_r['file']="$FILE_IDX"
+   loc_r['start_ln']="${CURSOR[lineno]}"
+   loc_r['start_col']="${CURSOR[colno]}"
+   loc_r['end_ln']="${CURSOR[lineno]}"
+   loc_r['end_col']="${CURSOR[colno]}"
 }
 
 
@@ -115,6 +120,7 @@ function utils:add_file {
    esac
 
    for f in "${FILES[@]}" ; do
+      # TODO: location reporting
       [[ "$f" == "$file" ]] && raise circular_import "$file"
    done
 
@@ -122,6 +128,7 @@ function utils:add_file {
       [[ ! -r "$fq_path" ]] ||
       [[   -d "$fq_path" ]]
    then
+      # TODO: location reporting
       raise missing_file "$fq_path"
    fi
 
@@ -200,11 +207,13 @@ function identify_constraint_file {
 
    for f in "${FILES[@]}" ; do
       if [[ "$f" == "$last_found" ]] ; then
-         raise parse_error "\`$f' may not be both a %constrain and %include"
+         # TODO: location reporting
+         raise circular_import  "$f"
       fi
    done
 
    if [[ ! $last_found ]] ; then
+      # TODO: location reporting
       raise missing_constraint
    else
       FILES+=( "$fq_path" )

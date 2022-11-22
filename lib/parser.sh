@@ -26,11 +26,6 @@ declare -ga  INCLUDES=() CONSTRAINTS=()
 # Saves us from a get_type() function call, or some equivalent.
 declare -gA TYPEOF=()
 
-# Drops anchor at the start of a declaration, expression, etc. For error
-# reporting.
-declare -g ANCHOR=
-
-
 # Wrapper around the below functions. Just for convenience. Little easier to
 # read as well perhaps.
 function ast:new { _ast_new_"$1" ;}
@@ -415,8 +410,8 @@ function parser:program {
 
    location:new
    local -n loc_r="$LOCATION"
-   loc_r['start_ln']=0
-   loc_r['start_col']=0
+   loc_r['start_ln']=1
+   loc_r['start_col']=1
    loc_r['file']="$FILE_IDX"
 
    # Section declaration itself.
@@ -428,9 +423,11 @@ function parser:program {
 
    location:new
    local -n loc_r="$LOCATION"
-   loc_r['start_ln']=0
-   loc_r['start_col']=0
+   loc_r['start_ln']=1
+   loc_r['start_col']=1
    loc_r['file']="$FILE_IDX"
+
+   declare -g ANCHOR="$LOCATION"
 
    local -n items=${node_r['items']}
    while ! parser:check 'EOF' ; do
@@ -448,7 +445,10 @@ function parser:program {
 
 
 function parser:statement {
+   local anchor="${CURRENT[location]}"
+
    if parser:match 'PERCENT' ; then
+      declare -g ANCHOR="$anchor"
       parser:parser_statement
    else
       parser:declaration
@@ -461,7 +461,7 @@ function parser:parser_statement {
    elif parser:match 'CONSTRAIN' ; then parser:constrain
    else
       e=( parse_error
-         --anchor "${CURRENT[location]}"
+         --anchor "$ANCHOR"
          --caught "${CURRENT[location]}"
          "invalid directive [${CURRENT[value]}]"
       ); raise "${e[@]}"
@@ -496,15 +496,13 @@ function parser:include {
 
 
 function parser:constrain {
-   local -n section_ptr=$SECTION
-   local -n name=${section_ptr[name]}
-
-   declare -g ANCHOR="${CURRENT[location]}"
+   local -n section_ptr="$SECTION"
+   local -n name="${section_ptr[name]}"
 
    if [[ ${name[value]} != '%inline' ]] ; then
       e=( parse_error
          --anchor "$ANCHOR"
-         --caught "${CURRENT[location]}"
+         --caught "$ANCHOR"
          '%constrain may not occur in a section'
       ); raise "${e[@]}"
    fi
@@ -512,7 +510,7 @@ function parser:constrain {
    if [[ ${name[file]} -ne 0 ]] ; then
       e=( parse_error
          --anchor "$ANCHOR"
-         --caught "${CURRENT[location]}"
+         --caught "$ANCHOR"
          '%constrain may not occur in a sub-file'
       ); raise "${e[@]}"
    fi
@@ -520,12 +518,12 @@ function parser:constrain {
    if [[ "${#CONSTRAINTS[@]}" -gt 0 ]] ; then
       e=( parse_error
          --anchor "$ANCHOR"
-         --caught "${CURRENT[location]}"
+         --caught "$ANCHOR"
          'may not specify multiple constrain blocks'
       ); raise "${e[@]}"
    fi
 
-   parser:munch 'L_BRACKET' "expecting \`[' to begin array of paths."
+   parser:munch 'L_BRACKET' "%constrain expects an array of paths"
    until parser:check 'R_BRACKET' ; do
       parser:path "$CURRENT_NAME"
       parser:munch 'PATH'
@@ -534,51 +532,17 @@ function parser:constrain {
       CONSTRAINTS+=( "${path[value]}" )
 
       parser:check 'R_BRACKET' && break
-      parser:munch 'COMMA' "array elements must be separated by \`,'."
+      parser:munch 'COMMA' "array elements must be separated by commas"
    done
 
    parser:munch 'R_BRACKET' "expecting \`]' after constrain block."
    declare -g NODE=
-   # Section declarations loop & append $NODEs to their .items. `include`/
-   # `constrain` directives are technically children of a section, but they do
-   # not live past the parser.
 }
 
 
-#function parser:use {
-#   local -n section_ptr=$SECTION
-#   local -n name=${section_ptr[name]}
-#
-#   if [[ ${name[value]} != '%inline' ]] ; then
-#      raise parse_error '%use may not occur in a section.'
-#   fi
-#
-#   ast:new use
-#   local save="$NODE"
-#   local -n use="$NODE"
-#
-#   parser:path "$CURRENT_NAME"
-#   parser:munch 'PATH' "expecting a module path."
-#   local path="$NODE"
-#
-#   if parser:match 'AS' ; then
-#      parser:identifier "$CURRENT_NAME"
-#      parser:munch 'IDENTIFIER'
-#      local name="$NODE"
-#   fi
-#
-#   use['path']="$path"
-#   use['name']="$name"
-#
-#   declare -g NODE="$save"
-#}
-
-
 function parser:declaration {
-   declare -g ANCHOR="${CURRENT[location]}"
-
    parser:identifier "$CURRENT_NAME"
-   parser:munch 'IDENTIFIER' "expecting variable declaration."
+   parser:munch 'IDENTIFIER'  "expecting declaration or closing \`}'"
 
    if parser:match 'L_BRACE' ; then
       parser:decl_section
@@ -591,6 +555,10 @@ function parser:declaration {
 function parser:decl_section {
    local ident="$NODE"
    local sect="$SECTION"
+
+   local anchor="$ANCHOR"
+   local -n ident_r="$ident"
+   declare -g ANCHOR="${ident_r[location]}"
 
    ast:new decl_section
    local node="$NODE"
@@ -612,6 +580,7 @@ function parser:decl_section {
    location:copy "$ident"  "$node"  'start_ln'  'start_col'
    location:copy "$close"  "$node"  'end_ln'    'end_col'
 
+   declare -g ANCHOR="$anchor"
    declare -g NODE="$node"
    declare -g SECTION="$sect"
 }
@@ -620,6 +589,10 @@ function parser:decl_section {
 function parser:decl_variable {
    # Variable declaration must be preceded by an identifier.
    local ident="$NODE"
+
+   local anchor="$ANCHOR"
+   local -n ident_r="$ident"
+   declare -g ANCHOR="${ident_r[location]}"
 
    ast:new decl_variable
    local node="$NODE"
@@ -633,32 +606,32 @@ function parser:decl_variable {
    #
    # For error reporting, pass the location of the L_PAREN in for the Typedef
    # LOCATION node.
-   local _open="$CURRENT_NAME"
+   local open="$CURRENT_NAME"
    if parser:match 'L_PAREN' ; then
       parser:typedef
       node_r['type']="$NODE"
 
-      local _close="$CURRENT_NAME"
+      local close="$CURRENT_NAME"
       parser:munch 'R_PAREN' "typedef must be closed by \`)'."
 
-      location:copy "$_open"   "$NODE"  'start_ln'  'start_col'
-      location:copy "$_close"  "$NODE"  'end_ln'    'end_col'
+      location:copy "$open"   "$NODE"  'start_ln'  'start_col'
+      location:copy "$close"  "$NODE"  'end_ln'    'end_col'
    fi
 
    # If current token is one that begins an expression, advise they likely
    # indended a colon before it.
    local expr_types=''
    for expr in "${!NUD[@]}" ; do
-      expr_types="${expr_str:+,}${expr}"
+      expr_types+=",${expr}"
    done
 
    # Expressions.
    if parser:match 'COLON' ; then
       parser:expression
       node_r['expr']=$NODE
-   elif parser:match "$expr_types" ; then
+   elif parser:check "$expr_types" ; then
       e=( parse_error
-         --anchor "${node_r[location]}"
+         --anchor "$ANCHOR"
          --caught "${CURRENT[location]}"
          "expecting \`:' before expression"
       ); raise "${e[@]}"
@@ -670,13 +643,14 @@ function parser:decl_variable {
    location:copy "$ident"  "$node"  'start_ln'  'start_col'
    location:copy "$close"  "$node"  'end_ln'    'end_col'
 
+   declare -g ANCHOR="$anchor"
    declare -g NODE="$node"
 }
 
 
 function parser:typedef {
    parser:identifier "$CURRENT_NAME"
-   parser:munch 'IDENTIFIER' 'type declarations must be identifiers.'
+   parser:munch 'IDENTIFIER' 'type declarations must be identifiers'
    local ident="$NODE"
 
    ast:new typedef
@@ -756,9 +730,9 @@ function parser:expression {
    if [[ ! $fn ]] ; then
       local -n token_r="$token"
       e=( parse_error
-         --anchor "${token_r[location]}"
+         --anchor "$ANCHOR"
          --caught "${token_r[location]}"
-         "not an expression [${CURRENT[type],,}]"
+         "expecting an expression"
       ); raise "${e[@]}"
       return
    fi
@@ -778,9 +752,9 @@ function parser:expression {
 
          if [[ ! $fn ]] ; then
             e=( parse_error
-               --anchor "${token_r[location]}"
+               --anchor "$ANCHOR"
                --caught "${token_r[location]}"
-               "not a postfix expression [${CURRENT[type],,}]"
+               "expecting a postfix expression"
             ); raise "${e[@]}"
          fi
 
@@ -805,7 +779,7 @@ function parser:expression {
          e=( parse_error
             --anchor "${token_r[location]}"
             --caught "${token_r[location]}"
-            "not an infix expression [${CURRENT[type],,}]"
+            "expecting an infix expression"
          ); raise "${e[@]}"
       fi
 
@@ -818,8 +792,14 @@ function parser:expression {
 
 
 function parser:grouping {
+   local anchor="$ANCHOR"
+   local -n paren_r="$1"
+   declare -g ANCHOR="${paren_r[location]}"
+
    parser:expression
    parser:munch 'R_PAREN' "grouping must be closed by \`)'."
+
+   declare -g ANCHOR="$anchor"
 }
 
 
@@ -859,7 +839,7 @@ function parser:concat {
    done
 
    parser:expression "$rbp"
-   node_r['concat']=$NODE
+   node_r['concat']="$NODE"
 
    location:copy "$lhs"   "$node"  'start_ln'  'start_col'
    location:copy "$NODE"  "$node"  'end_ln'    'end_col'
@@ -883,6 +863,10 @@ function parser:typecast {
    # Rather than        ...  ("" + %count +) ("0" -> int)
    #
    local lhs="$1"
+   
+   local anchor="$ANCHOR"
+   local -n lhs_r="$1"
+   declare -g ANCHOR="${lhs_r[location]}"
 
    ast:new typecast
    local node="$NODE"
@@ -895,6 +879,7 @@ function parser:typecast {
    location:copy "$lhs"   "$node"  'start_ln'  'start_col'
    location:copy "$NODE"  "$node"  'end_ln'    'end_col'
 
+   declare -g ANCHOR="$anchor"
    declare -g NODE="$node"
 }
 
