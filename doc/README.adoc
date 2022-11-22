@@ -10,10 +10,9 @@
 Configuration language, featuring strong typing and a small but robust feature set.
 
 NOTE:
-Kinda just slamming words below.
-Getting the gists of the necessary documentation below.
-I'd imagine it's still very unclear to anyone else what _exactly_ this does, let alone how it works.
-Need to come up with a brutally simple outline to explain it.
+Time for a break.
+Been working on this project for almost five months now.
+Putting it down for a bit, to pick up and finish incrementally at a later date.
 
 
 == What works
@@ -22,7 +21,7 @@ Need to come up with a brutally simple outline to explain it.
 * [ ] VM & post-compilation validation
 * [x] Accessing values from input data
 * [x] Including sub-files
-* [x] Enforcing contraints upon child-files
+* [x] Enforcing constraints upon child-files
 
 Around a503e1b917aa or so I broke a good amount of core functionality while fixing symbol tables.
 Gonna be worse before it gets better.
