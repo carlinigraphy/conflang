@@ -9,6 +9,7 @@ declare -g  LIBDIR="${PROGDIR}"/../../lib
 declare -a  INCLUDE_ROOT=()
 declare -ga FILES=( "${1?}" )
 
+source "${LIBDIR}"/utils.sh
 source "${LIBDIR}"/errors.sh
 source "${LIBDIR}"/lexer.sh
 lexer:init
