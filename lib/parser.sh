@@ -440,7 +440,7 @@ function parser:program {
    done
 
    parser:munch 'EOF'
-   location:copy "$CURRENT_NAME"  "$node"  'end_ln'  'end_col'
+   location:copy "$CURRENT_NAME"  "$node"  'file'  'end_ln'  'end_col'
 }
 
 
@@ -577,8 +577,8 @@ function parser:decl_section {
    local close="$CURRENT_NAME"
    parser:munch 'R_BRACE' "expecting \`}' after section."
 
-   location:copy "$ident"  "$node"  'start_ln'  'start_col'
-   location:copy "$close"  "$node"  'end_ln'    'end_col'
+   location:copy "$ident"  "$node"  'file'  'start_ln'  'start_col'
+   location:copy "$close"  "$node"  'file'  'end_ln'    'end_col'
 
    declare -g ANCHOR="$anchor"
    declare -g NODE="$node"
@@ -614,8 +614,8 @@ function parser:decl_variable {
       local close="$CURRENT_NAME"
       parser:munch 'R_PAREN' "typedef must be closed by \`)'."
 
-      location:copy "$open"   "$NODE"  'start_ln'  'start_col'
-      location:copy "$close"  "$NODE"  'end_ln'    'end_col'
+      location:copy "$open"   "$NODE"  'file'  'start_ln'  'start_col'
+      location:copy "$close"  "$NODE"  'file'  'end_ln'    'end_col'
    fi
 
    # If current token is one that begins an expression, advise they likely
@@ -640,8 +640,8 @@ function parser:decl_variable {
    local close="$CURRENT_NAME"
    parser:munch 'SEMI' "expecting \`;' after declaration."
 
-   location:copy "$ident"  "$node"  'start_ln'  'start_col'
-   location:copy "$close"  "$node"  'end_ln'    'end_col'
+   location:copy "$ident"  "$node"  'file'  'start_ln'  'start_col'
+   location:copy "$close"  "$node"  'file'  'end_ln'    'end_col'
 
    declare -g ANCHOR="$anchor"
    declare -g NODE="$node"
@@ -822,8 +822,8 @@ function parser:unary {
    node_r['op']="$op"
    node_r['right']="$NODE"
 
-   location:copy "$prev"   "$node"  'start_ln'  'start_col'
-   location:copy "$NODE"   "$node"  'end_ln'    'end_col'
+   location:copy "$prev"   "$node"  'file'  'start_ln'  'start_col'
+   location:copy "$NODE"   "$node"  'file'  'end_ln'    'end_col'
 
    declare -g ANCHOR="$anchor"
    declare -g NODE="$node"
@@ -845,8 +845,8 @@ function parser:concat {
    parser:expression "$rbp"
    node_r['concat']="$NODE"
 
-   location:copy "$lhs"   "$node"  'start_ln'  'start_col'
-   location:copy "$NODE"  "$node"  'end_ln'    'end_col'
+   location:copy "$lhs"   "$node"  'file'  'start_ln'  'start_col'
+   location:copy "$NODE"  "$node"  'file'  'end_ln'    'end_col'
 
    declare -g NODE="$lhs"
 }
@@ -880,8 +880,8 @@ function parser:typecast {
    node_r['expr']="$lhs"
    node_r['typedef']="$NODE"
 
-   location:copy "$lhs"   "$node"  'start_ln'  'start_col'
-   location:copy "$NODE"  "$node"  'end_ln'    'end_col'
+   location:copy "$lhs"   "$node"  'file'  'start_ln'  'start_col'
+   location:copy "$NODE"  "$node"  'file'  'end_ln'    'end_col'
 
    declare -g ANCHOR="$anchor"
    declare -g NODE="$node"
@@ -908,8 +908,8 @@ function parser:index {
    local close="$CURRENT_NAME"
    parser:munch 'R_BRACKET' "index must be closed by \`]'."
 
-   location:copy "$lhs"    "$node"  'start_ln'  'start_col'
-   location:copy "$close"  "$node"  'end_ln'    'end_col'
+   location:copy "$lhs"    "$node"  'file'  'start_ln'  'start_col'
+   location:copy "$close"  "$node"  'file'  'end_ln'    'end_col'
 
    declare -g ANCHOR="$anchor"
    declare -g NODE="$save"
@@ -934,8 +934,8 @@ function parser:member {
    node_r['left']="$lhs"
    node_r['right']="$NODE"
 
-   location:copy "$lhs"   "$node"  'start_ln'  'start_col'
-   location:copy "$NODE"  "$node"  'end_ln'    'end_col'
+   location:copy "$lhs"   "$node"  'file'  'start_ln'  'start_col'
+   location:copy "$NODE"  "$node"  'file'  'end_ln'    'end_col'
 
    declare -g ANCHOR="$anchor"
    declare -g NODE="$node"
@@ -966,8 +966,8 @@ function parser:array {
    local close="$CURRENT_NAME"
    parser:munch 'R_BRACKET' "array must be closed by \`]'."
 
-   location:copy "$open"   "$node"  'start_ln'  'start_col'
-   location:copy "$close"  "$node"  'end_ln'    'end_col'
+   location:copy "$open"   "$node"  'file'  'start_ln'  'start_col'
+   location:copy "$close"  "$node"  'file'  'end_ln'    'end_col'
 
    declare -g ANCHOR="$anchor"
    declare -g NODE="$node"

@@ -178,10 +178,67 @@ function error:_single_file_context {
    # Print context lines.
    local -i start="${e_r[anchor_ln]}"
    local -i end="${e_r[caught_ln]}"
-   local -n anchor_file_lines_r="${e_r[anchor_file_lines]}"
+   local -n lines_r="${e_r[anchor_file_lines]}"
 
+   # TODO:
+   # Don't include more than say... 4 total lines of context. The anchor line +1
+   # below, and the caught line with 1 above. Probably easier to just do this
+   # by concatenating two array slices.
+   #
+   # Only want if there's more than 5 lines of context.
+   #
+   # Seems like I can do....
+   #
+   #> printf '%s\n'   "${lines[@]:idx_0:2}"
+   #> printf '...\n'
+   #> printf '%s\n'   "${lines[@]: idx_1 - max:2}"
+   #
+   # Want something like...
+   #
+   # Type Error(e22): unterminated string
+   #    in ./sample/main.conf
+   #    anchor -----------|
+   #         3 | _ (str): "Here's the start of a string
+   #         4 |           here's more of the string
+   #         ...
+   #         8 |           Why is the string still here?
+   #         9 |
+   #    caught --|
+   #
+   #
+   #> context=( "${lines_r[@]:start:${#lines_r[@]} -max}" )
+   #>
+   #> if (( ${#context[@]} > 4 )) ; then
+   #>    local -i start0 end0
+   #>    (( start0 = start +1 ))
+   #>    (( end0   = end   -1 ))
+   #>
+   #>    numbers=( start  start0 )
+   #>    printf '%3s%6s | %s\n'  ''  "${numbers[@]}"  "${context[@]:0:2}"  
+   #>
+   #>    printf '%8s...\n'      ''
+   #>
+   #>    numbers=( end  end0 )
+   #>    printf '%3s%6s | %s\n'  ''  "${numbers[@]}"  "${context[@]: -2:2}"
+   #> else
+   #>    printf '%3s%6s | %s\n'  ''  "${lines_r[@]}"
+   #> fi
+   #
+   #
+   # Oof, turns out the above doesn't work. Thought I was being clever. But
+   # you can't printf two arrays to iterate both of them in parallel. It does
+   # them in sequence. Hmm.
+   #
+   #
+   # MORE THINKING IS AFOOTS.
+   #
+   # AFEET?
+   #
+   # AFOOTIES.
+   #
+   #
    for (( i=start; i <= end; ++i )) ; do
-      printf '%3s%6s | %s\n'  ''   "$i"   "${anchor_file_lines_r[$i]}"
+      printf '%3s%6s | %s\n'  ''   "$i"   "${lines_r[$i]}"
    done
 }
 
@@ -251,7 +308,7 @@ function _type_error {
 
 function _undefined_type {
    local -n error_r="$ERROR"
-   error_r[msg]="[${1}] is not defined"
+   error_r[msg]="[${1}] not a defined type"
 }
 
 function _not_a_type {
@@ -272,6 +329,7 @@ function _index_error {
 
 function _name_collision {
    local -n error_r="$ERROR"
+   declare -p $ERROR
    error_r[msg]="[${1}] already defined in this scope"  
 }
 

@@ -230,10 +230,15 @@ function symtab_decl_section {
 
    # Save section name in symbol.
    local -n ident_r="${node_r[name]}"
+   local name="${ident_r[value]}"
    symbol_r['name']="${ident_r[value]}"
 
    if symtab strict "$name" ; then
-      raise name_collision "$name"
+      e=( name_collision 
+         --anchor "${node_r[location]}"
+         --caught "${node_r[location]}"
+         "$name"
+      ); raise "${e[@]}"
    else
       symtab set "$symbol"
    fi
@@ -292,7 +297,11 @@ function symtab_decl_variable {
    symbol_r['name']="$name"
 
    if symtab strict "$name" ; then
-      raise name_collision "$name"
+      e=( name_collision 
+         --anchor "${node_r[location]}"
+         --caught "${node_r[location]}"
+         "$name"
+      ); raise "${e[@]}"
    else
       symtab set "$symbol"
    fi
@@ -325,7 +334,11 @@ function symtab_typedef {
    local name="${name_r[value]}"
 
    if ! symtab get "$name" ; then
-      raise undefined_type "${node_r[kind]}"  "$name"
+      e=( undefined_type
+         --anchor "${name_r[location]}"
+         --caught "${name_r[location]}"
+         "$name"
+      ); raise "${e[@]}"
    fi
 
    local -n symbol_r="$SYMBOL"
@@ -337,7 +350,11 @@ function symtab_typedef {
    #  ┌── doesn't know about dynamically created $_TYPE (confused with $TYPE).
    # shellcheck disable=SC2153,SC2154
    if ! type_equality  "$_TYPE"  "$outer_type" ; then
-      raise not_a_type "${node_r[kind]}" "$name"
+      e=( not_a_type
+         --anchor "${name_r[location]}"
+         --caught "${name_r[location]}"
+         "$name"
+      ); raise "${e[@]}"
    fi
 
    local -n outer_type_r="$outer_type"
