@@ -143,7 +143,9 @@ function error:print {
    fi
 
    # Anchor file name.
-   local file="${e_r[anchor_file_name]/$HOME/\~}"
+   local file="${e_r[anchor_file_name]/$PWD/\.}"
+   local file="${file/$HOME/\~}"
+
    printf '%3sin %s\n'   ''  "$file"
 
    if [[ "${e_r[anchor_file_name]}" == "${e_r[caught_file_name]}" ]] ; then

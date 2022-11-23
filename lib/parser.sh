@@ -738,7 +738,8 @@ function parser:expression {
    fi
 
    parser:advance
-   $fn "$token" ; lhs=$NODE
+   $fn "$token"
+   lhs="$NODE"
 
    while :; do
       op_type=${CURRENT[type]}
@@ -777,7 +778,7 @@ function parser:expression {
       fn=${LED[$op_type]}
       if [[ ! $fn ]] ; then
          e=( parse_error
-            --anchor "${token_r[location]}"
+            --anchor "$ANCHOR"
             --caught "${token_r[location]}"
             "expecting an infix expression"
          ); raise "${e[@]}"
@@ -805,7 +806,6 @@ function parser:grouping {
 
 function parser:unary {
    local prev="$1"
-
    local -n prev_r="$prev"
    local op="${prev_r[type]}"
    local rbp="${prefix_binding_power[$op]}"
@@ -813,6 +813,9 @@ function parser:unary {
    ast:new unary
    local node="$NODE"
    local -n node_r="$node"
+
+   local anchor="$ANCHOR"
+   declare -g ANCHOR="${prev_r[location]}"
 
    parser:expression "$rbp"
 
@@ -822,6 +825,7 @@ function parser:unary {
    location:copy "$prev"   "$node"  'start_ln'  'start_col'
    location:copy "$NODE"   "$node"  'end_ln'    'end_col'
 
+   declare -g ANCHOR="$anchor"
    declare -g NODE="$node"
 }
 
@@ -888,6 +892,9 @@ function parser:index {
    local lhs="$1"  _="$2"
                      # ^-- ignore rbp
 
+   local anchor="$ANCHOR"
+   declare -g ANCHOR="${CURRENT[location]}"
+
    parser:advance # past L_BRACKET.
 
    ast:new index
@@ -904,6 +911,7 @@ function parser:index {
    location:copy "$lhs"    "$node"  'start_ln'  'start_col'
    location:copy "$close"  "$node"  'end_ln'    'end_col'
 
+   declare -g ANCHOR="$anchor"
    declare -g NODE="$save"
 }
 
@@ -911,15 +919,17 @@ function parser:index {
 function parser:member {
    local lhs="$1"  _=$2  rbp="$3"
                     # ^-- ignore `.` operator
+
+   local anchor="$ANCHOR"
+   local -n lhs_r="$1"
+   declare -g ANCHOR="${lhs_r[location]}"
+
    ast:new member
    local node="$NODE"
    local -n node_r="$node"
 
    parser:identifier "$CURRENT_NAME"
-   parser:munch 'IDENTIFIER'
-   # TODO(error reporting):
-   # Include more helpful information. Check if it's an INTEGER, suggest they
-   # instead use [int].
+   parser:munch 'IDENTIFIER'  'member subscription requires an identifer'
 
    node_r['left']="$lhs"
    node_r['right']="$NODE"
@@ -927,13 +937,18 @@ function parser:member {
    location:copy "$lhs"   "$node"  'start_ln'  'start_col'
    location:copy "$NODE"  "$node"  'end_ln'    'end_col'
 
+   declare -g ANCHOR="$anchor"
    declare -g NODE="$node"
 }
 
 
 function parser:array {
-   # The opening `[` Token, for LOCATION informatino.
+   # Opening `[` Token, for LOCATION informatino.
    local open="$1"
+   local -n open_r="$open"
+
+   local anchor="$ANCHOR"
+   declare -g ANCHOR="${open_r[location]}"
 
    ast:new array
    local node="$NODE"
@@ -945,7 +960,7 @@ function parser:array {
       items_r+=( "$NODE" )
 
       parser:check 'R_BRACKET' && break
-      parser:munch 'COMMA' "array elements must be separated by \`,'."
+      parser:munch 'COMMA' "array elements must be separated by \`,'"
    done
 
    local close="$CURRENT_NAME"
@@ -954,6 +969,7 @@ function parser:array {
    location:copy "$open"   "$node"  'start_ln'  'start_col'
    location:copy "$close"  "$node"  'end_ln'    'end_col'
 
+   declare -g ANCHOR="$anchor"
    declare -g NODE="$node"
 }
 
@@ -970,8 +986,7 @@ function parser:env_var {
 
 
 function parser:identifier {
-   local -n token="$1"
-   local -n token_r="$CURRENT_NAME"
+   local -n token_r="$1"
 
    ast:new identifier
    local -n node_r="$NODE"

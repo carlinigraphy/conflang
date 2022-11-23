@@ -65,23 +65,14 @@ function token:new {
 
 
 function lexer:advance {
-   # Advance cursor position, pointing to each sequential character. Also incr.
-   # the column number indicator. If we go to a new line, it's reset to 0.
-   #
-   # NOTE: So this has some of the silliest garbage of all time. In bash, using
-   # ((...)) for arithmetic has a non-0 return status if the result is 0. E.g.,
-   #> (( 1 )) ; echo $?    #  0
-   #> (( 2 )) ; echo $?    #  0
-   #> (( 0 )) ; echo $?    #  1
-   # So the stupid way around this... add an `or true`. This is the short form:
+   (( ++CURSOR['colno'] )) ||:
    (( ++CURSOR['index'] )) ||:
-   (( ++CURSOR['colno']  ))
+   local -i idx="${CURSOR[index]}"
 
-   # This is a real dumb use of bash's confusing array indexing.
-   CURRENT=${CHARRAY[CURSOR['index']]}
-   PEEK=${CHARRAY[CURSOR['index']+1]}
+   declare -g CURRENT="${CHARRAY[$idx]}"
+   declare -g PEEK="${CHARRAY[$idx + 1]}"
 
-   if [[ $CURRENT == $'\n' ]] ; then
+   if [[ "$CURRENT" == $'\n' ]] ; then
       ((CURSOR['lineno']++))
       CURSOR['colno']=0
    fi
