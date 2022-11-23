@@ -262,7 +262,7 @@ function symtab_decl_section {
 
    # Check if this section is `required'. If any of its children are required,
    # it too must be present in a child file.
-   local -n symtab_r="$symtab"
+   local -n symtab_r="$SYMTAB"
    for sym in "${symtab_r[@]}" ; do
       local -n sym_r="$sym"
 
@@ -502,13 +502,20 @@ function merge_section {
    #  2. It is of a non-Section type in the child
 
    local -n p_sym_r="$1"
+   local -n p_node_r="${p_sym_r[node]}"
+   local -n p_name_r="${p_node_r[name]}"
+
    local c_sym="$2"
 
    # case 1.
    # Child section is missing, but was required in the parent.
    if [[ ! "$c_sym" ]] ; then
       if [[ "${p_sym_r[required]}" ]] ; then
-         raise missing_required
+         e=( missing_required
+            --anchor "${p_name_r[location]}"
+            --caught "${p_name_r[location]}"
+            "${p_sym_r[name]}"
+         ); raise "${e[@]}"
       else
          return 0  # if not required, can ignore.
       fi
@@ -516,6 +523,7 @@ function merge_section {
 
    local -n c_sym_r="$c_sym"
    local -n c_type_r="${c_sym_r[type]}"
+   local -n c_node_r="${c_sym_r[node]}"
 
    # case 2.
    # Found child node under the same identifier, but not a Section.
@@ -523,8 +531,8 @@ function merge_section {
       raise symbol_mismatch
    fi
 
-   merge_symtab "${p_sym_r[node]}"  "${p_sym_r[symtab]}"  "${c_sym_r[symtab]}"
-   #               ^-- parent node     ^-- parent symtab     ^-- child symtab
+   merge_symtab "${p_sym_r[node]}"  "${p_node_r[symtab]}"  "${c_node_r[symtab]}"
+   #               ^-- parent node     ^-- parent symtab      ^-- child symtab
 }
 
 
@@ -538,30 +546,47 @@ function merge_variable {
    #     b. it's declaring a different type
 
    local -n p_sym_r="$1"
+   local -n p_node_r="${p_sym_r[node]}"
+   local -n p_name_r="${p_node_r[name]}"
+
    local c_sym="$2"
 
    # case 1a.
    if [[ ! "$c_sym" ]] ; then
       if [[ "${p_sym_r[required]}" ]] ; then
-         raise missing_required
+         e=( missing_required
+            --anchor "${p_name_r[location]}"
+            --caught "${p_name_r[location]}"
+            "${p_sym_r[name]}"
+         ); raise "${e[@]}"
       else
          return 0  # if not required, can ignore.
       fi
    fi
 
    local -n c_sym_r="$c_sym"
+   local -n c_node_r="${c_sym_r[node]}"
+   local -n c_name_r="${c_node_r[name]}"
 
    # case 2a.
    # Expecting a variable declaration, child is actually a Section.
    local -n c_type_r="${c_sym_r[type]}"
    if [[ "${c_type_r[kind]}" == 'SECTION' ]] ; then
-      raise symbol_mismatch
+      e=( symbol_mismatch
+         --anchor "${p_name_r[location]}"
+         --caught "${c_name_r[location]}"
+         "${p_sym_r[name]}"
+      ); raise "${e[@]}"
    fi
 
    # case 2b.
    # The type of the child must defer to the type of the parent.
    if ! merge_type "${p_sym_r[type]}" "${c_sym_r[type]}" ; then
-      raise symbol_mismatch
+      e=( symbol_mismatch
+         --anchor "${p_name_r[location]}"
+         --caught "${c_name_r[location]}"
+         "${p_sym_r[name]}"
+      ); raise "${e[@]}"
    fi
 
    # If we haven't hit any errors, can safely copy over the child's value to the
@@ -843,7 +868,7 @@ function semantics_decl_section {
 function semantics_decl_variable {
    # The Symbol.type will be set to the "evaluated" type. If there is a typedef,
    # the expression's type must evaluate to *at least* the requirements of the
-   # declared type.
+   # declared type, though can be more specific.
    #
    #> arr (array): [0, 1];
    #> # declared: Type(ARRAY)
@@ -856,23 +881,27 @@ function semantics_decl_variable {
    symtab from "$NODE"
    symtab get "$name"
 
-   # Initially set a Type(ANY). If this is overwritten by walking the
-   # expression, that sets the evaluated type.
+   # Initially set Type(ANY). Potentially verwritten by the expr.
    declare -g TYPE="$_ANY"
    if [[ "${node_r[expr]}" ]] ; then
       walk_semantics "${node_r[expr]}"
    fi
    local actual="$TYPE"
 
-   # As above, if there is no declared type, the target inherits the evaluated
-   # type. This obviously matches. It becomes the Symbol.type.
+   # As above, initial Type(ANY).
    if [[ "${node_r[type]}" ]] ; then
       walk_semantics "${node_r[type]}"
    fi
    local target="$TYPE"
 
    if ! type_equality  "$target"  "$actual" ; then
-      raise type_error "${node_r[expr]}"
+      local -n type_r="${node_r[type]}"
+      local -n expr_r="${node_r[expr]}"
+
+      e=( type_error
+         --anchor "${type_r[location]}"
+         --caught "${expr_r[location]}"
+      ); raise "${e[@]}"
    fi
 
    local -n symbol_r="$SYMBOL"
@@ -926,15 +955,17 @@ function semantics_member {
    # also set $TYPE to its resulting type.
    walk_semantics "${node_r[left]}"
 
+   local -n right_r="${node_r[right]}"
+
    #  ┌── doesn't know about dynamically created $_SECTION var.
    # shellcheck disable=SC2154
    if ! type_equality  "$_SECTION"  "$TYPE" ; then
-      local msg='the left hand side must evaluate to a section.'
-      raise type_error "${node_r[left]}"  "$msg"
+      e=( type_error
+         --anchor "${node_r[location]}"
+         --caught "${right_r[location]}"
+         'the left hand side must evaluate to a section'
+      ); raise "${e[@]}"
    fi
-
-   local right="${node_r[right]}"
-   local -n right_r="$right"
 
    # Descend to section's scope (from above `walk_semantics`).
    local -n symbol_r="$SYMBOL"
@@ -942,7 +973,12 @@ function semantics_member {
 
    local index="${right_r[value]}"
    if ! symtab strict "$index" ; then
-      raise missing_var "$index"
+      raise
+      e=( missing_var
+         --anchor "${node_r[location]}"
+         --caught "${right_r[location]}"
+         "$index"
+      ); raise "${e[@]}"
    fi
 
    local -n section_r="$SYMBOL"

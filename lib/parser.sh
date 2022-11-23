@@ -674,7 +674,7 @@ function parser:typedef {
 #   -       unary minus                5
 #   [       array index                7
 #   .       member index               9
-# N/A       string concatenation       11
+#           string concatenation       11
 
 declare -gA prefix_binding_power=(
    [MINUS]=5

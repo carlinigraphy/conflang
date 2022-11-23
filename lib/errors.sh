@@ -145,7 +145,6 @@ function error:print {
    # Anchor file name.
    local file="${e_r[anchor_file_name]/$PWD/\.}"
    local file="${file/$HOME/\~}"
-
    printf '%3sin %s\n'   ''  "$file"
 
    if [[ "${e_r[anchor_file_name]}" == "${e_r[caught_file_name]}" ]] ; then
@@ -245,6 +244,28 @@ function error:_single_file_context {
 
 function error:_multi_file_context {
    local -n e_r="$1"
+
+   local filler='' ; local -i max
+   (( max = ${e_r[anchor_col]} + 1 ))
+   for (( i=0; i<max ; ++i )) ; do
+      filler+='-'
+   done
+   printf '%3sanchor %s|\n'  ''  "$filler"
+
+   local -i anchor_idx="${e_r[anchor_ln]}"
+   local -n anchor_file_lines_r="${e_r[anchor_file_lines]}"
+   local anchor_line="${anchor_file_lines_r[$anchor_idx]}"
+   printf '%3s%6s | %s\n'  ''   "$anchor_idx"   "$anchor_line"
+
+   # Caught file name.
+   local file="${e_r[caught_file_name]/$PWD/\.}"
+   local file="${file/$HOME/\~}"
+   printf '\n%3sin %s\n'   ''  "$file"
+
+   local -i caught_idx="${e_r[caught_ln]}"
+   local -n caught_file_lines_r="${e_r[caught_file_lines]}"
+   local caught_line="${caught_file_lines_r[$caught_idx]}"
+   printf '%3s%6s | %s\n'  ''   "$caught_idx"   "$caught_line"
 }
 
 #───────────────────────────────( I/O errors )──────────────────────────────────
@@ -256,7 +277,7 @@ function _no_input {
 
 function _missing_file {
    local -n error_r="$ERROR"
-   error_r[msg]= "missing or unreadable source file [${1##*/}]"
+   error_r[msg]="missing or unreadable source file [${1##*/}]"
 }
 
 
