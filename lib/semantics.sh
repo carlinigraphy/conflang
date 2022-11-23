@@ -365,10 +365,13 @@ function symtab_typedef {
    if [[ "${node_r[subtype]}" ]] ; then
       # See ./doc/truth.sh for an explanation on the test below. Checks if the
       # type has an unset .subtype field (indicating non-complex type).
-      if [[ ! "${type[subtype]+_}" ]] ; then
-         local loc="${node_r[subtype]}"
-         local msg="primitive types are not subscriptable."
-         raise type_error "$loc" "$msg"
+      if [[ ! "${type_r[subtype]+_}" ]] ; then
+         local -n subtype_r="${node_r[subtype]}"
+         e=( type_error
+            --anchor "${name_r[location]}"
+            --caught "${subtype_r[location]}"
+            "primitive types are not subscriptable"
+         ); raise "${e[@]}"
       fi
 
       walk_symtab "${node_r[subtype]}"

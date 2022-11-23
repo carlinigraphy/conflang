@@ -603,19 +603,12 @@ function parser:decl_variable {
    node_r['name']="$ident"
 
    # Typedefs.
-   #
-   # For error reporting, pass the location of the L_PAREN in for the Typedef
-   # LOCATION node.
-   local open="$CURRENT_NAME"
+   local paren="${CURRENT[location]}"
    if parser:match 'L_PAREN' ; then
+      declare -g ANCHOR="$paren"
       parser:typedef
       node_r['type']="$NODE"
-
-      local close="$CURRENT_NAME"
       parser:munch 'R_PAREN' "typedef must be closed by \`)'."
-
-      location:copy "$open"   "$NODE"  'file'  'start_ln'  'start_col'
-      location:copy "$close"  "$NODE"  'file'  'end_ln'    'end_col'
    fi
 
    # If current token is one that begins an expression, advise they likely
@@ -662,6 +655,9 @@ function parser:typedef {
       parser:typedef "$open"
       node_r['subtype']="$NODE"
    done
+
+   location:copy "$ident"  "$node"  'file'  'start_ln'  'start_col'
+   location:copy "$NODE"   "$node"  'file'  'end_ln'    'end_col'
 
    declare -g NODE="$node"
 }
