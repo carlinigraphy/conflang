@@ -356,12 +356,12 @@ function _name_collision {
 
 function _missing_env_var {
    local -n error_r="$ERROR"
-   error_r[msg]="env variable [${1}] is not defined"  
+   error_r[msg]="[${1}] undefined"  
 }
 
 function _missing_var {
    local -n error_r="$ERROR"
-   error_r[msg]="variable [${1}] is not defined"
+   error_r[msg]="[${1}] undefined"
 }
 
 function _missing_required {

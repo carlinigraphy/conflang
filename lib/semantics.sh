@@ -437,60 +437,67 @@ function symtab_env_var { :; }
 # Merging is only necessary if the parent has %constrain statements.
 
 function merge_symtab {
-   local -n parent=$1
-   local -n parent_symtab=$2
-   local -n child_symtab=$3
+   local -n parent_section_r="$1"
+   local p_symtab="$2"
+   local -n p_symtab_r="$p_symtab"
+   local -n c_symtab_r="$3"
 
    # We iterate over the parent symtab. So we're guaranteed to hit every key
    # there. The child symtab may contain *extra* keys that we need to merge in.
    # Every time we match a key from the parent->child, we can pop it from this
    # copy. Anything left is a duplicate that must be merged.
    local -A overflow=()
-   for k in "${!child_symtab[@]}" ; do
+   for k in "${!c_symtab_r[@]}" ; do
+      echo ":[ $k ]"
       overflow["$k"]=
    done
 
-   for p_key in "${!parent_symtab[@]}" ; do
+   for p_key in "${!p_symtab_r[@]}" ; do
       # Parent Symbol.
-      local p_sym_name="${parent_symtab[$p_key]}"
-      local -n p_sym=$p_sym_name
-      local p_node=${p_sym[node]}
+      local p_sym="${p_symtab_r[$p_key]}"
+      local -n p_sym_r="$p_sym"
+      local p_node="${p_sym_r[node]}"
 
       # Parent type information.
-      local p_type_name="${p_sym[type]}"
-      local -n p_type=$p_type_name
+      local p_type="${p_sym_r[type]}"
+      local -n p_type_r="$p_type"
 
       # Child Symbol.
       # The child symbol may not necessarily exist. These cases, and the error
       # reporting, are both handled in their respective functions:
       # `merge_variable`, `merge_section`.
-      local c_sym_name="${child_symtab[$p_key]}"
+      local c_sym="${c_symtab_r[$p_key]}"
 
-      # shellcheck disable=SC2184
-      unset overflow["$p_key"]
+      unset 'overflow[$p_key]'
       # Pop reference to child symbol from the `overflow[]` copy. Will allow
       # us to check at the end if there are leftover keys that are defined in
       # the child, but not in the parent.
 
-      if [[ "${p_type[kind]}" == 'SECTION' ]] ; then
-         merge_section  "$p_sym_name" "$c_sym_name"
+      if [[ "${p_type_r[kind]}" == 'SECTION' ]] ; then
+         merge_section  "$p_sym" "$c_sym"
       else
-         merge_variable "$p_sym_name" "$c_sym_name"
+         merge_variable "$p_sym" "$c_sym"
       fi
    done
 
    # Any additional keys from the child need to be copied into both...
    #  1. the parent's .items[] array
    #  2. the parent's symbol table
+   local -n items_r="${parent_section_r[items]}"
    for c_key in "${!overflow[@]}" ; do
-      # Add to symtab.
-      parent_symtab[$c_key]="${child_symtab[$c_key]}"
+      local c_sym="${c_symtab_r[$c_key]}"
 
-      local -n c_sym="${child_symtab[$c_key]}"
-      local -n items="${parent[items]}"
+      # Add to symtab.
+      p_symtab_r["$c_key"]="$c_sym"
 
       # Add to items.
-      items+=( "${c_sym[node]}" )
+      local -n c_sym_r="${c_symtab_r[$c_key]}"
+      items_r+=( "${c_sym_r[node]}" )
+
+      # Update symtab pointer.
+      local -n c_sym_r="$c_sym"
+      local -n c_node_r="${c_sym_r[node]}"
+      c_node_r[symtab]="$p_symtab"
    done
 }
 
@@ -524,15 +531,24 @@ function merge_section {
    local -n c_sym_r="$c_sym"
    local -n c_type_r="${c_sym_r[type]}"
    local -n c_node_r="${c_sym_r[node]}"
+   local -n c_name_r="${c_node_r[name]}"
 
    # case 2.
    # Found child node under the same identifier, but not a Section.
    if [[ ${c_type_r[kind]} != 'SECTION' ]] ; then
-      raise symbol_mismatch
+      e=( symbol_mismatch
+         --anchor "${p_name_r[location]}"
+         --caught "${c_name_r[location]}"
+         "${p_sym_r[name]}"
+      ); raise "${e[@]}"
    fi
 
    merge_symtab "${p_sym_r[node]}"  "${p_node_r[symtab]}"  "${c_node_r[symtab]}"
    #               ^-- parent node     ^-- parent symtab      ^-- child symtab
+
+   # If they occur in different files, must also copy over the reference to the
+   # parent symtab.
+   c_node_r[symtab]="${p_node_r[symtab]}"
 }
 
 
@@ -598,6 +614,10 @@ function merge_variable {
       # shellcheck disable=SC2034
       p_node_r['expr']="${c_node_r[expr]}"
    fi
+
+   # If they occur in different files, must also copy over the reference to the
+   # parent symtab.
+   c_node_r[symtab]="${p_node_r[symtab]}"
 }
 
 
@@ -741,10 +761,16 @@ function flatten_identifier {
    local -n node_r="$NODE"
    local name="${node_r[value]}"
 
-   symtab get "$name"
-   local -n symbol_r="$SYMBOL"
+   if ! symtab get "$name" ; then
+      e=( missing_var
+         --anchor "${node_r[location]}"
+         --caught "${node_r[location]}"
+         "$name"
+      ); raise "${e[@]}"
+   fi
 
    # Add variable target as a dependency.
+   local -n symbol_r="$SYMBOL"
    local target="${symbol_r[node]}"
    local -n dep="$DEPENDENCY"
    dep+=( "$target" )
@@ -1096,13 +1122,11 @@ function semantics_identifier {
    local name="${node_r[value]}"
 
    symtab from "$NODE"
-   if ! symtab get "$name" ; then
-      raise missing_var "$name"
-   fi
+   symtab get "$name"
+   local -n symbol_r="$SYMBOL"
 
    # Need to set the $NODE to "return" the expression referenced by this
    # variable. Necessary in index/member subscription expressions.
-   local -n symbol_r="$SYMBOL"
    local -n target_r="${symbol_r[node]}"
    declare -g NODE="${target_r[expr]}"
    declare -g TYPE="${symbol_r[type]}"

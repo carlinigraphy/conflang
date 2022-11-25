@@ -272,11 +272,11 @@ function utils:eval {
 
    # Each section assumes there's a symtab above it. There is a "hidden" top-
    # level section `%inline'. Need to create a parent symtab above to hold it.
-   symtab new ; parent_symtab=$SYMTAB
+   symtab new ; parent_symtab="$SYMTAB"
    walk_symtab "$PARENT_ROOT"
 
    if [[ "$CHILD_ROOT" ]] ; then
-      symtab new ; child_symtab=$SYMTAB
+      symtab new ; child_symtab="$SYMTAB"
       walk_symtab "$CHILD_ROOT"
 
       # shellcheck disable=SC2128
