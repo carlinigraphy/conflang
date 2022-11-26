@@ -18,8 +18,10 @@ lexer:scan
 parser:init
 parser:parse
 
-for n in ${!NODE_*} ; do
-   t="${TYPEOF[$n]}"
+nodes=( ${!NODE_*} )
+for n in $( seq 1 ${#nodes[@]} ) ; do
+   node="NODE_${n}"
+   t="${TYPEOF[$node]}"
    [[ "$t" ]] && printf "\n$t\n"
-   declare -p "$n" | sed -e 's,declare\s-[-Aa]\s,,g' -e 's,\[,\n\t[,g'
+   declare -p "$node" | sed -e 's,declare\s-[-Aai]\s,,g' -e 's,\[,\n\t[,g'
 done
