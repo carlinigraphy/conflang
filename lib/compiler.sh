@@ -11,12 +11,12 @@
 #    to the parent section's .items array.
 
 # Abstract away all the stuff below.
-function walk_compiler {
-   walk_skelly "$1"
+function walk:compiler {
+   walk:skelly "$1"
 
    for ast_node in "${ORDERED_DEPS[@]}" ; do
       local -n dst="${EXPR_MAP[$ast_node]}"
-      walk_evaluate "$ast_node"
+      walk:evaluate "$ast_node"
       dst="$DATA"
    done
 
@@ -25,7 +25,7 @@ function walk_compiler {
    undead_yoga "$_SKELLY_ROOT"
 
    # Clean up the generated output. The nodes _SKELLY_{1,2} are uselessly
-   # referring to the '%inline' implicit section. Can't unset during
+   # referring to the '%container' implicit section. Can't unset during
    # `undead_yoga`, as two references may point to the same intermediate node.
    # Clean up my skeleton army afterwards.
    for skelly in "${DISPOSABLE_SKELETONS[@]}" ; do
@@ -77,7 +77,7 @@ function mk_skelly {
 }
 
 
-function walk_skelly {
+function walk:skelly {
    declare -g NODE="$1"
    skelly_"${TYPEOF[$NODE]}"
 }
@@ -124,7 +124,7 @@ function skelly_decl_section {
       local -n name_r="${var_decl_r[name]}"
       local name="${name_r[value]}"
 
-      walk_skelly "$var_decl"
+      walk:skelly "$var_decl"
       dict_skelly_r[$name]="$SKELLY"
    done
 
@@ -158,7 +158,7 @@ function mk_compile_array {
 }
 
 
-function walk_evaluate {
+function walk:evaluate {
    declare -g NODE="$1"
    evaluate_"${TYPEOF[$NODE]}"
 }
@@ -168,7 +168,7 @@ function evaluate_decl_section {
    local -n node_r="$NODE"
    local -n items_r="${node_r[items]}"
    for ast_node in "${items_r[@]}"; do
-      walk_evaluate "$ast_node"
+      walk:evaluate "$ast_node"
    done
 }
 
@@ -176,14 +176,14 @@ function evaluate_decl_section {
 function evaluate_decl_variable {
    local -n node_r="$NODE"
    if [[ -n ${node_r[expr]} ]] ; then
-      walk_evaluate "${node_r[expr]}"
+      walk:evaluate "${node_r[expr]}"
    fi
 }
 
 
 function evaluate_typecast {
    local -n node_r="$NODE"
-   walk_evaluate "${node_r[expr]}"
+   walk:evaluate "${node_r[expr]}"
 }
 
 
@@ -193,7 +193,7 @@ function evaluate_member {
    #    .right  identifier
    local -n node_r="$NODE"
 
-   walk_evaluate "${node_r[left]}"
+   walk:evaluate "${node_r[left]}"
    local -n left_r="$DATA"
 
    local -n right_r="${node_r[right]}"
@@ -212,7 +212,7 @@ function evaluate_index {
    #    .right  integer
    local -n node_r="$NODE"
 
-   walk_evaluate "${node_r[left]}"
+   walk:evaluate "${node_r[left]}"
    local -n left_r="$DATA"
 
    local -n right_r="${node_r[right]}"
@@ -224,7 +224,7 @@ function evaluate_index {
 
 function evaluate_unary {
    local -n node_r="$NODE"
-   walk_evaluate "${node_r[right]}"
+   walk:evaluate "${node_r[right]}"
    (( DATA = DATA * -1 ))
 }
 
@@ -238,7 +238,7 @@ function evaluate_array {
    local -n array_r="$DATA"
 
    for ast_node in "${items_r[@]}"; do
-      walk_evaluate "$ast_node"
+      walk:evaluate "$ast_node"
       array_r+=( "$DATA" )
    done
 
@@ -263,7 +263,7 @@ function evaluate_string {
    local string="${node_r[value]}"
 
    while [[ "${node_r[concat]}" ]] ; do
-      walk_evaluate "${node_r[concat]}"
+      walk:evaluate "${node_r[concat]}"
       string+="$DATA"
       local -n node_r="${node_r[concat]}"
    done
@@ -277,7 +277,7 @@ function evaluate_path {
    local path="${node_r[value]}"
 
    while [[ "${node_r[concat]}" ]] ; do
-      walk_evaluate "${node_r[concat]}"
+      walk:evaluate "${node_r[concat]}"
       path+="$DATA"
       local -n node_r="${node_r[concat]}"
    done

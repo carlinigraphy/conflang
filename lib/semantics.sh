@@ -212,7 +212,7 @@ function copy_type {
 }
 
 
-function walk_symtab {
+function walk:symtab {
    declare -g NODE="$1"
    symtab_"${TYPEOF[$NODE]}"
 }
@@ -257,7 +257,7 @@ function symtab_decl_section {
 
    local -n items_r="${node_r[items]}"
    for ast_node in "${items_r[@]}"; do
-      walk_symtab "$ast_node"
+      walk:symtab "$ast_node"
    done
 
    # Check if this section is `required'. If any of its children are required,
@@ -309,7 +309,7 @@ function symtab_decl_variable {
    # Set the symbol's type to the declared type (if exists), else implicitly
    # takes a Type('ANY').
    if [[ "${node_r[type]}" ]] ; then
-      walk_symtab "${node_r[type]}"
+      walk:symtab "${node_r[type]}"
    else
       # shellcheck disable=SC2154
       copy_type "$_ANY"
@@ -319,7 +319,7 @@ function symtab_decl_variable {
    if [[ "${node_r[expr]}" ]] ; then
       # Still must descend into expression, as to make references to the symtab
       # in identifier nodes.
-      walk_symtab "${node_r[expr]}"
+      walk:symtab "${node_r[expr]}"
    else
       # Variables are `required' when they do not contain an expression. A
       # child must fill in the value.
@@ -374,7 +374,7 @@ function symtab_typedef {
          ); raise "${e[@]}"
       fi
 
-      walk_symtab "${node_r[subtype]}"
+      walk:symtab "${node_r[subtype]}"
       type_r['subtype']="$TYPE"
    fi
 
@@ -384,27 +384,27 @@ function symtab_typedef {
 
 function symtab_typecast {
    local -n node_r="$NODE"
-   walk_symtab "${node_r[expr]}"
+   walk:symtab "${node_r[expr]}"
 }
 
 
 function symtab_member {
    local -n node_r="$NODE"
-   walk_symtab "${node_r[left]}"
-   walk_symtab "${node_r[right]}"
+   walk:symtab "${node_r[left]}"
+   walk:symtab "${node_r[right]}"
 }
 
 
 function symtab_index {
    local -n node_r="$NODE"
-   walk_symtab "${node_r[left]}"
-   walk_symtab "${node_r[right]}"
+   walk:symtab "${node_r[left]}"
+   walk:symtab "${node_r[right]}"
 }
 
 
 function symtab_unary {
    local -n node_r="$NODE"
-   walk_symtab "${node_r[right]}"
+   walk:symtab "${node_r[right]}"
 }
 
 
@@ -412,7 +412,7 @@ function symtab_array {
    local -n node_r="$NODE"
    local -n items_r="${node_r[items]}"
    for ast_node in "${items_r[@]}" ; do
-      walk_symtab "$ast_node"
+      walk:symtab "$ast_node"
    done
 }
 
@@ -688,7 +688,7 @@ function mk_dependency {
 }
 
 
-function walk_flatten {
+function walk:flatten {
    declare -g NODE="$1"
    flatten_"${TYPEOF[$NODE]}"
 }
@@ -703,7 +703,7 @@ function flatten_decl_section {
 
    local -n items_r="${node_r[items]}"
    for var_decl in "${items_r[@]}"; do
-      walk_flatten "$var_decl"
+      walk:flatten "$var_decl"
    done
 
    declare -g NODE="$node"
@@ -716,34 +716,34 @@ function flatten_decl_variable {
 
    mk_dependency "$NODE"
    if [[ -n ${node_r[expr]} ]] ; then
-      walk_flatten "${node_r[expr]}"
+      walk:flatten "${node_r[expr]}"
    fi
 }
 
 
 function flatten_typecast {
    local -n node_r="$NODE"
-   walk_flatten "${node_r[expr]}"
+   walk:flatten "${node_r[expr]}"
 }
 
 
 function flatten_member {
    local -n node_r="$NODE"
-   walk_flatten "${node_r[left]}"
-   walk_flatten "${node_r[right]}"
+   walk:flatten "${node_r[left]}"
+   walk:flatten "${node_r[right]}"
 }
 
 
 function flatten_index {
    local -n node_r="$NODE"
-   walk_flatten "${node_r[left]}"
-   walk_flatten "${node_r[right]}"
+   walk:flatten "${node_r[left]}"
+   walk:flatten "${node_r[right]}"
 }
 
 
 function flatten_unary {
    local -n node_r="$NODE"
-   walk_flatten "${node_r[right]}"
+   walk:flatten "${node_r[right]}"
 }
 
 
@@ -751,7 +751,7 @@ function flatten_array {
    local -n node_r="$NODE"
    local -n items_r="${node_r[items]}"
    for ast_node in "${items_r[@]}"; do
-      walk_flatten "$ast_node"
+      walk:flatten "$ast_node"
    done
 }
 
@@ -871,7 +871,7 @@ function type_equality {
 }
 
 
-function walk_semantics {
+function walk:semantics {
    declare -g NODE="$1"
    semantics_${TYPEOF[$NODE]}
 }
@@ -910,13 +910,13 @@ function semantics_decl_variable {
    # Initially set Type(ANY). Potentially verwritten by the expr.
    declare -g TYPE="$_ANY"
    if [[ "${node_r[expr]}" ]] ; then
-      walk_semantics "${node_r[expr]}"
+      walk:semantics "${node_r[expr]}"
    fi
    local actual="$TYPE"
 
    # As above, initial Type(ANY).
    if [[ "${node_r[type]}" ]] ; then
-      walk_semantics "${node_r[type]}"
+      walk:semantics "${node_r[type]}"
    fi
    local target="$TYPE"
 
@@ -954,7 +954,7 @@ function semantics_typedef {
    local -n type_r="$type"
 
    if [[ ${node_r[subtype]} ]] ; then
-      walk_semantics ${node_r[subtype]}
+      walk:semantics ${node_r[subtype]}
       type_r[subtype]=$TYPE
    fi
 
@@ -965,7 +965,7 @@ function semantics_typedef {
 
 function semantics_typecast {
    local -n node_r="$NODE"
-   walk_semantics ${node_r[typedef]}
+   walk:semantics ${node_r[typedef]}
 }
 
 
@@ -979,7 +979,7 @@ function semantics_member {
    # Both must set $SYMTAB to point to either the result of the member
    # subscription, or the target symtab of the identifier respectively. it must
    # also set $TYPE to its resulting type.
-   walk_semantics "${node_r[left]}"
+   walk:semantics "${node_r[left]}"
 
    local -n right_r="${node_r[right]}"
 
@@ -993,7 +993,7 @@ function semantics_member {
       ); raise "${e[@]}"
    fi
 
-   # Descend to section's scope (from above `walk_semantics`).
+   # Descend to section's scope (from above `walk:semantics`).
    local -n symbol_r="$SYMBOL"
    symtab from "${symbol_r[node]}"
 
@@ -1025,7 +1025,7 @@ function semantics_member {
 function semantics_index {
    local -n node_r="$NODE"
 
-   walk_semantics "${node_r[left]}"
+   walk:semantics "${node_r[left]}"
    local -n lhs_r="$NODE"
 
    #  ┌── doesn't know about dynamically created $_ARRAY var.
@@ -1035,7 +1035,7 @@ function semantics_index {
       raise type_error "${node_r[left]}"  "$msg"
    fi
 
-   walk_semantics "${node_r[right]}"
+   walk:semantics "${node_r[right]}"
    local -n rhs_r="$NODE"
 
    #  ┌── doesn't know about dynamically created $_INTEGER var.
@@ -1054,14 +1054,14 @@ function semantics_index {
       raise index_error "$index"
    fi
 
-   walk_semantics "$rv"
+   walk:semantics "$rv"
    declare -g NODE="$rv"
 }
 
 
 function semantics_unary {
    local -n node_r="$NODE"
-   walk_semantics ${node_r[right]}
+   walk:semantics ${node_r[right]}
 
    #  ┌── doesn't know about dynamically created $_INTEGER var.
    # shellcheck disable=SC2154
@@ -1089,7 +1089,7 @@ function semantics_array {
    # conform to that.
    local -A types_found=()
    for ast_node in "${items_r[@]}" ; do
-      walk_semantics "$ast_node"
+      walk:semantics "$ast_node"
       local -n subtype_r=$TYPE
       local subtype="${subtype_r[kind]}"
 

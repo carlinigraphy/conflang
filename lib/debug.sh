@@ -16,7 +16,7 @@ function pprint_symtab {
       local -n symbol="${symtab[$key]}"
       local -n type="${symbol[type]}"
 
-      if [[ "$key" == '%inline' ]] ; then
+      if [[ "$key" == '%container' ]] ; then
          local -n node="${symbol[node]}"
          local -n name="${node[name]}"
          printf '%s' "${FILES[${name[file]}]##*/}"
@@ -213,7 +213,7 @@ function pprint_identifier {
    local -n node=$NODE
    local -- value="${node[value]}"
 
-   if [[ "$value" == '%inline' ]] ; then
+   if [[ "$value" == '%container' ]] ; then
       local index=${node['file']}
       local fname=${FILES[$index]}
       value="${fname##*/}"
@@ -241,7 +241,7 @@ function pprint_int_var {
 
    # Internal vars are absolute paths, always beginning at the root of the
    # symbol table.
-   local -n inline="${GLOBALS[%inline]}"
+   local -n inline="${GLOBALS[%container]}"
    local -n symtab="${inline[symtab]}"
 
    local symbol_name="${symtab[$var]}"

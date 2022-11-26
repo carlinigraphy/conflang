@@ -1,19 +1,13 @@
 #!/bin/bash
-# shellcheck disable=SC2184
-#  "Quote arguments to `unset` so they're not glob expanded"
-#     Only ever unsetting a single character in an array of single characters.
-#     No ability to glob expand to anything else.
-#
-# Requires from ENV:
-#  list:path   FILES[]
 
 declare -gi TOKEN_NUM=0
 
 declare -gA KEYWORD=(
    ['true']=true
    ['false']=true
-   ['include']=true
-   ['constrain']=true
+   ['import']=true
+   ['as']=true
+   ['typedef']=true
 )
 
 function lexer:init {
@@ -26,7 +20,7 @@ function lexer:init {
    declare -ga "$lines"
    declare -g  FILE_LINES="$lines"
 
-   declare -g   CURRENT=''  PEEK=''
+   declare -g   CHAR=''  PEEK_CHAR=''
    declare -ga  CHARRAY=()
    declare -ga  TOKENS=()
    declare -gA  FREEZE CURSOR=(
@@ -69,10 +63,10 @@ function lexer:advance {
    (( ++CURSOR['index'] )) ||:
    local -i idx="${CURSOR[index]}"
 
-   declare -g CURRENT="${CHARRAY[$idx]}"
-   declare -g PEEK="${CHARRAY[$idx + 1]}"
+   declare -g CHAR="${CHARRAY[$idx]}"
+   declare -g PEEK_CHAR="${CHARRAY[$idx + 1]}"
 
-   if [[ "$CURRENT" == $'\n' ]] ; then
+   if [[ "$CHAR" == $'\n' ]] ; then
       ((CURSOR['lineno']++))
       CURSOR['colno']=0
    fi
@@ -92,7 +86,7 @@ function lexer:scan {
    done < "${FILES[-1]}"
 
    while (( "${CURSOR[index]}" < ${#CHARRAY[@]} )) ; do
-      lexer:advance ; [[ ! "$CURRENT" ]] && break
+      lexer:advance ; [[ ! "$CHAR" ]] && break
 
       # Save current cursor information.
       FREEZE['index']=${CURSOR['index']}
@@ -100,39 +94,39 @@ function lexer:scan {
       FREEZE['colno']=${CURSOR['colno']}
 
       # Skip comments.
-      if [[ $CURRENT == '#' ]] ; then
+      if [[ $CHAR == '#' ]] ; then
          lexer:comment ; continue
       fi
 
       # Skip whitespace.
-      if [[ $CURRENT =~ [[:space:]] ]] ; then
+      if [[ $CHAR =~ [[:space:]] ]] ; then
          continue
       fi
 
       # Symbols.
-      case $CURRENT in
-         '.')  token:new        'DOT' "$CURRENT"  ; continue ;;
-         ',')  token:new      'COMMA' "$CURRENT"  ; continue ;;
-         ';')  token:new       'SEMI' "$CURRENT"  ; continue ;;
-         ':')  token:new      'COLON' "$CURRENT"  ; continue ;;
-         '$')  token:new     'DOLLAR' "$CURRENT"  ; continue ;;
-         '%')  token:new    'PERCENT' "$CURRENT"  ; continue ;;
-         '?')  token:new   'QUESTION' "$CURRENT"  ; continue ;;
+      case $CHAR in
+         '@')  token:new  'AT'        "$CHAR"  ; continue ;;
+         '.')  token:new  'DOT'       "$CHAR"  ; continue ;;
+         ',')  token:new  'COMMA'     "$CHAR"  ; continue ;;
+         ';')  token:new  'SEMI'      "$CHAR"  ; continue ;;
+         ':')  token:new  'COLON'     "$CHAR"  ; continue ;;
+         '$')  token:new  'DOLLAR'    "$CHAR"  ; continue ;;
+         '?')  token:new  'QUESTION'  "$CHAR"  ; continue ;;
+                                      
+         '(')  token:new  'L_PAREN'   "$CHAR"  ; continue ;;
+         ')')  token:new  'R_PAREN'   "$CHAR"  ; continue ;;
 
-         '(')  token:new    'L_PAREN' "$CURRENT"  ; continue ;;
-         ')')  token:new    'R_PAREN' "$CURRENT"  ; continue ;;
+         '[')  token:new  'L_BRACKET' "$CHAR"  ; continue ;;
+         ']')  token:new  'R_BRACKET' "$CHAR"  ; continue ;;
 
-         '[')  token:new  'L_BRACKET' "$CURRENT"  ; continue ;;
-         ']')  token:new  'R_BRACKET' "$CURRENT"  ; continue ;;
-
-         '{')  token:new    'L_BRACE' "$CURRENT"  ; continue ;;
-         '}')  token:new    'R_BRACE' "$CURRENT"  ; continue ;;
+         '{')  token:new  'L_BRACE'   "$CHAR"  ; continue ;;
+         '}')  token:new  'R_BRACE'   "$CHAR"  ; continue ;;
       esac
 
       # Typecast, or minus.
-      if [[ $CURRENT == '-' ]] ; then
+      if [[ $CHAR == '-' ]] ; then
          # If subsequent `>', is an arrow for typecast.
-         if [[ $PEEK == '>' ]] ; then
+         if [[ $PEEK_CHAR == '>' ]] ; then
             lexer:advance
             token:new 'ARROW' '->'
          else
@@ -143,33 +137,33 @@ function lexer:scan {
       fi
 
       # f-{strings,paths}
-      if [[ $CURRENT == 'f' ]] ; then
-         if   [[ $PEEK == '"' ]] ; then
+      if [[ $CHAR == 'f' ]] ; then
+         if   [[ $PEEK_CHAR == '"' ]] ; then
             lexer:advance ; lexer:fstring
             continue
-         elif [[ $PEEK == "'" ]] ; then
+         elif [[ $PEEK_CHAR == "'" ]] ; then
             lexer:advance ; lexer:fpath
             continue
          fi
       fi
 
       # Identifiers.
-      if [[ $CURRENT =~ [[:alpha:]_] ]] ; then
+      if [[ $CHAR =~ [[:alpha:]_] ]] ; then
          lexer:identifier ; continue
       fi
 
       # Strings. Surrounded by `"`.
-      if [[ $CURRENT == '"' ]] ; then
+      if [[ $CHAR == '"' ]] ; then
          lexer:string ; continue
       fi
 
       # Paths. Surrounded by `'`.
-      if [[ $CURRENT == "'" ]] ; then
+      if [[ $CHAR == "'" ]] ; then
          lexer:path ; continue
       fi
 
       # Numbers.
-      if [[ $CURRENT =~ [[:digit:]] ]] ; then
+      if [[ $CHAR =~ [[:digit:]] ]] ; then
          # Bash only natively handles integers. It's not able to do floats
          # without bringing `bc` or something. For now, that's all we'll also
          # support. Maybe later I'll add a float type, just so I can write some
@@ -184,7 +178,7 @@ function lexer:scan {
       e=( syntax_error
          --anchor "${t_r[location]}"
          --caught "${t_r[location]}"
-          "invalid character [$CURRENT]"
+          "invalid character [$CHAR]"
       ); raise "${e[@]}"
    done
 
@@ -196,19 +190,19 @@ function lexer:scan {
 
 function lexer:comment {
    # There are no multiline comments. Seeks from '#' to the end of the line.
-   while [[ -n $CURRENT ]] ; do
-      [[ "$PEEK" =~ $'\n' ]] && break
+   while [[ -n $CHAR ]] ; do
+      [[ "$PEEK_CHAR" =~ $'\n' ]] && break
       lexer:advance
    done
 }
 
 
 function lexer:identifier {
-   local buffer="$CURRENT"
+   local buffer="$CHAR"
 
-   while [[ -n $CURRENT ]] ; do
-      [[ $PEEK =~ [^[:alnum:]_] ]] && break
-      lexer:advance ; buffer+="$CURRENT"
+   while [[ -n $CHAR ]] ; do
+      [[ $PEEK_CHAR =~ [^[:alnum:]_] ]] && break
+      lexer:advance ; buffer+="$CHAR"
    done
 
    if [[ ${KEYWORD[$buffer]} ]] ; then
@@ -222,10 +216,10 @@ function lexer:identifier {
 function lexer:string {
    local -a buffer=()
 
-   while [[ $PEEK ]] ; do
+   while [[ $PEEK_CHAR ]] ; do
       lexer:advance
 
-      if [[ $CURRENT == '"' ]] ; then
+      if [[ $CHAR == '"' ]] ; then
          # shellcheck disable=SC1003
          # Misidentified error.
          if [[ $buffer && ${buffer[-1]} == '\' ]] ; then
@@ -236,7 +230,7 @@ function lexer:string {
          fi
       fi
 
-      buffer+=( "$CURRENT" )
+      buffer+=( "$CHAR" )
    done
 
    local join=''
@@ -252,10 +246,10 @@ function lexer:string {
 function lexer:path {
    local -a buffer=()
 
-   while [[ $PEEK ]] ; do
+   while [[ $PEEK_CHAR ]] ; do
       lexer:advance
 
-      if [[ $CURRENT == "'" ]] ; then
+      if [[ $CHAR == "'" ]] ; then
          # shellcheck disable=SC1003
          # Misidentified error.
          if [[ $buffer && ${buffer[-1]} == '\' ]] ; then
@@ -266,7 +260,7 @@ function lexer:path {
          fi
       fi
 
-      buffer+=( "$CURRENT" )
+      buffer+=( "$CHAR" )
    done
 
    local join=''
@@ -280,10 +274,10 @@ function lexer:path {
 
 
 function lexer:number {
-   local number="${CURRENT}"
+   local number="${CHAR}"
 
-   while [[ $PEEK =~ [[:digit:]] ]] ; do
-      lexer:advance ; number+="$CURRENT"
+   while [[ $PEEK_CHAR =~ [[:digit:]] ]] ; do
+      lexer:advance ; number+="$CHAR"
    done
 
    token:new 'INTEGER' "$number"
@@ -297,14 +291,14 @@ function lexer:interpolation {
    while [[ "${CURSOR[index]}" -lt ${#CHARRAY[@]} ]] ; do
       # String interpolation ends upon a closing R_BRACE token, or if there's
       # no current character.
-      if [[ ! $CURRENT ]] || [[ $PEEK == '}' ]] ; then
+      if [[ ! $CHAR ]] || [[ $PEEK_CHAR == '}' ]] ; then
          break
       fi
 
       lexer:advance
 
       # Skip whitespace.
-      if [[ $CURRENT =~ [[:space:]] ]] ; then
+      if [[ $CHAR =~ [[:space:]] ]] ; then
          continue
       fi
 
@@ -313,15 +307,15 @@ function lexer:interpolation {
       FREEZE['lineno']=${CURSOR['lineno']}
       FREEZE['colno']=${CURSOR['colno']}
 
-      case $CURRENT in
-         '.')  token:new        'DOT' "$CURRENT"  ; continue ;;
-         '$')  token:new     'DOLLAR' "$CURRENT"  ; continue ;;
-         '[')  token:new  'L_BRACKET' "$CURRENT"  ; continue ;;
-         ']')  token:new  'R_BRACKET' "$CURRENT"  ; continue ;;
+      case $CHAR in
+         '.')  token:new        'DOT' "$CHAR"  ; continue ;;
+         '$')  token:new     'DOLLAR' "$CHAR"  ; continue ;;
+         '[')  token:new  'L_BRACKET' "$CHAR"  ; continue ;;
+         ']')  token:new  'R_BRACKET' "$CHAR"  ; continue ;;
       esac
 
       # Identifiers.
-      if [[ $CURRENT =~ [[:alpha:]_] ]] ; then
+      if [[ $CHAR =~ [[:alpha:]_] ]] ; then
          lexer:identifier ; continue
       fi
 
@@ -330,7 +324,7 @@ function lexer:interpolation {
       e=( invalid_interpolation_char
          --anchor "$anchor"
          --caught "${t_r[location]}"
-         "invalid character in fstring [$CURRENT]"
+         "invalid character in fstring [$CHAR]"
       ); raise "${e[@]}"
    done
 }
@@ -339,10 +333,10 @@ function lexer:interpolation {
 function lexer:fstring {
    local -a buffer=()
 
-   while [[ $PEEK ]] ; do
+   while [[ $PEEK_CHAR ]] ; do
       lexer:advance
 
-      if [[ $CURRENT == '"' ]] ; then
+      if [[ $CHAR == '"' ]] ; then
          # shellcheck disable=SC1003
          if [[ $buffer && ("${buffer[-1]}" == '\') ]] ; then
             unset 'buffer[-1]'
@@ -352,10 +346,10 @@ function lexer:fstring {
       fi
 
       # When used outside an expression, closing braces must be escaped.
-      if [[ $CURRENT == '}' ]] ; then
+      if [[ $CHAR == '}' ]] ; then
          if [[ $buffer && "${buffer[-1]}" == '\' ]] ; then
             unset buffer[-1]
-            buffer+=( "$CURRENT" )
+            buffer+=( "$CHAR" )
             continue
          else
             token:new 'ERROR'
@@ -369,10 +363,10 @@ function lexer:fstring {
       fi
 
       # Start of f-string.
-      if [[ $CURRENT == '{' ]] ; then
+      if [[ $CHAR == '{' ]] ; then
          if [[ $buffer && "${buffer[-1]}" == '\' ]] ; then
             unset buffer[-1]
-            buffer+=( "$CURRENT" )
+            buffer+=( "$CHAR" )
             continue
          fi
 
@@ -410,7 +404,7 @@ function lexer:fstring {
          continue
       fi
 
-      buffer+=( "$CURRENT" )
+      buffer+=( "$CHAR" )
    done
 
    local join=''
@@ -426,10 +420,10 @@ function lexer:fstring {
 function lexer:fpath {
    local -a buffer=()
 
-   while [[ $PEEK ]] ; do
+   while [[ $PEEK_CHAR ]] ; do
       lexer:advance
 
-      if [[ $CURRENT == "'" ]] ; then
+      if [[ $CHAR == "'" ]] ; then
          # shellcheck disable=SC1003
          if [[ $buffer && ("${buffer[-1]}" == '\') ]] ; then
             unset 'buffer[-1]'
@@ -439,10 +433,10 @@ function lexer:fpath {
       fi
 
       # When used outside an expression, closing braces must be escaped.
-      if [[ $CURRENT == '}' ]] ; then
+      if [[ $CHAR == '}' ]] ; then
          if [[ $buffer && "${buffer[-1]}" == '\' ]] ; then
             unset buffer[-1]
-            buffer+=( "$CURRENT" )
+            buffer+=( "$CHAR" )
             continue
          else
             token:new 'ERROR'
@@ -456,10 +450,10 @@ function lexer:fpath {
       fi
 
       # Start of f-path.
-      if [[ $CURRENT == '{' ]] ; then
+      if [[ $CHAR == '{' ]] ; then
          if [[ $buffer && "${buffer[-1]}" == '\' ]] ; then
             unset buffer[-1]
-            buffer+=( "$CURRENT" )
+            buffer+=( "$CHAR" )
             continue
          fi
 
@@ -497,7 +491,7 @@ function lexer:fpath {
          continue
       fi
 
-      buffer+=( "$CURRENT" )
+      buffer+=( "$CHAR" )
    done
 
    local join=''

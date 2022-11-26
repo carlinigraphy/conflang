@@ -6,11 +6,11 @@ declare -g PROGDIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" ; pwd )
 function usage {
 cat <<EOF
 
-./do COMMAND
+./do COMMAND [FILE]
 
 commands
-   run         Runs \`confc\`
-   rundb       Runs \`confc\` with debug flag(s)
+   run         Runs \`confc\` on <FILE>
+   rundb       Runs \`confc\` on <FILE> with debug flag(s) set
    test        Run \`BATS\` tests
    cov         Run \`BATS\` tests with \`kcov\` coverage
    check       Run \`shellcheck\`

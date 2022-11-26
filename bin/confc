@@ -59,9 +59,9 @@ function argparse {
    fi
 
    if [[ "${positional[0]}" == '-' ]] ; then
-      INPUT=/dev/stdin
+      declare -g INPUT=/dev/stdin
    else
-      INPUT="${positional[0]}"
+      declare -g INPUT="${positional[0]}"
    fi
 }
 
@@ -98,11 +98,9 @@ source "${LIBDIR}"/compiler.sh
 # shellcheck source=./lib/compiler.sh
 source "${LIBDIR}"/api.sh
 
-init_globals
 argparse "$@"
-
-utils:parse
-utils:eval
+echo $INPUT
+evaluate
 
 #declare -f conf > "$DATA_OUT"
 [[ ${!_SKELLY_*} ]] && declare -p ${!_SKELLY_*} > "$DATA_OUT"  ||:
