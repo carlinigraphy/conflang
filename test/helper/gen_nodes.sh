@@ -18,5 +18,8 @@ lexer:scan
 parser:init
 parser:parse
 
-declare -p ROOT ${!NODE_*} | sort -V -k3 | sed 's,\[,\n\t[,g'
-declare -p TYPEOF | sed 's,\[,\n\t[,g' | sort -V
+for n in ${!NODE_*} ; do
+   t="${TYPEOF[$n]}"
+   [[ "$t" ]] && printf "\n$t\n"
+   declare -p "$n" | sed -e 's,declare\s-[-Aa]\s,,g' -e 's,\[,\n\t[,g'
+done
