@@ -1,29 +1,6 @@
 #!/bin/bash
-#
-# Requires from ENV:
-#  TOKENS[]             # Array of token names
-#  TOKEN_$n             # Sequence of all token objects
-#  FILES[]              # Array of imported files
-# }
 
-#═════════════════════════════════╡ AST NODES ╞═════════════════════════════════
-declare -gi  NODE_NUM=0
-declare -gi  INCLUDE_NUM=0
-#declare -gi USE_NUM=0
-
-# `include` & `constrain` directives are handled by the parser. They don't
-# create NODES_$n's.
-declare -ga  INCLUDES=() CONSTRAINTS=()
-# Both hold lists.
-# Sub-objects:
-#> INCLUDES=([0]='INCLUDE_1', [1]='INCLUDE_2')
-#> INCLUDE_1=([path]='./colors.conf' [target]='NODE_01')
-#> INCLUDE_1=([path]='./keybinds.conf' [target]='NODE_25')
-#>
-# Raw values:
-#> CONSTRAINTS=('./subfile1.conf', './subfile2.conf')
-
-# Saves us from a get_type() function call, or some equivalent.
+declare -gi NODE_NUM=0
 declare -gA TYPEOF=()
 
 # Wrapper around the below functions. Just for convenience. Little easier to
@@ -31,16 +8,89 @@ declare -gA TYPEOF=()
 function ast:new { _ast_new_"$1" ;}
 
 
-function _ast_new_decl_section {
-   # 1) create parent
+function _ast_new_program {
    (( ++NODE_NUM ))
    local node="NODE_${NODE_NUM}"
    declare -gA "$node"
    declare -g NODE="$node"
 
-   # Set global SECTION pointer here for validating %constrain blocks, and
-   # setting $target of %include's
-   declare -g SECTION="$node"
+   local -n node_r="$NODE"
+   node_r['header']=
+   node_r['container']=
+}
+
+
+function _ast_new_header {
+   (( ++NODE_NUM ))
+   local node="NODE_${NODE_NUM}"
+   declare -gA "$node"
+   declare -g NODE="$node"
+
+   (( ++NODE_NUM ))
+   local items="NODE_${NODE_NUM}"
+   declare -ga "$items"
+
+   # Assign .items node.
+   local -n node_r="$node"
+   node_r['items']="$items"
+
+   # Assign .location node.
+   location:new
+   node_r['location']="$LOCATION"
+
+   TYPEOF["$node"]='header'
+}
+
+
+function _ast_new_import {
+   (( ++NODE_NUM ))
+   local node="NODE_${NODE_NUM}"
+   declare -gA "$node"
+   declare -g NODE="$node"
+
+   local -n node_r="$node"
+   node_r['path']=''
+   node_r['as']=''
+
+   location:new
+   node_r['location']="$LOCATION"
+}
+
+
+function _ast_new_container {
+   ast:new identifier                  # name:  %container
+   local ident="$NODE"
+   local -n ident_r="$ident"
+   ident_r['value']='%container'
+
+   location:new
+   local -n loc_r="$LOCATION"          #--^ name's location info
+   loc_r['file']="$FILE_IDX"
+   loc_r['start_ln']=1
+   loc_r['start_col']=1
+   loc_r['end_ln']=1
+   loc_r['end_col']=1
+
+   ast:new decl_section                # section:  %container
+   declare -g ROOT="$NODE"
+   local node="$NODE"
+   local -n node_r="$node"
+   node_r['name']="$ident"
+
+   location:new                        #--^ section's location info
+   local -n loc_r="$LOCATION"
+   loc_r['start_ln']=1
+   loc_r['start_col']=1
+   loc_r['file']="$FILE_IDX"
+}
+
+
+function _ast_new_decl_section {
+   # 1) create section container
+   (( ++NODE_NUM ))
+   local node="NODE_${NODE_NUM}"
+   declare -gA "$node"
+   declare -g NODE="$node"
 
    # 2) create list to hold the items within the section.
    (( ++NODE_NUM ))
@@ -79,23 +129,6 @@ function _ast_new_decl_variable {
    node_r['location']="$LOCATION"
 
    TYPEOF["$node"]='decl_variable'
-}
-
-
-function _ast_new_include {
-   (( ++INCLUDE_NUM ))
-   local node="INCLUDE_${INCLUDE_NUM}"
-   declare -gA "$node"
-   declare -g INCLUDE="$node"
-
-   local -n node_r="$node"
-   node_r['path']=''
-   node_r['target']=''
-
-   location:new
-   node_r['location']="$LOCATION"
-
-   INCLUDES+=( "$node" )
 }
 
 
@@ -148,8 +181,9 @@ function _ast_new_typedef {
    declare -g NODE="$node"
 
    local -n node_r="$node"
-   node_r['kind']=''        # Primitive type
-   node_r['subtype']=''     # Sub `Type' node
+   node_r['kind']=''
+   node_r['params']=''
+   node_r['next']=''
 
    location:new
    node_r['location']="$LOCATION"
@@ -316,30 +350,22 @@ function _ast_new_env_var {
 }
 
 
-#═══════════════════════════════════╡ utils ╞═══════════════════════════════════
+#──────────────────────────────────( utils )────────────────────────────────────
 function parser:init {
    declare -gi IDX=0
-   declare -g  CURRENT=''  CURRENT_NAME=''
+   declare -g  TOKEN_r=''  TOKEN=''
    # Calls to `advance' both globally set the name of the current/next node(s),
    # e.g., `TOKEN_1', as well as declaring a nameref to the variable itself.
 
    declare -g  ROOT=''        #< Root of this tree
    declare -g  NODE=''        #< Last generated AST node
-   declare -g  INCLUDE=''     #< 
-
-   # Need to take note of the section.
-   # `%include` blocks must reference the target Section to include any included
-   # sub-nodes.
-   # `%constrain` blocks must check they are not placed anywhere but a top-level
-   # %inline section.
-   declare -g SECTION=''
 }
 
 
 function parser:_advance {
    if (( $IDX < ${#TOKENS[@]} )) ; then
-      declare -g  CURRENT_NAME="${TOKENS[$IDX]}"
-      declare -gn CURRENT="$CURRENT_NAME"
+      declare -g  TOKEN="${TOKENS[$IDX]}"
+      declare -gn TOKEN_r="$TOKEN"
       (( ++IDX ))
    fi
 }
@@ -347,7 +373,7 @@ function parser:_advance {
 
 function parser:advance {
    parser:_advance
-   while [[ ${CURRENT[type]} == ERROR ]] ; do
+   while [[ ${TOKEN_r[type]} == ERROR ]] ; do
       parser:_advance
    done
 }
@@ -362,8 +388,8 @@ function parser:synchronize {
 
 
 function parser:check {
-   # Is $CURRENT one of a comma-delimited list of types.
-   [[ ,"$1", ==  *,${CURRENT[type]},* ]]
+   # Is $TOKEN_r one of a comma-delimited list of types.
+   [[ ,"$1", ==  *,${TOKEN_r[type]},* ]]
 }
 
 
@@ -382,8 +408,8 @@ function parser:munch {
    else
       e=( munch_error
          --anchor "$ANCHOR"
-         --caught "${CURRENT[location]}"
-         "${1,,}"  "${CURRENT[type],,}"  "$2"
+         --caught "${TOKEN_r[location]}"
+         "${1,,}"  "${TOKEN_r[type],,}"  "$2"
       ); raise "${e[@]}"
    fi
 }
@@ -394,154 +420,78 @@ function parser:parse {
    parser:program
 }
 
-#═════════════════════════════╡ GRAMMAR FUNCTIONS ╞═════════════════════════════
+#────────────────────────────( grammar functions )──────────────────────────────
 function parser:program {
-   # This is preeeeeeeeeeeeetty janky. I don't love it. Since this pseudo-
-   # section doesn't actually exist in-code, it doesn't have any opening or
-   # closing braces. So `section()` gets fucked up when trying to munch a
-   # closing brace. Gotta just in-line stuff here all hacky-like.
-   #
-   # Creates a default top-level `section', allowing top-level key:value pairs,
-   # wout requiring a dict (take that, JSON).
-   ast:new identifier
-   local ident="$NODE"
-   local -n ident_r="$ident"
-   ident_r['value']='%inline'
+   parser:header
+   local header="$NODE"
 
-   location:new
-   local -n loc_r="$LOCATION"
-   loc_r['start_ln']=1
-   loc_r['start_col']=1
-   loc_r['file']="$FILE_IDX"
+   parser:container
+   local container="$NODE"
 
-   # Section declaration itself.
-   ast:new decl_section
-   declare -g ROOT="$NODE"
-   local node="$NODE"
-   local -n node_r="$node"
-   node_r['name']="$ident"
-
-   location:new
-   local -n loc_r="$LOCATION"
-   loc_r['start_ln']=1
-   loc_r['start_col']=1
-   loc_r['file']="$FILE_IDX"
-
-   declare -g ANCHOR="$LOCATION"
-
-   local -n items=${node_r['items']}
-   while ! parser:check 'EOF' ; do
-      parser:statement
-      # %include/%constrain are statements, but do not have an associated $NODE.
-      # Need to avoid adding an empty string to the section.items[]
-      if [[ $NODE ]] ; then
-         items+=( "$NODE" )
-      fi
-   done
+   ast:new program
+   local program="$NODE"
+   local -n program_r="$program"
+   program_r['header']="$header"
+   program_r['container']="$container"
 
    parser:munch 'EOF'
-   location:copy "$CURRENT_NAME"  "$node"  'file'  'end_ln'  'end_col'
 }
 
 
-function parser:statement {
-   local anchor="${CURRENT[location]}"
+function parser:header {
+   ast:new header
+   local node="$NODE"
+   local -n node_r="$node"
+   local -n items_r="${node_r[items]}"
 
-   if parser:match 'PERCENT' ; then
-      declare -g ANCHOR="$anchor"
-      parser:parser_statement
-   else
-      parser:declaration
-   fi
-}
-
-
-function parser:parser_statement {
-   if   parser:match 'INCLUDE'   ; then parser:include
-   elif parser:match 'CONSTRAIN' ; then parser:constrain
-   else
-      e=( parse_error
-         --anchor "$ANCHOR"
-         --caught "${CURRENT[location]}"
-         "invalid directive [${CURRENT[value]}]"
-      ); raise "${e[@]}"
-   fi
-
-   parser:munch 'SEMI' "expecting \`;' after directive."
-}
-
-
-function parser:include {
-   # TODO(refactor): this shouldn't be an `ast:__` fn. Include statements don't
-   # go onto the AST.
-   ast:new include
-   local include="$INCLUDE"
-   local -n include_r="$include"
-
-   # When used outside the `parser:expression()` function, need to explicitly
-   # pass in a refernce to the current token.
-   parser:path "$CURRENT_NAME"
-   parser:munch 'PATH' "expecting path after %include."
-
-   local -n path="$NODE"
-   # shellcheck disable=SC2034
-   include['path']="${path[value]}"
-   include['target']="$SECTION"
-
-   declare -g NODE=
-   # Section declarations loop & append $NODEs to their .items. `include`/
-   # `constrain` directives are technically children of a section, but they do
-   # not live past the parser.
-}
-
-
-function parser:constrain {
-   local -n section_ptr="$SECTION"
-   local -n name="${section_ptr[name]}"
-
-   if [[ ${name[value]} != '%inline' ]] ; then
-      e=( parse_error
-         --anchor "$ANCHOR"
-         --caught "$ANCHOR"
-         '%constrain may not occur in a section'
-      ); raise "${e[@]}"
-   fi
-
-   if [[ ${name[file]} -ne 0 ]] ; then
-      e=( parse_error
-         --anchor "$ANCHOR"
-         --caught "$ANCHOR"
-         '%constrain may not occur in a sub-file'
-      ); raise "${e[@]}"
-   fi
-
-   if [[ "${#CONSTRAINTS[@]}" -gt 0 ]] ; then
-      e=( parse_error
-         --anchor "$ANCHOR"
-         --caught "$ANCHOR"
-         'may not specify multiple constrain blocks'
-      ); raise "${e[@]}"
-   fi
-
-   parser:munch 'L_BRACKET' "%constrain expects an array of paths"
-   until parser:check 'R_BRACKET' ; do
-      parser:path "$CURRENT_NAME"
-      parser:munch 'PATH'
-
-      local -n path=$NODE
-      CONSTRAINTS+=( "${path[value]}" )
-
-      parser:check 'R_BRACKET' && break
-      parser:munch 'COMMA' "array elements must be separated by commas"
+   declare -g ANCHOR="${TOKEN_r[location]}"
+   while parser:match 'IMPORT' ; do
+      parser:import
+      items_r+=( "$NODE" )
    done
 
-   parser:munch 'R_BRACKET' "expecting \`]' after constrain block."
-   declare -g NODE=
+   declare -g NODE="$node"
+}
+
+
+function parser:container {
+   ast:new container
+   local node="$NODE"
+   local -n node_r="$node"
+   local -n items_r="${node_r[items]}"
+
+   while ! parser:check 'EOF' ; do
+      parser:declaration
+      items_r+=( "$NODE" )
+   done
+
+   declare -g NODE="$node"
+}
+
+
+function parser:import {
+   parser:path "$TOKEN"
+   local path="$NODE"
+   parser:munch 'PATH'  'expecting import path'
+
+   parser:munch 'AS'  'imports require `as <name>`'
+
+   parser:identifier "$TOKEN"
+   local ident="$NODE"
+   parser:munch 'IDENTIFIER'  'expecting import name'
+
+   ast:new import
+   local node="$NODE"
+   local -n node_r="$node"
+   node_r['path']="$path"
+   node_r['name']="$ident"
+
+   parser:munch 'SEMI' "expecting \`;' after import"
 }
 
 
 function parser:declaration {
-   parser:identifier "$CURRENT_NAME"
+   parser:identifier "$TOKEN"
    parser:munch 'IDENTIFIER'  "expecting declaration or closing \`}'"
 
    if parser:match 'L_BRACE' ; then
@@ -574,7 +524,7 @@ function parser:decl_section {
       fi
    done
 
-   local close="$CURRENT_NAME"
+   local close="$TOKEN"
    parser:munch 'R_BRACE' "expecting \`}' after section."
 
    location:copy "$ident"  "$node"  'file'  'start_ln'  'start_col'
@@ -603,12 +553,11 @@ function parser:decl_variable {
    node_r['name']="$ident"
 
    # Typedefs.
-   local paren="${CURRENT[location]}"
-   if parser:match 'L_PAREN' ; then
-      declare -g ANCHOR="$paren"
+   local open="${TOKEN_r[location]}"
+   if parser:match 'AT' ; then
+      declare -g ANCHOR="$open"
       parser:typedef
       node_r['type']="$NODE"
-      parser:munch 'R_PAREN' "typedef must be closed by \`)'."
    fi
 
    # If current token is one that begins an expression, advise they likely
@@ -625,13 +574,13 @@ function parser:decl_variable {
    elif parser:check "$expr_types" ; then
       e=( parse_error
          --anchor "$ANCHOR"
-         --caught "${CURRENT[location]}"
+         --caught "${TOKEN_r[location]}"
          "expecting \`:' before expression"
       ); raise "${e[@]}"
    fi
 
-   local close="$CURRENT_NAME"
-   parser:munch 'SEMI' "expecting \`;' after declaration."
+   local close="$TOKEN"
+   parser:munch 'SEMI' "expecting \`;' after declaration"
 
    location:copy "$ident"  "$node"  'file'  'start_ln'  'start_col'
    location:copy "$close"  "$node"  'file'  'end_ln'    'end_col'
@@ -640,9 +589,15 @@ function parser:decl_variable {
    declare -g NODE="$node"
 }
 
-
+# parser:typedef()
+#
+# @description
+#  As records and lists may take parameters (`@rec[str, int]`), this function
+#  creates a linked list in the .params slot. Each type within .params sets
+#  the .next slot.
+#
 function parser:typedef {
-   parser:identifier "$CURRENT_NAME"
+   parser:identifier "$TOKEN"
    parser:munch 'IDENTIFIER' 'type declarations must be identifiers'
    local ident="$NODE"
 
@@ -651,13 +606,37 @@ function parser:typedef {
    local -n node_r="$node"
    node_r['kind']="$ident"
 
-   while parser:match 'COLON' ; do
-      parser:typedef "$open"
-      node_r['subtype']="$NODE"
-   done
+   local anchor="$ANCHOR"
+   local open="${TOKEN_r[location]}"
+
+   if parser:match 'L_BRACKET' ; then
+      declare -g ANCHOR="$open"
+
+      parser:typelist
+      node_r['params']="$NODE"
+
+      parser:munch 'R_BRACKET' "type params must close with \`]'."
+   fi
 
    location:copy "$ident"  "$node"  'file'  'start_ln'  'start_col'
    location:copy "$NODE"   "$node"  'file'  'end_ln'    'end_col'
+
+   declare -g ANCHOR="$anchor"
+   declare -g NODE="$node"
+}
+
+
+# @arg $1 NODE  The parent AST node
+function parser:typelist {
+   parser:typedef
+   local node="$NODE"
+   local -n node_r="$node"
+
+   while parser:match 'COMMA' ; do
+      parser:typedef
+      node_r['next']="$NODE"
+      local -n node_r="$NODE"
+   done
 
    declare -g NODE="$node"
 }
@@ -719,8 +698,8 @@ function parser:expression {
    local op lhs
    local -i lbp=0 rbp=0
 
-   local token="$CURRENT_NAME"
-   local type="${CURRENT[type]}"
+   local token="$TOKEN"
+   local type="${TOKEN_r[type]}"
 
    local fn="${NUD[$type]}"
    if [[ ! $fn ]] ; then
@@ -738,14 +717,14 @@ function parser:expression {
    lhs="$NODE"
 
    while :; do
-      op_type=${CURRENT[type]}
+      op_type=${TOKEN_r[type]}
 
       #───────────────────────────( postfix )───────────────────────────────────
       lbp=${postfix_binding_power[$op_type]:-0}
       (( rbp = (lbp == 0 ? 0 : lbp+1) )) ||:
 
       if [[ $lbp -ge $min_bp ]] ; then
-         fn="${RID[${CURRENT[type]}]}"
+         fn="${RID[${TOKEN_r[type]}]}"
 
          if [[ ! $fn ]] ; then
             e=( parse_error
@@ -889,7 +868,7 @@ function parser:index {
                      # ^-- ignore rbp
 
    local anchor="$ANCHOR"
-   declare -g ANCHOR="${CURRENT[location]}"
+   declare -g ANCHOR="${TOKEN_r[location]}"
 
    parser:advance # past L_BRACKET.
 
@@ -901,7 +880,7 @@ function parser:index {
    index['left']="$lhs"
    index['right']="$NODE"
 
-   local close="$CURRENT_NAME"
+   local close="$TOKEN"
    parser:munch 'R_BRACKET' "index must be closed by \`]'."
 
    location:copy "$lhs"    "$node"  'file'  'start_ln'  'start_col'
@@ -924,7 +903,7 @@ function parser:member {
    local node="$NODE"
    local -n node_r="$node"
 
-   parser:identifier "$CURRENT_NAME"
+   parser:identifier "$TOKEN"
    parser:munch 'IDENTIFIER'  'member subscription requires an identifer'
 
    node_r['left']="$lhs"
@@ -959,7 +938,7 @@ function parser:array {
       parser:munch 'COMMA' "array elements must be separated by \`,'"
    done
 
-   local close="$CURRENT_NAME"
+   local close="$TOKEN"
    parser:munch 'R_BRACKET' "array must be closed by \`]'."
 
    location:copy "$open"   "$node"  'file'  'start_ln'  'start_col'
@@ -971,7 +950,7 @@ function parser:array {
 
 
 function parser:env_var {
-   local -n token_r="$CURRENT_NAME"
+   local -n token_r="$TOKEN"
    parser:advance # past DOLLAR.
 
    ast:new env_var

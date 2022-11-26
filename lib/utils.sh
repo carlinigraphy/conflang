@@ -4,18 +4,13 @@
 # and compiler. Allows re-entering the parser for each included file, and
 # concatenating (not literally, but in spirt) %include files.
 
-function init_globals {
-   # Declares all the necessary global variables for each run. Wrapping into a
-   # setup() function allows for easier BATS testing.
-
-   # Path to initial file to compile.
-   declare -g INPUT=
-
+function utils:init {
    # Compiled output tree file location. Defaults to stdout.
    declare -g DATA_OUT=/dev/stdout
 
    # The root NODE_$n of the parent and child AST trees.
-   declare -g PARENT_ROOT= CHILD_ROOT=
+   declare -g PARENT_ROOT=
+   declare -g CHILD_ROOT=
 
    # The root of the compiled output.
    declare -g _SKELLY_ROOT=
@@ -34,15 +29,6 @@ function init_globals {
    # %constrain statement.
    declare -ga FILES=()
    declare -gi FILE_IDX
-
-   # Stores the $ROOT after each `parse()`. The idx of a root node here should
-   # correspond to it's matching INCLUDE_$n from the INCLUDES[] array. Example:
-   #> INCLUDE_ROOT [ NODE_10,    NODE_20    ]
-   #> INCLUDES     [ INCLUDE_01, INCLUDE_02 ]
-   # Meaning...
-   # Take the contents of INCLUDE_ROOT[0].items, and drop them into
-   # INCLUDES[0].target.items.
-   declare -ga INCLUDE_ROOT=()  INCLUDES=()
 }
 
 
@@ -271,13 +257,14 @@ function utils:eval {
    populate_globals
 
    # Each section assumes there's a symtab above it. There is a "hidden" top-
-   # level section `%inline'. Need to create a parent symtab above to hold it.
+   # level section `%container'. Need to create a parent symtab above to hold
+   # it.
    symtab new ; parent_symtab="$SYMTAB"
-   walk_symtab "$PARENT_ROOT"
+   walk:symtab "$PARENT_ROOT"
 
    if [[ "$CHILD_ROOT" ]] ; then
       symtab new ; child_symtab="$SYMTAB"
-      walk_symtab "$CHILD_ROOT"
+      walk:symtab "$CHILD_ROOT"
 
       # shellcheck disable=SC2128
       merge_symtab "$PARENT_ROOT"  "$parent_symtab"  "$child_symtab"
@@ -293,18 +280,20 @@ function utils:eval {
       symtab_r[$key]="${global_r[$key]}"
    done
 
-   walk_flatten "$PARENT_ROOT"
+   walk:flatten "$PARENT_ROOT"
    dependency_to_map
    dependency_sort
 
    for ast_node in "${ORDERED_DEPS[@]}" ; do
-      walk_semantics "$ast_node"
+      walk:semantics "$ast_node"
    done
 
-   if (( ${#ALL_ERRORS[@]} )) ; then
-      error:print_all
-      exit 1
-   fi
+   walk:compiler  "$PARENT_ROOT"
+}
 
-   walk_compiler  "$PARENT_ROOT"
+
+function evaluate {
+   utils:init
+   utils:parse
+   utils:eval
 }

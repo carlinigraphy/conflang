@@ -15,6 +15,8 @@ source "${LIBDIR}"/lexer.sh
 source "${LIBDIR}"/parser.sh
 lexer:init
 lexer:scan
+parser:init
 parser:parse
 
-declare -p ROOT TYPEOF ${!NODE_*} | sort -V -k3
+declare -p ROOT ${!NODE_*} | sort -V -k3 | sed 's,\[,\n\t[,g'
+declare -p TYPEOF | sed 's,\[,\n\t[,g' | sort -V

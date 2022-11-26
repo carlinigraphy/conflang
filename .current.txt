@@ -140,17 +140,85 @@
 
    That's down the line. Ignore for now.
 
-   I think the next priorities, in order...
-      1. Throw away `constrain` stuff
-      2. Refactor all `add_file` and related functions
-      3. Include statement in the HEADER section
-      4. New parsing structure, make independent tuples of {AST,Symtab}
-         - Much more testable
-         - Easier to merge
-      5. New `merge` that respects new import rules
-      6. Includes use `as`, enter the identifier into the symtab
-      7. Records, arrays as single-type-only, typedefs
+
+2022-11-25
+   1. [] Throw away `constrain` stuff
+   2. [] Refactor all `add_file` and related functions
+   3. [] Include statement in the HEADER section
+   4. [] New parsing structure, make independent tuples of {AST,Symtab}
+         - [] Much more testable
+         - [] Easier to merge
+   5. [] New `merge` that respects new import rules
+   6. [] Includes use `as`, enter the identifier into the symtab
+   7. [] Records, arrays as single-type-only, typedefs
 
    Part of this refactoring is going to be cleaning up the lib/utils.sh. All of
    the `file`-based functions are kinda janky. Need to clean up just all that
    nonsense.
+
+
+import 'something' as s;
+import 'else'      as e;
+
+typedef arr[str];          Type(ARRAY, Type(STR, None))
+typedef set[str, int];     Type(SET,   Type(STR, Type(INT)))
+typedef set[set[str, int], int];
+      Type(SET, Type(SET,
+                        Type(STR,
+                                 Type(INT, None)
+                                 
+      Type
+         kind:
+         subtype:
+         next:
+
+set[
+   set[str, int],
+   int
+]
+
+      kind: SET
+      subtype:     kind: SET
+                   subtype:   kind: STR
+                              subtype:
+                              next: INT
+
+                   next:      kind: INT
+                              subtype:
+                              next:
+
+(SET,
+   (SET,
+      (STR,
+         (),
+         (INT,
+            (),
+            ()))),
+   (INT,
+      (),
+      ()))
+
+
+
+typedef rec[str, str, int] as Tim;
+
+something @Tim: {"this", "this", 4};
+
+rec[str, list[int], rec[str, int]]
+
+rec
+   - str
+   - list
+     - int
+   - rec
+     - str
+     - int
+
+kind:  rec
+sub:   str
+next: 
+
+Arrays and Records may have subtypes to indicate their parameters.
+Parameters are a linked list, with each sequential item referred to as a .next
+(NOT as a .subtype).
+Still allows for the same method of disallowing subscription of primitive types.
