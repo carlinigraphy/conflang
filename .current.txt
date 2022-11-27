@@ -1,145 +1,4 @@
-2022-11-24
-   New representation for what a file is at each step.
-   Unify constrain and include into one thing.
-
-
-   Each file is lexed, parsed, AST generated, then merged to a resulting AST/symtab.
-   A -> {aAST, aSymtab} -> 
-
-   Don't know yet if I want an %extend/%constrain statement that won't throw
-   name errors, and enforces types, vs. %include which doesn't allow the same
-   key as one that exists.
-
-   Maybe go back to only include, it's a more straightforward model. Easier to
-   reason about, easier to put into code.
-
-   ast = parse(input)
-   while len(includes) > 0:
-      new = parse(includes.pop())
-      ast = merge(ast, new)
-
-   aSource -> {aAST, aSymtab}
-   while len(includes) > 0:
-      {bAST, bSymtab} = parse(includes.pop())
-      {cAST, cSymtab} = merge({aAST, aSymtab}, {bAST, bSymtab})
-
-   Data is represented by the AST,Symtab tuple.
-
-
-   Thinking through if this is really a road that I want to go down necessarily.
-   As I have attempted to describe this project to people, the split between the
-   "parent file" and "child file" seems to be not intially understood. It also
-   does not really feel like the most common use case.
-
-   But it's not really the situation in which this is used. Most often you'll
-   have something like...
-
-      ./script_dir
-        +-- script
-        +-- example.conf
-      /etc/
-        +-- script
-            +-- system.conf
-      ~/.config
-        +-- script
-            +-- user.conf
-
-   In which the `script` may then call something like
-   > %include 'example.conf';
-   > %include '/etc/script/system.conf';
-   > %include '{$HOME}/.config/script/user.conf';
-
-   Each file will be sourced, parsed, and merged with the top level file.
-   Probably need an `%include` for "I promoise this file exists, explode if
-   not", and a `%includeif` that doesn't matter if it doesn't exist.
-
-   The permissible operations are
-      - Overwriting expressions
-      - Defining more specific types
-         - ANY   -> INTEGER
-         - ARRAY -> ARRAY:STR
-      - Adding new keys
-
-   Non-permissible operations are
-      - Defining types as *less* specific
-         - INTEGER   -> ANY
-         - ARRAY:STR -> ARRAY
-
-
-   Given the above, I need to re-think the merging, and the semantic analysis.
-   Some things are now allowed that previously were not.
-
-   You may ignore keys wout expressions in parent files.
-   You may re-define a key to an empty declaration.
-   You may *not* repeat the same key *in the same file*.
-
-   Arrays must now only contain elements of a single type.
-      A collection of similar stuff.
-   Records may contain mixed types, but do not have keys:  {"Marcus", 30}.
-      A consistent collection of different stuff.
-
-   Add a `%typedef`, same syntax as C:  `%typedef expression name;`.
-      How to resolve circular typedefs?
-      > %typedef NumberB NumberA;
-      > %typedef NumberA NumberB;
-
-   Recs & typedefs are probably going to come later.
-
-
-   I've neer really had a good way of handling the 2 kinds of directives
-      1. No AST affect     %typdef
-      2. Influences AST    %include
-
-   It is possible to `%include` a file within a sub-section. This impacts the
-   resulting AST, though it does not generate an AST node--
-   OOH. What if it's formed as:
-   > import '...' as <name>;
-   You can then use <name> to refer to it within the AST. It's exactly like a
-   regular identifier/reference, except it's referencing the contents of another
-   file.
-
-   This would allow me to shift all of this to the top of the file. Have a
-   `header` section that can contain the typedefs & imports. Once you're out of
-   the header, can no longer have any header-values. Can have this be implicit,
-   in which the first declaration clears the "IN_HEADER" flag. Or can have it be
-   explicit:
-   >  ---
-   >  import 'main.conf' as main;
-   >  import 'bindings.conf' as bindings;
-   >  ---
-   >  # Other stuff down here
-
-   "Explicit is better than implicit." But also, usability and simplicity is
-   very important. It's not likely to be end users that are importing things, or
-   that are defining typedefs.
-
-   > HEADER:
-   >  import 'main.conf' as main;
-   >  import 'bindings.conf' as bindings;
-   > :HEADER
-
-   Nah. I think just having it live at the top is fine.
-
-   Would love at some point to attach docstrings to declarations, so automatic
-   documentation can be generated. Something as simple as:
-   >
-   > #| Window sizing decoration, etc.
-   > window {
-   >     #| window height in pixels
-   >     height (int);
-   > }
-
-   Then calling `confc --template <file>` would run all the includes, compile
-   everything, and print to stdout (or `--out`) a documented template file:
-   >
-   > # Window sizing decoration, etc.
-   > window {
-   >     # window height in pixels
-   >     height (int);
-   > }
-
-   That's down the line. Ignore for now.
-
+# vim: ft=conf
 
 2022-11-25
    1. [x] Throw away `constrain` stuff
@@ -155,3 +14,23 @@
    Part of this refactoring is going to be cleaning up the lib/utils.sh. All of
    the `file`-based functions are kinda janky. Need to clean up just all that
    nonsense.
+
+2022-11-27
+   Wondering about `import ... as ...;`. There is no way to then put the
+   imported section into the file. Sections are not expressions. Merely a
+   collection of declarations.
+
+   Can either:
+      1. Allow `as <name>` to bind to a symbol, or not to concatenate into the
+         file, or
+      2. Only use the `as <name>` form, and require use of a keyword to place
+         it in the file
+
+   I worry about binding to a name, as it's easy for a downstream file to
+   inadvertanly stomp on the name.
+
+   Hmm. Should be caught by typechecking though. Pulling in the values of a
+   section with a `from <name>;` statement or something only may take a section.
+
+   I think for now we ignore this. Concatenation only. Can look at it again down
+   the line.

@@ -45,7 +45,7 @@ function argparse {
 
          -o | --out)
                shift
-               DATA_OUT="$1"
+               OUTPUT="$1"
                shift
                ;;
 
@@ -92,6 +92,9 @@ source "${LIBDIR}"/lexer.sh
 # shellcheck source=./lib/parser.sh
 source "${LIBDIR}"/parser.sh
 
+# shellcheck source=./lib/symbols.sh
+source "${LIBDIR}"/symbols.sh
+
 # shellcheck source=./lib/pre-compile.sh
 source "${LIBDIR}"/semantics.sh
 
@@ -104,6 +107,6 @@ source "${LIBDIR}"/api.sh
 argparse "$@"
 evaluate "$INPUT"
 
-#declare -f conf > "$DATA_OUT"
-[[ ${!_SKELLY_*} ]] && declare -p ${!_SKELLY_*} > "$DATA_OUT"  ||:
-[[ ${!_DATA_*}   ]] && declare -p ${!_DATA_*}   > "$DATA_OUT"  ||:
+#declare -f conf > "$OUTPUT"
+[[ ${!_SKELLY_*} ]] && declare -p ${!_SKELLY_*} > "$OUTPUT"  ||:
+[[ ${!_DATA_*}   ]] && declare -p ${!_DATA_*}   > "$OUTPUT"  ||:

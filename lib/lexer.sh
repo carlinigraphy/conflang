@@ -16,13 +16,11 @@ declare -gA KEYWORD=(
 #  Some information (e.g., `TOKEN_NUM`) helps to not reset. Allows for easier
 #  debugging if it's not constantly stomped by each successive run.
 #
-# @
-#
+# @noargs
 function lexer:init {
    local lines="FILE_${FILE_IDX}_LINES"
-   declare -ga "$lines"
-   declare -g  FILE_LINES="$lines"
-
+   declare -ga  "$lines"
+   declare -g   FILE_LINES="$lines"
    declare -g   CHAR=''  PEEK_CHAR=''
    declare -ga  CHARRAY=()
    declare -ga  TOKENS=()
@@ -33,7 +31,16 @@ function lexer:init {
    )
 }
 
-
+# token:new()
+# @description
+#  Creates new Token object, appending to TOKENS[]. Store location information
+#  via frozen start line/col, and ending line/col.
+#
+# @env   LOCATION
+# @sets  TOKENS[]
+# @sets  TOKEN_*
+# @ags   $1    str   Type of Token ('INTEGER', 'STRING', ...)
+# @ags   $2    str   Value of Token (character, string, identifier, ...)
 function token:new {
    local type=$1  value=$2
 
@@ -60,7 +67,16 @@ function token:new {
    loc_r['end_col']="${CURSOR[colno]}"
 }
 
-
+# lexer:advance()
+# @description
+#  Advances cursor position in file. Sets global vars for the current and next
+#  characters.
+#  
+# @env   CURSOR
+# @env   CHARRAY
+# @sets  CHAR
+# @sets  PEEK_CHAR
+# @noargs
 function lexer:advance {
    (( ++CURSOR['colno'] )) ||:
    (( ++CURSOR['index'] )) ||:
@@ -70,7 +86,7 @@ function lexer:advance {
    declare -g PEEK_CHAR="${CHARRAY[$idx + 1]}"
 
    if [[ "$CHAR" == $'\n' ]] ; then
-      ((CURSOR['lineno']++))
+      (( ++CURSOR['lineno'] ))
       CURSOR['colno']=0
    fi
 }

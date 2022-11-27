@@ -2,11 +2,11 @@
 #
 # All of the utilities that tie together functionality from the lexer, parser,
 # and compiler. Allows re-entering the parser for each included file, and
-# concatenating (not literally, but in spirt) %include files.
+# concatenating (not literally, but in spirt) imported files.
 
 function utils:init {
    # Compiled output tree file location. Defaults to stdout.
-   declare -g DATA_OUT=/dev/stdout
+   declare -g OUTPUT=/dev/stdout
 
    # The root NODE_$n of the parent and child AST trees.
    declare -g PARENT_ROOT=
@@ -38,14 +38,18 @@ function location:new {
    declare -gA "$loc"
    declare -g  LOCATION="$loc"
 
-   # Without a value, this isn't glob matched by a ${!_LOC_*}
+   # Without a value, this isn't glob matched by ${!_LOC_*} expansion
    local -n l="$loc" ; l=()
 }
 
-
+# location:copy()
+# @description
+#  Copies the properties from $1's location node to $2's. If no properties are
+#  specified, copies all of them. May only operate on TOKENs and NODEs.
+#
+# @arg   $1    NODE,TOKEN  Source location-containing node
+# @arg   $2    NODE,TOKEN  Destination location-containing node
 function location:copy {
-   # Copies the properties from $1's location node to $2's. If no properties are
-   # specified, copies all of them. May only operate on TOKENs and NODEs.
    local -n from_r="$1" ; shift
    local -n to_r="$1"   ; shift
    local -a props=( "$@" )
@@ -54,7 +58,7 @@ function location:copy {
    local -n to_loc_r="${to_r[location]}"
 
    if (( ! ${#props[@]} )) ; then
-      props=( "${!from[@]}" )
+      props=( "${!from_loc_r[@]}" )
    fi
 
    local k v
@@ -64,10 +68,16 @@ function location:copy {
    done
 }
 
-
+# location:cursor()
+# @description
+#  Convenience function to create a location at the current cursor's position.
+#  Cleans up otherwise messy and repetitive code in the lexer.
+#
+# @sets LOCATION
+# @env  FILE_IDX
+# @env  CURSOR
+# @noargs
 function location:cursor {
-   # Convenience function to create a location at the current cursor's position.
-   # Cleans up otherwise messy and repetitive code in the lexer.
    location:new
    local -n loc_r="$LOCATION"
    loc_r['file']="$FILE_IDX"
@@ -77,11 +87,22 @@ function location:cursor {
    loc_r['end_col']="${CURSOR[colno]}"
 }
 
-
+# utils:add_file()
+# @description
+#  Serves to both ensure we don't have circular imports, as well as resolving
+#  relative paths to their fully qualified path.
+#
+# @sets  FILES[]
+# @sets  FILE_IDX
+# @arg   $1    str      Relative or absolute path to config file
+# @arg   $2    LOCATION [Optional] For error reporting import statements
 function utils:add_file {
-   # Serves to both ensure we don't have circular imports, as well as resolving
-   # relative paths to their fully qualified path.
    local file="$1"
+   local location="$2"
+   if [[ $location ]] ; then
+      local -n location_r="$location"
+   fi
+
    local fq_path parent
 
    if [[ "${#FILES[@]}" -eq 0 ]] ; then
@@ -103,22 +124,29 @@ function utils:add_file {
    esac
 
    for f in "${FILES[@]}" ; do
-      # TODO: location reporting
-      [[ "$f" == "$file" ]] && raise circular_import "$file"
+      [[ ! "$f" == "$file" ]] && continue
+      e=( circular_import
+         --anchor "${location_r[location]}"
+         --caught "${location_r[location]}"
+         "$file"
+      ); raise "${e[@]}"
    done
 
    if [[ ! -e "$fq_path" ]] ||
       [[ ! -r "$fq_path" ]] ||
       [[   -d "$fq_path" ]]
    then
-      # TODO: location reporting
-      raise missing_file "$fq_path"
+      [[ ! "$f" == "$file" ]] && continue
+      e=( missing_file
+         --anchor "${location_r[location]}"
+         --caught "${location_r[location]}"
+         "$fq_path"
+      ); raise "${e[@]}"
    fi
 
    FILES+=( "$fq_path" )
    (( FILE_IDX = ${#FILES[@]} - 1 )) ||:
 }
-
 
 # utils:parse()
 # @description
@@ -150,7 +178,6 @@ function utils:parse {
    # symbol table.
 }
 
-
 # utils:import()
 # @description
 #  Identifies and merges all include statements for this given file.
@@ -177,7 +204,6 @@ function utils:import {
    done
 }
 
-
 # utils:eval
 # @description
 #  Requires all imports already merged into a single AST/symtab. Flattens AST
@@ -195,7 +221,6 @@ function utils:eval {
 
    walk:compiler "$NODE"
 }
-
 
 # evaluate()
 # @description

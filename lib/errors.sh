@@ -61,7 +61,7 @@ function error:new {
    declare -gA "$err"
    declare -g  ERROR="$err"
 
-   # Without a value, this isn't glob matched by a ${!_LOC_*}
+   # Without a value, this isn't glob matched by ${!_LOC_*} expansion.
    local -n e="$err" ; e=()
 }
 

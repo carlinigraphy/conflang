@@ -59,8 +59,8 @@ function mk_compile_dict {
    declare -gA "$skelly"
    declare -g  SKELLY="$skelly"
 
-   # Without a value, this isn't glob matched by a ${!_SKELLY_*}. Can't assign
-   # in the initial `declare -g` as you can with strings values.
+   # Without a value, this isn't glob matched by ${!_SKELLY_*} expansion. Can't
+   # assign in the initial `declare -g` as you can with strings values.
    local -n s="$skelly" ; s=()
 }
 
@@ -152,8 +152,8 @@ function mk_compile_array {
    declare -ga "$data"
    declare -g  DATA="$data"
 
-   # Without a value, this isn't glob matched by a ${!_DATA_*}. Necessary for
-   # dumping to $DATA_OUT.
+   # Without a value, this isn't glob matched by ${!_DATA_*} expansion.
+   # Necessary for dumping to $OUTPUT.
    local -n d="$data" ; d=()
 }
 

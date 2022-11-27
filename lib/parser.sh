@@ -363,15 +363,6 @@ function parser:init {
 }
 
 
-function parser:_advance {
-   if (( $IDX < ${#TOKENS[@]} )) ; then
-      declare -g  TOKEN="${TOKENS[$IDX]}"
-      declare -gn TOKEN_r="$TOKEN"
-      (( ++IDX ))
-   fi
-}
-
-
 function parser:advance {
    parser:_advance
    while [[ ${TOKEN_r[type]} == ERROR ]] ; do
@@ -379,12 +370,25 @@ function parser:advance {
    done
 }
 
-
-function parser:synchronize {
-   until parser:check 'SEMI,EOF' ; do
-      parser:advance
-   done
-   declare -g PANICKING=
+# parser:_advance()
+# @internal
+# @description
+#  Holdover until I wire up synchronization function. Called by parser:advance()
+#  to advance current global Token and nameref pointers.
+#
+# @see parser:advance
+#
+# @env   TOKENS
+# @env   IDX
+# @sets  TOKEN
+# @sets  TOKEN_r
+# @noargs
+function parser:_advance {
+   if (( $IDX < ${#TOKENS[@]} )) ; then
+      declare -g  TOKEN="${TOKENS[$IDX]}"
+      declare -gn TOKEN_r="$TOKEN"
+      (( ++IDX ))
+   fi
 }
 
 
@@ -422,6 +426,14 @@ function parser:parse {
 }
 
 #────────────────────────────( grammar functions )──────────────────────────────
+
+# parser:program()
+# @description
+#  program  -> header container EOF
+#
+# @env   NODE
+# @sets  NODE
+# @noargs
 function parser:program {
    parser:header
    local header="$NODE"
@@ -440,6 +452,17 @@ function parser:program {
 }
 
 
+# parser:header()
+# @description
+#  header  -> (import | typedef)*
+#
+# @see   parser:import
+# @see   parser:typedef
+#
+# @env   NODE
+# @sets  NODE
+# @sets  ANCHOR
+# @noargs
 function parser:header {
    ast:new header
    local node="$NODE"
@@ -453,8 +476,6 @@ function parser:header {
 
    declare -g NODE="$node"
 }
-
-
 function parser:_header {
    declare -g ANCHOR="${TOKEN_r[location]}"
 
@@ -465,7 +486,15 @@ function parser:_header {
    fi
 }
 
-
+# parser:container()
+# @description
+#  container  ->  declaration*
+#
+# @see   parser:declaration
+#
+# @env   NODE
+# @sets  NODE
+# @noargs
 function parser:container {
    ast:new container
    local node="$NODE"
@@ -480,7 +509,14 @@ function parser:container {
    declare -g NODE="$node"
 }
 
-
+# parser:import()
+# @description
+#  import  ->  "import"  IDENTIFIER  ";"
+#
+# @env   NODE
+# @env   TOKEN
+# @sets  NODE
+# @noargs
 function parser:import {
    parser:path "$TOKEN"
    local path="$NODE"
@@ -494,7 +530,18 @@ function parser:import {
    parser:munch 'SEMI' "expecting \`;' after import"
 }
 
-
+# parser:typedef()
+# @description
+#  typedef  ->  "typedef"  type  (as IDENTIFIER)?  ";"
+#  type     ->  IDENTIFIER  ("[" typelist "]")?
+#  typelist ->  type ("," type)+
+#
+# @see parser:type
+#
+# @env   NODE
+# @env   TOKEN
+# @sets  NODE
+# @noargs
 function parser:typedef {
    parser:type
    local type="$NODE"
@@ -513,7 +560,18 @@ function parser:typedef {
    parser:munch 'SEMI' "expecting \`;' after typedef"
 }
 
-
+# parser:declaration()
+# @description
+#  declaration -> decl_section
+#               | decl_variable
+#
+# @see parser:decl_section
+# @see parser:decl_variable
+#
+# @env   TOKEN
+# @env   NODE
+# @sets  NODE
+# @noargs
 function parser:declaration {
    if parser:check 'IMPORT,TYPEDEF' ; then
       e=( parse_error
@@ -533,11 +591,21 @@ function parser:declaration {
    fi
 }
 
-
+# parser:decl_section()
+# @description
+#  decl_section -> declaration*
+#
+# @see parser:declaration
+#
+# @env   NODE
+# @env   TOKEN
+# @env   ANCHOR
+#
+# @sets  NODE
+# @sets  ANCHOR
+# @noargs
 function parser:decl_section {
    local ident="$NODE"
-   local sect="$SECTION"
-
    local anchor="$ANCHOR"
    local -n ident_r="$ident"
    declare -g ANCHOR="${ident_r[location]}"
@@ -561,10 +629,22 @@ function parser:decl_section {
 
    declare -g ANCHOR="$anchor"
    declare -g NODE="$node"
-   declare -g SECTION="$sect"
 }
 
-
+# parser:decl_variable()
+# @description
+#  decl_variable -> IDENTIFIER ("@" type)?  expression?  ";"
+#
+# @see parser:type
+# @see parser:expression
+#
+# @env   NODE
+# @env   TOKEN
+# @env   ANCHOR
+#
+# @sets  NODE
+# @sets  ANCHOR
+# @noargs
 function parser:decl_variable {
    # Variable declaration must be preceded by an identifier.
    local ident="$NODE"
@@ -620,6 +700,9 @@ function parser:decl_variable {
 
 # parser:type()
 # @description
+#  type     ->  IDENTIFIER  [ "[" typelist "]" ]?
+#  typelist ->  type ("," type)+
+#
 #  Within the parameters of a type, [...], Type() nodes are assigned as a linked
 #  list to the .next slot. The pointer to the parameters themselves is in the
 #  .params slot.
@@ -639,6 +722,12 @@ function parser:decl_variable {
 #  rec  = Type('RECORD', param: list)
 #  ```
 #
+# @see   parser:typelist
+#
+# @env   NODE
+# @env   TOKEN
+# @sets  NODE
+# @noargs
 function parser:type {
    parser:identifier "$TOKEN"
    parser:munch 'IDENTIFIER' 'type declarations must be identifiers'
@@ -667,7 +756,15 @@ function parser:type {
 }
 
 
-# @arg $1 NODE  The parent AST node
+# parser:typelist()
+# @description
+#  typelist ->  type ("," type)+
+#
+# @see parser:type
+#
+# @env   NODE
+# @sets  ANCHOR
+# @noargs
 function parser:typelist {
    parser:type
    local node="$NODE"
