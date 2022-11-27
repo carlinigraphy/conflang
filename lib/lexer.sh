@@ -10,12 +10,15 @@ declare -gA KEYWORD=(
    ['typedef']=true
 )
 
+# lexer:init()
+# @description
+#  Resets global variables that are specific to *only* this run of the lexer.
+#  Some information (e.g., `TOKEN_NUM`) helps to not reset. Allows for easier
+#  debugging if it's not constantly stomped by each successive run.
+#
+# @
+#
 function lexer:init {
-   # Some variables need to be reset at the start of every run. They hold
-   # information that should not be carried from file to file.
-
-   (( FILE_IDX = ${#FILES[@]} - 1 )) ||:
-
    local lines="FILE_${FILE_IDX}_LINES"
    declare -ga "$lines"
    declare -g  FILE_LINES="$lines"

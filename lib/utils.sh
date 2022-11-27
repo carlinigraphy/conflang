@@ -82,10 +82,7 @@ function utils:add_file {
    # Serves to both ensure we don't have circular imports, as well as resolving
    # relative paths to their fully qualified path.
    local file="$1"
-
-   # The full, absolute path to the file.
-   local fq_path
-   local parent
+   local fq_path parent
 
    if [[ "${#FILES[@]}" -eq 0 ]] ; then
       # If there's nothing in FILES[], it's our first run. Any path that's
@@ -119,97 +116,21 @@ function utils:add_file {
    fi
 
    FILES+=( "$fq_path" )
+   (( FILE_IDX = ${#FILES[@]} - 1 )) ||:
 }
 
 
-function merge_includes {
-   # Parse all `%include` files.
-   for (( idx=0; idx<${#INCLUDES[@]}; ++idx )) ; do
-      local -n node_r=${INCLUDES[idx]}
-      insert_node_path="${node_r[path]}"
+# utils:parse()
+# @description
+#  Generates the AST & symbol table for a single file.
+#
+# @sets  NODE
+# @sets  SYMTAB
+# @arg   $1    str         Path to file to parse
+# @arg   $2    LOCATION    [Optional] For error reporting of import statements
+function utils:parse {
+   utils:add_file "$1" "$2"
 
-      utils:add_file "$insert_node_path"
-      utils:parse_file
-
-      # Construct array (backwards) of the $ROOT nodes for each %include
-      # statement.  Allows us to iter the INCLUDES backwards, and match $idx to
-      # its corresponding root here.
-      INCLUDE_ROOT=( "$ROOT"  "${INCLUDE_ROOT[@]}" )
-   done
-
-   # Iterates bottom-to-top over the %include statements. Appends the items
-   # from the included section into the target section.
-   local -i len="${#INCLUDES[@]}"
-   for (( idx=(len - 1); idx >= 0; idx-- )) ; do
-      local -- include="${INCLUDES[$idx]}"
-      local -n include_r="$include"
-      # e.g., INCLUDE_1(path: './colors.conf', target: NODE_2)
-
-      local -n target_r=${include_r['target']}
-      local -n target_items_r=${target_r['items']}
-      # e.g., NODE_2(items: NODE_3, name: NODE_1)
-      #       target_items = NODE_3[]
-
-      local -n root_r="${INCLUDE_ROOT[$idx]}"
-      local -n root_items_r="${root_r['items']}"
-      # e.g., INCLUDE_ROOT[idx] = NODE_16
-      #       NODE_16(items: NODE_17, name: NODE_15)
-      #       root_items = NODE_17[]
-
-      # For each node in the sub-file, append it to the targetted node's
-      # .items[].
-      for n in "${root_items_r[@]}" ; do
-         target_items_r+=( "$n" )
-      done
-   done
-}
-
-
-function identify_constraint_file {
-   # Reset INCLUDE_ROOT[] and INCLUDES[] before parsing the constrain'd
-   # file(s).
-   declare -ga INCLUDE_ROOT=()  INCLUDES=()
-
-   # Constraint files are sorted in order of precedence. The last found file
-   # takes the highest precedence. If no file exists, throw an error.
-   local last_found
-
-   # Constrain statements are restricted to only occuring at the top-level
-   # parent file. They may not be present in a sub-file, or in a sub-section.
-   # We may always compare them relatively to the path of the initial $INPUT
-   # file, AKA ${FILES[0]}.
-   local fq_path
-   for file in "${CONSTRAINTS[@]}" ; do
-      case "$file" in
-         /*)   fq_path="${file}"            ;;
-         ~*)   fq_path="${file/\~/${HOME}}" ;;
-         *)    fq_path=$( realpath -m "${FILES[0]%/*}/${file}" -q ) ;;
-      esac
-
-      if [[ -e "$fq_path" ]] ; then
-         last_found="$fq_path"
-      fi
-   done
-
-   for f in "${FILES[@]}" ; do
-      if [[ "$f" == "$last_found" ]] ; then
-         # TODO: location reporting
-         raise circular_import  "$f"
-      fi
-   done
-
-   if [[ ! $last_found ]] ; then
-      # TODO: location reporting
-      raise missing_constraint
-   else
-      FILES+=( "$fq_path" )
-   fi
-}
-
-
-function utils:parse_file {
-   # Some elements of the scanner/parser need to be reset before every run.
-   # Vars that hold file-specific information.
    lexer:init
    lexer:scan
    # Exports:
@@ -219,68 +140,52 @@ function utils:parse_file {
    parser:init
    parser:parse
    # Exports:
-   #  str   ROOT
    #  dict  TYPEOF{}
    #  dict  NODE_*
+
+   local root="$NODE"
+   walk:symtab  "$root"
+   utils:import "$root"  "$SYMTAB"
+   # For each `import` statement, parse & concatenate returning a new AST and
+   # symbol table.
 }
 
 
-function utils:parse {
-   # Parse the top-level `base' file.
-   utils:add_file "$INPUT"
-   utils:parse_file
-   declare -g PARENT_ROOT=$ROOT
-   merge_includes
-   # Merge all (potentially nested) `%include` statements from the parent file.
+# utils:import()
+# @description
+#  Identifies and merges all include statements for this given file.
+#
+# @arg   $1    NODE     Root AST node for a file
+# @arg   $2    SYMTAB   Associated symbol table
+function utils:import {
+   local node="$1"
+   local -n node_r="$node"
+   local -n header_r="${node_r[header]}"
+   local -n container_r="${node_r[container]}"
 
-   if [[ $CONSTRAINTS ]] ; then
-      identify_constraint_file
+   local symtab="$2"
+   local -n symtab_r="$symtab"
 
-      utils:parse_file
-      declare -g CHILD_ROOT=$ROOT
+   local path location
+   for h in "${header_r[@]}" ; do
+      if [[ ! ${TYPEOF[$h]} == import ]] ; then
+         continue
+      fi
 
-      merge_includes
-   fi
-
-   # Restore top-level root node.
-   declare -g ROOT=$PARENT_ROOT
-}
-
-
-function utils:eval {
-   # There may be both a parent and child ASTs, both of which have their own
-   # symbol table. Until they're merged, we want a single point of reference
-   # for any globally defined identifiers--currently typedefs. After the symbol
-   # tables are merged we can copy the types to the root of the parent symtab.
-   symtab new
-   local top_level_symtab="$SYMTAB"
-   populate_globals
-
-   # Each section assumes there's a symtab above it. There is a "hidden" top-
-   # level section `%container'. Need to create a parent symtab above to hold
-   # it.
-   symtab new ; parent_symtab="$SYMTAB"
-   walk:symtab "$PARENT_ROOT"
-
-   if [[ "$CHILD_ROOT" ]] ; then
-      symtab new ; child_symtab="$SYMTAB"
-      walk:symtab "$CHILD_ROOT"
-
-      # shellcheck disable=SC2128
-      merge_symtab "$PARENT_ROOT"  "$parent_symtab"  "$child_symtab"
-   fi
-
-   # Reset pointer back to the parent symtab.
-   declare -g SYMTAB="$parent_symtab"
-
-   # Integrate globals at the root of the top-level symbol table.
-   declare -n symtab_r="$parent_symtab"
-   declare -n global_r="$top_level_symtab"
-   for key in "${!global_r[@]}" ; do
-      symtab_r[$key]="${global_r[$key]}"
+      local -n h_r="$h"
+      utils:parse "${h_r[path]}"  "${h_r[location]}"
    done
+}
 
-   walk:flatten "$PARENT_ROOT"
+
+# utils:eval
+# @description
+#  Requires all imports already merged into a single AST/symtab. Flattens AST
+#  in order of dependencies for semantics & final evaluation.
+#
+# @noargs
+function utils:eval {
+   walk:flatten "$NODE"
    dependency_to_map
    dependency_sort
 
@@ -288,12 +193,20 @@ function utils:eval {
       walk:semantics "$ast_node"
    done
 
-   walk:compiler  "$PARENT_ROOT"
+   walk:compiler "$NODE"
 }
 
 
+# evaluate()
+# @description
+#  Wrapper function to kick off the whole parse, typcheck, and evaluation
+#  pieline.
+#
+# @env   NODE
+# @env   SYMTAB
+# @arg   $1    str   Initial file path to evaluate
 function evaluate {
    utils:init
-   utils:parse
-   utils:eval
+   utils:parse "$1"
+   #utils:eval
 }

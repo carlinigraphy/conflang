@@ -38,7 +38,6 @@ function mk_metatype() {
 function populate_globals {
    local -A primitive=(
       [any]='ANY'
-      #[fn]='FUNCTION'
       [int]='INTEGER'
       [str]='STRING'
       [bool]='BOOLEAN'
@@ -48,7 +47,8 @@ function populate_globals {
 
    local -A complex=(
       [type]='TYPE'
-      [array]='ARRAY'
+      [list]='LIST'
+      [rec]='RECORD'
    )
 
    # Create symbols for primitive types.
@@ -166,11 +166,6 @@ function mk_symbol {
    symbol['name']=    #> str
    # While it isn't really required, it's substantially easier if we have a
    # string name, rather than needing to pull it from the symbol.node.name.value
-
-   symbol['required']=
-   # Variable declaration symbols are `required' if its NODE has no expression.
-   # A Section is considered to be `required' if *any* of its children are
-   # required. This is only needed when enforcing constraints upon a child file.
 }
 
 
@@ -179,7 +174,6 @@ declare -i TYPE_NUM=${TYPE_NUM:-0}
 
 function mk_type {
    (( ++TYPE_NUM ))
-
    local type="TYPE_${TYPE_NUM}"
    declare -gA $type
    declare -g  TYPE="$type"
@@ -215,6 +209,44 @@ function copy_type {
 function walk:symtab {
    declare -g NODE="$1"
    symtab_"${TYPEOF[$NODE]}"
+}
+
+
+function symtab_program {
+   symtab new
+   populate_globals
+   local symtab="$SYMTAB"
+
+   local -n node_r="$NODE"
+   walk:symtab "${node_r[header]}"
+   walk:symtab "${node_r[container]}"
+
+   declare -g SYMTAB="$symtab"
+}
+
+
+function symtab_header {
+   local -n node_r="$NODE"
+   local -n items_r="${node_r[items]}"
+   for ast_node in "${items_r[@]}" ; do
+      walk:symtab "$ast_node"
+   done
+}
+
+
+function symtab_typedef {
+   mk_symbol
+   local symbol="$SYMBOL"
+   local -n symbol_r="$symbol"
+
+   local -n node_r="$NODE"
+   walk:symtab "${node_r[type]}"
+   symbol_r['type']="$TYPE"
+
+   local -n name_r="${node_r[name]}"
+   symbol_r['name']="${name_r[value]}"
+
+   symtab set "$symbol"
 }
 
 
@@ -258,18 +290,6 @@ function symtab_decl_section {
    local -n items_r="${node_r[items]}"
    for ast_node in "${items_r[@]}"; do
       walk:symtab "$ast_node"
-   done
-
-   # Check if this section is `required'. If any of its children are required,
-   # it too must be present in a child file.
-   local -n symtab_r="$SYMTAB"
-   for sym in "${symtab_r[@]}" ; do
-      local -n sym_r="$sym"
-
-      if [[ "${sym_r[required]}" ]] ; then
-         symbol_r['required']='yes'
-         break
-      fi
    done
 
    declare -g SYMTAB="$symtab"
@@ -320,10 +340,6 @@ function symtab_decl_variable {
       # Still must descend into expression, as to make references to the symtab
       # in identifier nodes.
       walk:symtab "${node_r[expr]}"
-   else
-      # Variables are `required' when they do not contain an expression. A
-      # child must fill in the value.
-      symbol_r[required]='yes'
    fi
 }
 
@@ -408,7 +424,7 @@ function symtab_unary {
 }
 
 
-function symtab_array {
+function symtab_list {
    local -n node_r="$NODE"
    local -n items_r="${node_r[items]}"
    for ast_node in "${items_r[@]}" ; do
@@ -422,6 +438,7 @@ function symtab_identifier {
    node_r['symtab']="$SYMTAB"
 }
 
+function symtab_import  { :; }
 function symtab_boolean { :; }
 function symtab_integer { :; }
 function symtab_string  { :; }
@@ -747,7 +764,7 @@ function flatten_unary {
 }
 
 
-function flatten_array {
+function flatten_list {
    local -n node_r="$NODE"
    local -n items_r="${node_r[items]}"
    for ast_node in "${items_r[@]}"; do
@@ -850,8 +867,8 @@ function type_equality {
    fi
 
    # In the case of...
-   #  t1(type: array, subtype: any)
-   #  t2(type: array, subtype: None)
+   #  t1(type: list, subtype: any)
+   #  t2(type: list, subtype: None)
    # ...the first type_equality() on their .type will match, but the second must
    # not throw an exception. It is valid to have a missing (or different) type,
    # if the principal type is ANY.
@@ -896,9 +913,9 @@ function semantics_decl_variable {
    # the expression's type must evaluate to *at least* the requirements of the
    # declared type, though can be more specific.
    #
-   #> arr (array): [0, 1];
-   #> # declared: Type(ARRAY)
-   #> # actual:   Type(ARRAY, subtype: Type(INTEGER))
+   #> arr (list): [0, 1];
+   #> # declared: Type('LIST')
+   #> # actual:   Type('LIST', subtype: Type(INTEGER))
 
    local -n node_r="$NODE"
    local -n name_r="${node_r[name]}"
@@ -907,7 +924,7 @@ function semantics_decl_variable {
    symtab from "$NODE"
    symtab get "$name"
 
-   # Initially set Type(ANY). Potentially verwritten by the expr.
+   # Initially set Type(ANY). Potentially overwritten by the expr.
    declare -g TYPE="$_ANY"
    if [[ "${node_r[expr]}" ]] ; then
       walk:semantics "${node_r[expr]}"
@@ -1028,10 +1045,10 @@ function semantics_index {
    walk:semantics "${node_r[left]}"
    local -n lhs_r="$NODE"
 
-   #  ┌── doesn't know about dynamically created $_ARRAY var.
+   #  ┌── doesn't know about dynamically created $_LIST var.
    # shellcheck disable=SC2154
-   if ! type_equality  "$_ARRAY"  "$TYPE" ; then
-      local msg='the left hand side must evaluate to an array.'
+   if ! type_equality  "$_LIST"  "$TYPE" ; then
+      local msg='the left hand side must evaluate to an list.'
       raise type_error "${node_r[left]}"  "$msg"
    fi
 
@@ -1042,7 +1059,7 @@ function semantics_index {
    # shellcheck disable=SC2154
    if ! type_equality "$_INTEGER"  "$TYPE" ; then
       local loc="${node_r[right]}"
-      local msg="array indexes must evaluate to an integer."
+      local msg="list indexes must evaluate to an integer."
       raise type_error  "$loc"  "$msg"
    fi
 
@@ -1076,16 +1093,16 @@ function semantics_unary {
 }
 
 
-function semantics_array {
+function semantics_list {
    local -n node_r="$NODE"
    local -n items_r="${node_r[items]}"
 
    # shellcheck disable=SC2154
-   copy_type "$_ARRAY"
+   copy_type "$_LIST"
    local type="$TYPE"
    local -n type_r="$TYPE"
 
-   # If the target type is specific (e.g., array:str), the actual type must
+   # If the target type is specific (e.g., list[str]), the actual type must
    # conform to that.
    local -A types_found=()
    for ast_node in "${items_r[@]}" ; do

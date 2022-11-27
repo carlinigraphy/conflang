@@ -1,6 +1,6 @@
 #!/bin/bash
 
-declare -gi NODE_NUM=0
+declare -gi _NODE_NUM=0
 declare -gA TYPEOF=()
 
 # ast:new()
@@ -16,25 +16,27 @@ function ast:new { _ast_new_"$1" ;}
 
 
 function _ast_new_program {
-   (( ++NODE_NUM ))
-   local node="NODE_${NODE_NUM}"
+   (( ++_NODE_NUM ))
+   local node="NODE_${_NODE_NUM}"
    declare -gA "$node"
    declare -g NODE="$node"
 
    local -n node_r="$NODE"
    node_r['header']=
    node_r['container']=
+
+   TYPEOF["$node"]='program'
 }
 
 
 function _ast_new_header {
-   (( ++NODE_NUM ))
-   local node="NODE_${NODE_NUM}"
+   (( ++_NODE_NUM ))
+   local node="NODE_${_NODE_NUM}"
    declare -gA "$node"
    declare -g NODE="$node"
 
-   (( ++NODE_NUM ))
-   local items="NODE_${NODE_NUM}"
+   (( ++_NODE_NUM ))
+   local items="NODE_${_NODE_NUM}"
    declare -ga "$items"
 
    # Assign .items node.
@@ -50,14 +52,13 @@ function _ast_new_header {
 
 
 function _ast_new_import {
-   (( ++NODE_NUM ))
-   local node="NODE_${NODE_NUM}"
+   (( ++_NODE_NUM ))
+   local node="NODE_${_NODE_NUM}"
    declare -gA "$node"
    declare -g NODE="$node"
 
    local -n node_r="$node"
    node_r['path']=''
-   node_r['name']=''
 
    location:new
    node_r['location']="$LOCATION"
@@ -67,8 +68,8 @@ function _ast_new_import {
 
 
 function _ast_new_typedef {
-   (( ++NODE_NUM ))
-   local node="NODE_${NODE_NUM}"
+   (( ++_NODE_NUM ))
+   local node="NODE_${_NODE_NUM}"
    declare -gA "$node"
    declare -g NODE="$node"
 
@@ -98,7 +99,6 @@ function _ast_new_container {
    loc_r['end_col']=1
 
    ast:new decl_section                # section:  %container
-   declare -g ROOT="$NODE"
    local node="$NODE"
    local -n node_r="$node"
    node_r['name']="$ident"
@@ -113,14 +113,14 @@ function _ast_new_container {
 
 function _ast_new_decl_section {
    # 1) create section container
-   (( ++NODE_NUM ))
-   local node="NODE_${NODE_NUM}"
+   (( ++_NODE_NUM ))
+   local node="NODE_${_NODE_NUM}"
    declare -gA "$node"
    declare -g NODE="$node"
 
    # 2) create list to hold the items within the section.
-   (( ++NODE_NUM ))
-   local items="NODE_${NODE_NUM}"
+   (( ++_NODE_NUM ))
+   local items="NODE_${_NODE_NUM}"
    declare -ga "$items"
 
    # 3) assign child node to parent.
@@ -141,15 +141,15 @@ function _ast_new_decl_section {
 
 
 function _ast_new_decl_variable {
-   (( ++NODE_NUM ))
-   local node="NODE_${NODE_NUM}"
+   (( ++_NODE_NUM ))
+   local node="NODE_${_NODE_NUM}"
    declare -gA "$node"
    declare -g NODE="$node"
 
    local -n node_r="$node"
    node_r['name']=''                      # AST(identifier)
    node_r['type']=''                      # AST(type)
-   node_r['expr']=''                      # AST(array, int, str, ...)
+   node_r['expr']=''                      # AST(list, int, str, ...)
 
    location:new
    node_r['location']="$LOCATION"
@@ -158,15 +158,15 @@ function _ast_new_decl_variable {
 }
 
 
-function _ast_new_array {
-   (( ++NODE_NUM ))
-   local node="NODE_${NODE_NUM}"
+function _ast_new_list {
+   (( ++_NODE_NUM ))
+   local node="NODE_${_NODE_NUM}"
    declare -gA "$node"
    declare -g NODE="$node"
 
-   # Similar to sections, arrays need a .items property to hold their values.
-   (( ++NODE_NUM ))
-   local items="NODE_${NODE_NUM}"
+   # Similar to sections, lists need a .items property to hold their values.
+   (( ++_NODE_NUM ))
+   local items="NODE_${_NODE_NUM}"
    declare -ga "$items"
 
    # Assign .items node.
@@ -177,13 +177,13 @@ function _ast_new_array {
    location:new
    node_r['location']="$LOCATION"
 
-   TYPEOF["$node"]='array'
+   TYPEOF["$node"]='list'
 }
 
 
 function _ast_new_type {
-   (( ++NODE_NUM ))
-   local node="NODE_${NODE_NUM}"
+   (( ++_NODE_NUM ))
+   local node="NODE_${_NODE_NUM}"
    declare -gA "$node"
    declare -g NODE="$node"
 
@@ -200,8 +200,8 @@ function _ast_new_type {
 
 
 function _ast_new_typecast {
-   (( ++NODE_NUM ))
-   local node="NODE_${NODE_NUM}"
+   (( ++_NODE_NUM ))
+   local node="NODE_${_NODE_NUM}"
    declare -gA "$node"
    declare -g  NODE="$node"
 
@@ -217,10 +217,10 @@ function _ast_new_typecast {
 
 
 function _ast_new_member {
-   # Only permissible in accessing section keys. Not in array indices.
+   # Only permissible in accessing section keys. Not in list indices.
 
-   (( ++NODE_NUM ))
-   local node="NODE_${NODE_NUM}"
+   (( ++_NODE_NUM ))
+   local node="NODE_${_NODE_NUM}"
    declare -gA "$node"
    declare -g NODE="$node"
 
@@ -236,10 +236,10 @@ function _ast_new_member {
 
 
 function _ast_new_index {
-   # Only permissible in accessing array indices. Not in sections.
+   # Only permissible in accessing list indices. Not in sections.
 
-   (( ++NODE_NUM ))
-   local node="NODE_${NODE_NUM}"
+   (( ++_NODE_NUM ))
+   local node="NODE_${_NODE_NUM}"
    declare -gA "$node"
    declare -g NODE="$node"
 
@@ -255,8 +255,8 @@ function _ast_new_index {
 
 
 function _ast_new_unary {
-   (( ++NODE_NUM ))
-   local node="NODE_${NODE_NUM}"
+   (( ++_NODE_NUM ))
+   local node="NODE_${_NODE_NUM}"
    declare -gA "$node"
    declare -g NODE="$node"
 
@@ -272,8 +272,8 @@ function _ast_new_unary {
 
 
 function _ast_new_boolean {
-   (( ++NODE_NUM ))
-   local node="NODE_${NODE_NUM}"
+   (( ++_NODE_NUM ))
+   local node="NODE_${_NODE_NUM}"
    declare -gA "$node"
    declare -g NODE="$node"
 
@@ -286,8 +286,8 @@ function _ast_new_boolean {
 
 
 function _ast_new_integer {
-   (( ++NODE_NUM ))
-   local node="NODE_${NODE_NUM}"
+   (( ++_NODE_NUM ))
+   local node="NODE_${_NODE_NUM}"
    declare -gA "$node"
    declare -g NODE="$node"
 
@@ -300,8 +300,8 @@ function _ast_new_integer {
 
 
 function _ast_new_string {
-   (( ++NODE_NUM ))
-   local node="NODE_${NODE_NUM}"
+   (( ++_NODE_NUM ))
+   local node="NODE_${_NODE_NUM}"
    declare -gA "$node"
    declare -g NODE="$node"
 
@@ -314,8 +314,8 @@ function _ast_new_string {
 
 
 function _ast_new_path {
-   (( ++NODE_NUM ))
-   local node="NODE_${NODE_NUM}"
+   (( ++_NODE_NUM ))
+   local node="NODE_${_NODE_NUM}"
    declare -gA "$node"
    declare -g NODE="$node"
 
@@ -328,8 +328,8 @@ function _ast_new_path {
 
 
 function _ast_new_identifier {
-   (( ++NODE_NUM ))
-   local node="NODE_${NODE_NUM}"
+   (( ++_NODE_NUM ))
+   local node="NODE_${_NODE_NUM}"
    declare -gA "$node"
    declare -g NODE="$node"
 
@@ -342,8 +342,8 @@ function _ast_new_identifier {
 
 
 function _ast_new_env_var {
-   (( ++NODE_NUM ))
-   local node="NODE_${NODE_NUM}"
+   (( ++_NODE_NUM ))
+   local node="NODE_${_NODE_NUM}"
    declare -gA "$node"
    declare -g NODE="$node"
 
@@ -358,12 +358,8 @@ function _ast_new_env_var {
 #──────────────────────────────────( utils )────────────────────────────────────
 function parser:init {
    declare -gi IDX=0
-   declare -g  TOKEN_r=''  TOKEN=''
-   # Calls to `advance' both globally set the name of the current/next node(s),
-   # e.g., `TOKEN_1', as well as declaring a nameref to the variable itself.
-
-   declare -g  ROOT=''        #< Root of this tree
-   declare -g  NODE=''        #< Last generated AST node
+   declare -g  TOKEN=''  TOKEN_r=''
+   declare -g  NODE=''
 }
 
 
@@ -438,8 +434,9 @@ function parser:program {
    local -n program_r="$program"
    program_r['header']="$header"
    program_r['container']="$container"
-
    parser:munch 'EOF'
+
+   declare -g NODE="$program"
 }
 
 
@@ -489,16 +486,10 @@ function parser:import {
    local path="$NODE"
    parser:munch 'PATH'  'expecting import path'
 
-   parser:munch 'AS'  'imports require `as <name>`'
-   parser:identifier "$TOKEN"
-   local ident="$NODE"
-   parser:munch 'IDENTIFIER'  'expecting import name'
-
    ast:new import
    local node="$NODE"
    local -n node_r="$node"
    node_r['path']="$path"
-   node_r['name']="$ident"
 
    parser:munch 'SEMI' "expecting \`;' after import"
 }
@@ -586,7 +577,6 @@ function parser:decl_variable {
    local node="$NODE"
    local -n node_r="$node"
 
-   #  ┌── incorrectly identified error by `shellcheck`.
    # shellcheck disable=SC2128
    node_r['name']="$ident"
 
@@ -702,7 +692,7 @@ function parser:typelist {
 # Priority (lowest to highest)
 #  ->       type casts                 3
 #   -       unary minus                5
-#   [       array index                7
+#   [       list index                 7
 #   .       member index               9
 #           string concatenation       11
 
@@ -718,7 +708,7 @@ declare -gA NUD=(
    [STRING]='parser:string'
    [INTEGER]='parser:integer'
    [DOLLAR]='parser:env_var'
-   [L_BRACKET]='parser:array'
+   [L_BRACKET]='parser:list'
    [IDENTIFIER]='parser:identifier'
 )
 
@@ -945,7 +935,7 @@ function parser:member {
    local -n node_r="$node"
 
    parser:identifier "$TOKEN"
-   parser:munch 'IDENTIFIER'  'member subscription requires an identifer'
+   parser:munch 'IDENTIFIER'  'member subscription requires an identifier'
 
    node_r['left']="$lhs"
    node_r['right']="$NODE"
@@ -958,15 +948,15 @@ function parser:member {
 }
 
 
-function parser:array {
-   # Opening `[` Token, for LOCATION informatino.
+function parser:list {
+   # Opening `[` Token, for LOCATION information.
    local open="$1"
    local -n open_r="$open"
 
    local anchor="$ANCHOR"
    declare -g ANCHOR="${open_r[location]}"
 
-   ast:new array
+   ast:new list
    local node="$NODE"
    local -n node_r="$node"
    local -n items_r="${node_r[items]}"
@@ -976,11 +966,11 @@ function parser:array {
       items_r+=( "$NODE" )
 
       parser:check 'R_BRACKET' && break
-      parser:munch 'COMMA' "array elements must be separated by \`,'"
+      parser:munch 'COMMA' "list elements must be separated by \`,'"
    done
 
    local close="$TOKEN"
-   parser:munch 'R_BRACKET' "array must be closed by \`]'."
+   parser:munch 'R_BRACKET' "list must be closed by \`]'."
 
    location:copy "$open"   "$node"  'file'  'start_ln'  'start_col'
    location:copy "$close"  "$node"  'file'  'end_ln'    'end_col'

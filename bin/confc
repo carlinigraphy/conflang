@@ -102,7 +102,7 @@ source "${LIBDIR}"/compiler.sh
 source "${LIBDIR}"/api.sh
 
 argparse "$@"
-evaluate
+evaluate "$INPUT"
 
 #declare -f conf > "$DATA_OUT"
 [[ ${!_SKELLY_*} ]] && declare -p ${!_SKELLY_*} > "$DATA_OUT"  ||:
