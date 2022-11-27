@@ -28,7 +28,7 @@ case "$1" in
    'run')   shift ; exec "${PROGDIR}"/bin/confc "$@"
             ;;
 
-   'rundb') shift ; CONFC_DEBUG='t' exec "${PROGDIR}"/bin/confc "$@"
+   'rundb') shift ; CONFC_TRACEBACK='sure' exec "${PROGDIR}"/bin/confc "$@"
             ;;
 
    'test')  shift ; args=( "$@" )

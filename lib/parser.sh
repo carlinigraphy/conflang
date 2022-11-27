@@ -3,8 +3,15 @@
 declare -gi NODE_NUM=0
 declare -gA TYPEOF=()
 
-# Wrapper around the below functions. Just for convenience. Little easier to
-# read as well perhaps.
+# ast:new()
+# @description
+#  Helper function wrapping all the below AST node creation functions.
+#
+# @example
+#  ast:new 'decl_section'
+#  local -n section_r="$NODE"
+#
+# @arg $1 str AST node's name to create
 function ast:new { _ast_new_"$1" ;}
 
 
@@ -50,10 +57,29 @@ function _ast_new_import {
 
    local -n node_r="$node"
    node_r['path']=''
-   node_r['as']=''
+   node_r['name']=''
 
    location:new
    node_r['location']="$LOCATION"
+
+   TYPEOF["$node"]='import'
+}
+
+
+function _ast_new_typedef {
+   (( ++NODE_NUM ))
+   local node="NODE_${NODE_NUM}"
+   declare -gA "$node"
+   declare -g NODE="$node"
+
+   local -n node_r="$node"
+   node_r['type']=''
+   node_r['name']=''
+
+   location:new
+   node_r['location']="$LOCATION"
+
+   TYPEOF["$node"]='typedef'
 }
 
 
@@ -132,25 +158,6 @@ function _ast_new_decl_variable {
 }
 
 
-# NYI
-#
-#function _ast_new_use {
-#   (( ++USE_NUM ))
-#   local node="NODE_${NODE_NUM}"
-#   declare -gA "$node"
-#   declare -g NODE="$node"
-#
-#   local -n node_r="$node"
-#   node_r['path']=       # the 'path' to the module
-#   node_r['name']=       # identifier, if using `as $ident;`
-#
-#   location:new
-#   node_r['location']="$LOCATION"
-#
-#   TYPEOF["$node"]='use'
-#}
-
-
 function _ast_new_array {
    (( ++NODE_NUM ))
    local node="NODE_${NODE_NUM}"
@@ -174,7 +181,7 @@ function _ast_new_array {
 }
 
 
-function _ast_new_typedef {
+function _ast_new_type {
    (( ++NODE_NUM ))
    local node="NODE_${NODE_NUM}"
    declare -gA "$node"
@@ -188,7 +195,7 @@ function _ast_new_typedef {
    location:new
    node_r['location']="$LOCATION"
 
-   TYPEOF["$node"]='typedef'
+   TYPEOF["$node"]='type'
 }
 
 
@@ -200,7 +207,7 @@ function _ast_new_typecast {
 
    local -n node_r="$node"
    node_r['expr']=''
-   node_r['typedef']=''
+   node_r['type']=''
 
    location:new
    node_r['location']="$LOCATION"
@@ -330,7 +337,6 @@ function _ast_new_identifier {
    node_r['value']=''
    node_r['location']=''
 
-   # shellcheck disable=SC2034
    TYPEOF["$node"]='identifier'
 }
 
@@ -345,7 +351,6 @@ function _ast_new_env_var {
    node_r['value']=''
    node_r['location']=''
 
-   # shellcheck disable=SC2034
    TYPEOF["$node"]='env_var'
 }
 
@@ -444,13 +449,23 @@ function parser:header {
    local -n node_r="$node"
    local -n items_r="${node_r[items]}"
 
-   declare -g ANCHOR="${TOKEN_r[location]}"
-   while parser:match 'IMPORT' ; do
-      parser:import
+   while parser:check 'IMPORT,TYPEDEF' ; do
+      parser:_header
       items_r+=( "$NODE" )
    done
 
    declare -g NODE="$node"
+}
+
+
+function parser:_header {
+   declare -g ANCHOR="${TOKEN_r[location]}"
+
+   if parser:match 'IMPORT' ; then
+      parser:import
+   elif parser:match 'TYPEDEF' ; then
+      parser:typedef
+   fi
 }
 
 
@@ -475,7 +490,6 @@ function parser:import {
    parser:munch 'PATH'  'expecting import path'
 
    parser:munch 'AS'  'imports require `as <name>`'
-
    parser:identifier "$TOKEN"
    local ident="$NODE"
    parser:munch 'IDENTIFIER'  'expecting import name'
@@ -490,7 +504,34 @@ function parser:import {
 }
 
 
+function parser:typedef {
+   parser:type
+   local type="$NODE"
+
+   parser:munch 'AS'  'typedefs require `as <name>`'
+   parser:identifier "$TOKEN"
+   local ident="$NODE"
+   parser:munch 'IDENTIFIER'  'expecting typedef name'
+
+   ast:new typedef
+   local node="$NODE"
+   local -n node_r="$node"
+   node_r['type']="$type"
+   node_r['name']="$ident"
+
+   parser:munch 'SEMI' "expecting \`;' after typedef"
+}
+
+
 function parser:declaration {
+   if parser:check 'IMPORT,TYPEDEF' ; then
+      e=( parse_error
+         --anchor "${TOKEN_r[location]}"
+         --caught "${TOKEN_r[location]}"
+         'import statements may only occur at the top of a file'
+      ); raise "${e[@]}"
+   fi
+
    parser:identifier "$TOKEN"
    parser:munch 'IDENTIFIER'  "expecting declaration or closing \`}'"
 
@@ -517,11 +558,8 @@ function parser:decl_section {
 
    local -n items_r="${node_r['items']}"
    while ! parser:check 'R_BRACE' ; do
-      parser:statement
-      # Ignore %-directives, they generate an empty NODE.
-      if [[ $NODE ]] ; then
-         items_r+=( "$NODE" )
-      fi
+      parser:declaration
+      items_r+=( "$NODE" )
    done
 
    local close="$TOKEN"
@@ -552,11 +590,11 @@ function parser:decl_variable {
    # shellcheck disable=SC2128
    node_r['name']="$ident"
 
-   # Typedefs.
+   # Type declaration.
    local open="${TOKEN_r[location]}"
    if parser:match 'AT' ; then
       declare -g ANCHOR="$open"
-      parser:typedef
+      parser:type
       node_r['type']="$NODE"
    fi
 
@@ -589,19 +627,34 @@ function parser:decl_variable {
    declare -g NODE="$node"
 }
 
-# parser:typedef()
-#
+
+# parser:type()
 # @description
-#  As records and lists may take parameters (`@rec[str, int]`), this function
-#  creates a linked list in the .params slot. Each type within .params sets
-#  the .next slot.
+#  Within the parameters of a type, [...], Type() nodes are assigned as a linked
+#  list to the .next slot. The pointer to the parameters themselves is in the
+#  .params slot.
 #
-function parser:typedef {
+# @example
+#  ```python
+#  class Type():
+#     def __init__(self, kind: str, param: Type, next: Type):
+#        self.kind  = kind
+#        self.param = param
+#        self.next  = next
+#  
+#  # rec[list[str], int]
+#  int  = Type('INT')
+#  str  = Type('STR')
+#  list = Type('LIST', param: str, next: int)
+#  rec  = Type('RECORD', param: list)
+#  ```
+#
+function parser:type {
    parser:identifier "$TOKEN"
    parser:munch 'IDENTIFIER' 'type declarations must be identifiers'
    local ident="$NODE"
 
-   ast:new typedef
+   ast:new type
    local node="$NODE"
    local -n node_r="$node"
    node_r['kind']="$ident"
@@ -611,10 +664,8 @@ function parser:typedef {
 
    if parser:match 'L_BRACKET' ; then
       declare -g ANCHOR="$open"
-
       parser:typelist
       node_r['params']="$NODE"
-
       parser:munch 'R_BRACKET' "type params must close with \`]'."
    fi
 
@@ -628,12 +679,12 @@ function parser:typedef {
 
 # @arg $1 NODE  The parent AST node
 function parser:typelist {
-   parser:typedef
+   parser:type
    local node="$NODE"
    local -n node_r="$node"
 
    while parser:match 'COMMA' ; do
-      parser:typedef
+      parser:type
       node_r['next']="$NODE"
       local -n node_r="$NODE"
    done
@@ -797,18 +848,21 @@ function parser:unary {
    node_r['op']="$op"
    node_r['right']="$NODE"
 
-   location:copy "$prev"   "$node"  'file'  'start_ln'  'start_col'
-   location:copy "$NODE"   "$node"  'file'  'end_ln'    'end_col'
+   location:copy "$prev"  "$node"  'file'  'start_ln'  'start_col'
+   location:copy "$NODE"  "$node"  'file'  'end_ln'    'end_col'
 
    declare -g ANCHOR="$anchor"
    declare -g NODE="$node"
 }
 
-
+# parser:concat()
+# @description
+#  String interpolation is parsed as a high left-associative infix operator.
+#
+# @arg $1 Expression  LHS expression
+# @arg $2 str         Concatenation operator
+# @arg $3 int         Right binding power
 function parser:concat {
-   # String (and path) interpolation are parsed as a high left-associative
-   # infix operator.
-
    local lhs="$1"  _=$2  rbp="$3"
                     # ^-- ignore operator
 
@@ -828,19 +882,6 @@ function parser:concat {
 
 
 function parser:typecast {
-   # Typecasts are a infix operator. The previous lhs is passed in as the
-   # 1st argument.
-   #
-   # Typecasts should have a low binding power, as they must apply to the
-   # entirety of the lhs expression, rather than binding to solely the last
-   # component of it.
-   #
-   # Example:
-   #> num_times_ten: "{%count}0" -> int;
-   #
-   # Should compile to  ...  ("" + %count + "0") -> int
-   # Rather than        ...  ("" + %count +) ("0" -> int)
-   #
    local lhs="$1"
    
    local anchor="$ANCHOR"
@@ -851,9 +892,9 @@ function parser:typecast {
    local node="$NODE"
    local -n node_r="$node"
 
-   parser:typedef
+   parser:type
    node_r['expr']="$lhs"
-   node_r['typedef']="$NODE"
+   node_r['type']="$NODE"
 
    location:copy "$lhs"   "$node"  'file'  'start_ln'  'start_col'
    location:copy "$NODE"  "$node"  'file'  'end_ln'    'end_col'

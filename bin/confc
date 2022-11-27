@@ -1,6 +1,9 @@
 #!/bin/bash
 set -eo pipefail
-[[ $CONFC_DEBUG ]] && trap '(( $? )) && traceback 2' EXIT
+
+if [[ $CONFC_TRACEBACK ]] ; then
+   trap '(( $? )) && traceback 2' EXIT
+fi
 
 # Current environment's variables. When the user queries an env var (e.g., PATH)
 # we need to make sure it isn't something that's been stomped on by a variable
@@ -99,7 +102,6 @@ source "${LIBDIR}"/compiler.sh
 source "${LIBDIR}"/api.sh
 
 argparse "$@"
-echo $INPUT
 evaluate
 
 #declare -f conf > "$DATA_OUT"

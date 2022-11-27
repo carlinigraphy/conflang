@@ -110,7 +110,7 @@ function pprint_decl_variable {
 }
 
 
-function pprint_typedef {
+function pprint_type {
    local -- save=$NODE
    local -n node=$save
 
@@ -129,7 +129,7 @@ function pprint_typecast {
    local -n node="$NODE"
    walk_pprint "${node[expr]}"
    printf ' -> '
-   walk_pprint "${node[typedef]}"
+   walk_pprint "${node[type]}"
 }
 
 

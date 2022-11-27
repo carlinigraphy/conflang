@@ -328,7 +328,7 @@ function symtab_decl_variable {
 }
 
 
-function symtab_typedef {
+function symtab_type {
    local -n node_r="$NODE"
    local -n name_r="${node_r[kind]}"
    local name="${name_r[value]}"
@@ -623,7 +623,7 @@ function merge_variable {
 
 function merge_type {
    # This it's not a semantic typecheck. It only enforces the deference in a
-   # child's typedef. The child must either...
+   # child's type. The child must either...
    #  1. match exactly
    #  2. be 'ANY'
    #  3. not exist (in the case of a parent subtype, and the child's is empty)
@@ -892,7 +892,7 @@ function semantics_decl_section {
 
 
 function semantics_decl_variable {
-   # The Symbol.type will be set to the "evaluated" type. If there is a typedef,
+   # The Symbol.type will be set to the "evaluated" type. If there is a type,
    # the expression's type must evaluate to *at least* the requirements of the
    # declared type, though can be more specific.
    #
@@ -935,7 +935,7 @@ function semantics_decl_variable {
 }
 
 
-function semantics_typedef {
+function semantics_type {
    local node="$NODE"
    local -n node_r="$node"
    local -n name_r="${node_r[kind]}"
@@ -965,7 +965,7 @@ function semantics_typedef {
 
 function semantics_typecast {
    local -n node_r="$NODE"
-   walk:semantics ${node_r[typedef]}
+   walk:semantics ${node_r[type]}
 }
 
 
