@@ -15,6 +15,7 @@
    the `file`-based functions are kinda janky. Need to clean up just all that
    nonsense.
 
+
 2022-11-27
    Wondering about `import ... as ...;`. There is no way to then put the
    imported section into the file. Sections are not expressions. Merely a
@@ -34,3 +35,13 @@
 
    I think for now we ignore this. Concatenation only. Can look at it again down
    the line.
+
+   What may be overwritten in a symbol when included?
+      - Expressions
+      - Types may be declared with equal or greater specificity
+
+
+   After the parsing & symbol table phases, I don't think we actually need to
+   parse the entirety of the AST. Can just do sections, starting with the
+   %container. The header information is unnecessary after imports, and typedefs
+   (which are handled in the symtab phase).

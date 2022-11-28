@@ -205,7 +205,18 @@ function copy_type {
    declare -g TYPE="$t1"
 }
 
-#──────────────────────────────( create scopes )────────────────────────────────
+#-------------------------------------------------------------------------------
+# @section                       Create scopes
+# @description
+#  1. Creates .symtab references in nodes of...
+#     * Section declarations
+#     * Variable declarations
+#     * Identifiers
+#  2. Explodes if...
+#     * Variable already declared in that scope
+#     * Type isn't found in symbol table
+#     * Type isn't a valid type
+
 function walk:symtab {
    declare -g NODE="$1"
    symtab_"${TYPEOF[$NODE]}"
@@ -217,11 +228,14 @@ function symtab_program {
    populate_globals
    local symtab="$SYMTAB"
 
-   local -n node_r="$NODE"
+   local node="$NODE"
+   local -n node_r="$node"
+
    walk:symtab "${node_r[header]}"
    walk:symtab "${node_r[container]}"
 
    declare -g SYMTAB="$symtab"
+   declare -g NODE="$node"
 }
 
 

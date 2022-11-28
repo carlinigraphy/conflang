@@ -1,8 +1,11 @@
 #!/bin/bash
-#
-# All of the utilities that tie together functionality from the lexer, parser,
-# and compiler. Allows re-entering the parser for each included file, and
-# concatenating (not literally, but in spirt) imported files.
+#===============================================================================
+# @section                           Utils
+# @description
+#  All of the utilities that tie together functionality from the lexer, parser,
+#  and compiler. Allows re-entering the parser for each included file, and
+#  concatenating (not literally, but in spirt) imported files.
+#-------------------------------------------------------------------------------
 
 function utils:init {
    # Compiled output tree file location. Defaults to stdout.
@@ -29,6 +32,16 @@ function utils:init {
    # %constrain statement.
    declare -ga FILES=()
    declare -gi FILE_IDX
+
+   # Create resulting "file tuple". Any parsed or imported files will be folded
+   # into these blank resulting ones.
+   declare -ga FILE_TUPLES=()
+   declare -g  TUPLE=
+   declare -gi _TUPLE_NUM=0
+
+   # Results of the parsing, symtab, and import phases.
+   declare -g  FINAL_AST
+   declare -g  FINAL_SYMTAB
 }
 
 
@@ -41,6 +54,7 @@ function location:new {
    # Without a value, this isn't glob matched by ${!_LOC_*} expansion
    local -n l="$loc" ; l=()
 }
+
 
 # location:copy()
 # @description
@@ -68,6 +82,7 @@ function location:copy {
    done
 }
 
+
 # location:cursor()
 # @description
 #  Convenience function to create a location at the current cursor's position.
@@ -86,6 +101,7 @@ function location:cursor {
    loc_r['end_ln']="${CURSOR[lineno]}"
    loc_r['end_col']="${CURSOR[colno]}"
 }
+
 
 # utils:add_file()
 # @description
@@ -148,12 +164,15 @@ function utils:add_file {
    (( FILE_IDX = ${#FILES[@]} - 1 )) ||:
 }
 
+
 # utils:parse()
 # @description
 #  Generates the AST & symbol table for a single file.
 #
 # @sets  NODE
 # @sets  SYMTAB
+# @sets  FILE_TUPLES
+# @sets  TUPLE
 # @arg   $1    str         Path to file to parse
 # @arg   $2    LOCATION    [Optional] For error reporting of import statements
 function utils:parse {
@@ -161,48 +180,43 @@ function utils:parse {
 
    lexer:init
    lexer:scan
-   # Exports:
-   #  list  TOKENS[]
-   #  dict  TOKEN_*
 
    parser:init
    parser:parse
-   # Exports:
-   #  dict  TYPEOF{}
-   #  dict  NODE_*
 
    local root="$NODE"
-   walk:symtab  "$root"
-   utils:import "$root"  "$SYMTAB"
-   # For each `import` statement, parse & concatenate returning a new AST and
-   # symbol table.
+   walk:symtab "$root"
+
+   utils:mk_tuple  "$NODE"  "$SYMTAB"
+   FILE_TUPLES+=( "$TUPLE" )
 }
 
-# utils:import()
+
+# utils:mk_tuple()
 # @description
-#  Identifies and merges all include statements for this given file.
+#  Creates a tuple of {AST,Symtab}, to be merged and folded.
 #
-# @arg   $1    NODE     Root AST node for a file
-# @arg   $2    SYMTAB   Associated symbol table
-function utils:import {
-   local node="$1"
-   local -n node_r="$node"
-   local -n header_r="${node_r[header]}"
-   local -n container_r="${node_r[container]}"
+# @see   imports:merge
+# @see   imports:fold
+#
+# @sets  FILE_TUPLES[]
+# @sets  TUPLE
+#
+# @arg   $1    NODE    Root node of AST
+# @arg   $2    SYMTAB  Root node of corresponding symbol table
+function utils:mk_tuple {
+   local node="$1"  symtab="$2"
 
-   local symtab="$2"
-   local -n symtab_r="$symtab"
+   (( ++_TUPLE_NUM ))
+   local tuple="TUPLE_${_TUPLE_NUM}"
+   declare -gA "$tuple"
+   declare -g TUPLE="$tuple"
 
-   local path location
-   for h in "${header_r[@]}" ; do
-      if [[ ! ${TYPEOF[$h]} == import ]] ; then
-         continue
-      fi
-
-      local -n h_r="$h"
-      utils:parse "${h_r[path]}"  "${h_r[location]}"
-   done
+   local -n t_r="$tuple"
+   t_r['node']="$node"
+   t_r['symtab']="$symtab"
 }
+
 
 # utils:eval
 # @description
@@ -222,6 +236,7 @@ function utils:eval {
    walk:compiler "$NODE"
 }
 
+
 # evaluate()
 # @description
 #  Wrapper function to kick off the whole parse, typcheck, and evaluation
@@ -233,5 +248,9 @@ function utils:eval {
 function evaluate {
    utils:init
    utils:parse "$1"
+
+   imports:parse "$NODE"
+   imports:fold
+
    #utils:eval
 }

@@ -5,10 +5,8 @@ if [[ $CONFC_TRACEBACK ]] ; then
    trap '(( $? )) && traceback 2' EXIT
 fi
 
-# Current environment's variables. When the user queries an env var (e.g., PATH)
-# we need to make sure it isn't something that's been stomped on by a variable
-# declared within this script itself. By returning the value of SNAPSHOT[$var],
-# we're guaranteed to never have stomped a value.
+# When querying an env var, must ensure it hasn't been stomped by a variable
+# declared within this script itself. Returning value of SNAPSHOT[$var].
 declare -gA SNAPSHOT=()
 while IFS= read -r -d '' line ; do
    key="${line%%=*}"
@@ -91,6 +89,9 @@ source "${LIBDIR}"/lexer.sh
 
 # shellcheck source=./lib/parser.sh
 source "${LIBDIR}"/parser.sh
+
+# shellcheck source=./lib/imports.sh
+source "${LIBDIR}"/imports.sh
 
 # shellcheck source=./lib/symbols.sh
 source "${LIBDIR}"/symbols.sh
