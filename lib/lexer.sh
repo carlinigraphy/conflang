@@ -1,7 +1,5 @@
 #!/bin/bash
 
-declare -gi TOKEN_NUM=0
-
 declare -gA KEYWORD=(
    ['true']=true
    ['false']=true
@@ -13,14 +11,12 @@ declare -gA KEYWORD=(
 # lexer:init()
 # @description
 #  Resets global variables that are specific to *only* this run of the lexer.
-#  Some information (e.g., `TOKEN_NUM`) helps to not reset. Allows for easier
+#  Some information (e.g., `_TOKEN_NUM`) helps to not reset. Allows for easier
 #  debugging if it's not constantly stomped by each successive run.
 #
-# @noargs
 function lexer:init {
-   local lines="FILE_${FILE_IDX}_LINES"
-   declare -ga  "$lines"
-   declare -g   FILE_LINES="$lines"
+   local -n file_r="$FILE"
+   declare -g   FILE_LINES="${file_r[lines]}"
    declare -g   CHAR=''  PEEK_CHAR=''
    declare -ga  CHARRAY=()
    declare -ga  TOKENS=()
@@ -37,15 +33,15 @@ function lexer:init {
 #  via frozen start line/col, and ending line/col.
 #
 # @env   LOCATION
-# @sets  TOKENS[]
-# @sets  TOKEN_*
-# @ags   $1    str   Type of Token ('INTEGER', 'STRING', ...)
-# @ags   $2    str   Value of Token (character, string, identifier, ...)
+# @set   TOKENS[]
+# @set   TOKEN_*
+# @arg   $1    :str   Type of Token ('INTEGER', 'STRING', ...)
+# @arg   $2    :str   Value of Token (character, string, identifier, ...)
 function token:new {
    local type=$1  value=$2
 
-   (( ++TOKEN_NUM ))
-   local token="TOKEN_${TOKEN_NUM}"
+   (( ++_TOKEN_NUM ))
+   local token="TOKEN_${_TOKEN_NUM}"
    declare -gA "$token"
    TOKENS+=( "$token" )
 
@@ -60,49 +56,30 @@ function token:new {
    t_r['location']="$LOCATION"
 
    local -n loc_r="$LOCATION"
-   loc_r['file']="$FILE_IDX"
    loc_r['start_ln']="${FREEZE[lineno]}"
    loc_r['start_col']="${FREEZE[colno]}"
    loc_r['end_ln']="${CURSOR[lineno]}"
    loc_r['end_col']="${CURSOR[colno]}"
-}
 
-# lexer:advance()
-# @description
-#  Advances cursor position in file. Sets global vars for the current and next
-#  characters.
-#  
-# @env   CURSOR
-# @env   CHARRAY
-# @sets  CHAR
-# @sets  PEEK_CHAR
-# @noargs
-function lexer:advance {
-   (( ++CURSOR['colno'] )) ||:
-   (( ++CURSOR['index'] )) ||:
-   local -i idx="${CURSOR[index]}"
-
-   declare -g CHAR="${CHARRAY[$idx]}"
-   declare -g PEEK_CHAR="${CHARRAY[$idx + 1]}"
-
-   if [[ "$CHAR" == $'\n' ]] ; then
-      (( ++CURSOR['lineno'] ))
-      CURSOR['colno']=0
-   fi
+   local -n file_r="$FILE"
+   loc_r['file']="${file_r[path]}"
 }
 
 
 function lexer:scan {
+   local -n file_r="$FILE"
+   local input="${file_r[path]}"
+
    # For later error reporting. Easier to report errors by line number if we
    # have them in lines... by number...
    local -n file_lines_r="$FILE_LINES"
-   mapfile -t -O1 file_lines_r < "${FILES[-1]}"
+   mapfile -t -O1 file_lines_r < "$input"
 
    # For easier lookahead, read all characters first into an array. Allows us
    # to seek/index very easily.
    while read -rN1 character ; do
       CHARRAY+=( "$character" )
-   done < "${FILES[-1]}"
+   done < "$input"
 
    while (( "${CURSOR[index]}" < ${#CHARRAY[@]} )) ; do
       lexer:advance ; [[ ! "$CHAR" ]] && break
@@ -204,6 +181,31 @@ function lexer:scan {
    FREEZE[lineno]="${CURSOR[lineno]}"
    FREEZE[colno]="${CURSOR[colno]}"
    token:new 'EOF'
+}
+
+
+# lexer:advance()
+# @description
+#  Advances cursor position in file. Sets global vars for the current and next
+#  characters.
+#  
+# @env   CURSOR
+# @env   CHARRAY
+# @set   CHAR
+# @set   PEEK_CHAR
+# @noargs
+function lexer:advance {
+   (( ++CURSOR['colno'] )) ||:
+   (( ++CURSOR['index'] )) ||:
+   local -i idx="${CURSOR[index]}"
+
+   declare -g CHAR="${CHARRAY[$idx]}"
+   declare -g PEEK_CHAR="${CHARRAY[$idx + 1]}"
+
+   if [[ "$CHAR" == $'\n' ]] ; then
+      (( ++CURSOR['lineno'] ))
+      CURSOR['colno']=0
+   fi
 }
 
 
@@ -408,14 +410,14 @@ function lexer:fstring {
          #
          # In that case we want to only add one concatenation token before, and
          # omit the closing one.
-         local t0="$TOKEN_NUM"
+         local t0="$_TOKEN_NUM"
 
          lexer:interpolation
          lexer:advance # past the closing `}'
 
          # Only create the closing CONCAT token if there were contents to the
          # expression.
-         local t1="$TOKEN_NUM"
+         local t1="$_TOKEN_NUM"
          if (( $t0 != $t1 )) ; then
             token:new 'CONCAT'
          fi
@@ -431,7 +433,6 @@ function lexer:fstring {
       join+="$c"
    done
 
-   # Create token.
    token:new 'STRING' "$join"
 }
 
@@ -495,14 +496,14 @@ function lexer:fpath {
          #
          # In that case we want to only add one concatenation token before, and
          # omit the closing one.
-         local t0="$TOKEN_NUM"
+         local t0="$_TOKEN_NUM"
 
          lexer:interpolation
          lexer:advance # past the closing `}'
 
          # Only create the closing CONCAT token if there were contents to the
          # expression.
-         local t1="$TOKEN_NUM"
+         local t1="$_TOKEN_NUM"
          if (( $t0 != $t1 )) ; then
             token:new 'CONCAT'
          fi
@@ -518,6 +519,5 @@ function lexer:fpath {
       join+="$c"
    done
 
-   # Create token.
    token:new 'PATH' "$join"
 }

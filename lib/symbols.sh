@@ -65,22 +65,34 @@ function populate_globals {
 }
 
 
-#───────────────────────────────( symbol table )────────────────────────────────
-declare -- SYMTAB=
-declare -i SYMTAB_NUM=0
 
-declare -A SYMTAB_PARENT=()
-# Rather than the traditional stack of symbol tables that we push & pop from,
-# a map of each symtab to its parent is easier to implement in Bash. Less
-# nonsense.
+#===============================================================================
+# @section                        Symbol table trees
+# @description
+#  Rather than the traditional stack of symbol tables that we push & pop from,
+#  a map of each symtab to its parent is easier to implement in Bash. Less
+#  nonsense.
+#-------------------------------------------------------------------------------
 
-# Symbol table API. Directly calls sub-commands:
-#  new()       :: creates new symtab, assigns previous one as its parent.
-#  get(key)    :: recursively searches upward for Symbol identified by $key.
-#  strict(key) :: searches only current symtab for Symbol identified by $key.
-#  set(symbol) :: sets ${symbol[name]} -> $symbol in current symtab
-#  from(node)  :: sets global $SYMTAB pointer to that referenced in $node
+# symtab()
+# @description
+#  Symbol table API. Directly calls sub-commands:
+#  - `new()`       :: create new symtab, assigns previous one as its parent
+#  - `get(key)`    :: recursively search upward for Symbol identified by `$key`
+#  - `strict(key)` :: search only current symtab for Symbol identified by `$key`
+#  - `set(symbol)` :: set `${symbol[name]}` -> `$symbol` in current symtab
+#  - `from(node)`  :: set global `$SYMTAB` pointer to that referenced in $node
 #
+#  The first argument is the sub-command to call. Additional arguments are
+#  passed to that command.
+#
+#  Example:
+#  ```bash
+#  symtab get "key"
+#  #--^ calls `_symtab_get key`
+#  ```
+#
+# @arg   $1    :str     Sub-command to call
 function symtab {
    local cmd="$1" ; shift
    _symtab_"$cmd" "$@"
@@ -88,8 +100,8 @@ function symtab {
 
 # new()  :: creates new symtab, assigns previous one as its parent.
 function _symtab_new {
-   (( ++SYMTAB_NUM ))
-   local symtab="SYMTAB_${SYMTAB_NUM}"
+   (( ++_SYMTAB_NUM ))
+   local symtab="SYMTAB_${_SYMTAB_NUM}"
    local old_symtab="$SYMTAB"
 
    declare -gA "$symtab"
@@ -151,12 +163,9 @@ function _symtab_from {
 }
 
 
-declare -- SYMBOL=
-declare -i SYMBOL_NUM=${TYPE_NUM:-0}
-
 function mk_symbol {
-   (( ++SYMBOL_NUM ))
-   local   --  sname="SYMBOL_${SYMBOL_NUM}"
+   (( ++_SYMBOL_NUM ))
+   local   --  sname="SYMBOL_${_SYMBOL_NUM}"
    declare -gA $sname
    declare -g  SYMBOL=$sname
    local   -n  symbol=$sname
@@ -169,12 +178,9 @@ function mk_symbol {
 }
 
 
-declare -- TYPE=
-declare -i TYPE_NUM=${TYPE_NUM:-0}
-
 function mk_type {
-   (( ++TYPE_NUM ))
-   local type="TYPE_${TYPE_NUM}"
+   (( ++_TYPE_NUM ))
+   local type="TYPE_${_TYPE_NUM}"
    declare -gA $type
    declare -g  TYPE="$type"
 
@@ -205,7 +211,7 @@ function copy_type {
    declare -g TYPE="$t1"
 }
 
-#-------------------------------------------------------------------------------
+#===============================================================================
 # @section                       Create scopes
 # @description
 #  1. Creates .symtab references in nodes of...
@@ -216,7 +222,14 @@ function copy_type {
 #     * Variable already declared in that scope
 #     * Type isn't found in symbol table
 #     * Type isn't a valid type
+#-------------------------------------------------------------------------------
 
+# walk:symtab()
+# @description
+#  Calls the appropriate `symtab_`-prefixed function depending on the node
+#  type.
+#
+# @arg   $1    :NODE
 function walk:symtab {
    declare -g NODE="$1"
    symtab_"${TYPEOF[$NODE]}"

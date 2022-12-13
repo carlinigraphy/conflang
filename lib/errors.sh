@@ -111,20 +111,24 @@ function raise {
 #  Compiles the start line/column of the anchor & caught positions into a single
 #  ERROR{} object.
 #
-# @arg $1 LOCATION  Node for the `start_ln` and `start_col`
-# @arg $2 LOCATION  Node for the `end_ln` and `end_col`
+# @arg   $1    :LOCATION   Node for the `start_ln` and `start_col`
+# @arg   $2    :LOCATION   Node for the `end_ln` and `end_col`
 function build_error_location {
    local -n anchor_r="$1"
    local -n caught_r="$2"
    local -n error_r="$ERROR"
 
-   error_r[anchor_file_name]="${FILES[${anchor_r[file]}]}"
-   error_r[anchor_file_lines]="FILE_${anchor_r[file]}_LINES"
+   local anchor_file_name="${anchor_r[file]}"
+   local -n anchor_file_r="${FILES[$anchor_file_name]}"
+   error_r[anchor_file_name]="$anchor_file_name"
+   error_r[anchor_file_lines]="${anchor_file_r[lines]}"
    error_r[anchor_ln]="${anchor_r[start_ln]}"
    error_r[anchor_col]="${anchor_r[start_col]}"
 
-   error_r[caught_file_name]="${FILES[${caught_r[file]}]}"
-   error_r[caught_file_lines]="FILE_${caught_r[file]}_LINES"
+   local caught_file_name="${caught_r[file]}"
+   local -n caught_file_r="${FILES[$caught_file_name]}"
+   error_r[caught_file_name]="$caught_file_name"
+   error_r[caught_file_lines]="${caught_file_r[lines]}"
    error_r[caught_ln]="${caught_r[start_ln]}"
    error_r[caught_col]="${caught_r[start_col]}"
 }

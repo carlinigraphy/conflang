@@ -4,13 +4,10 @@
 #  STRIP_WHITESPACE  :: set to "yes" if empty lines should be skipped
 #  STRIP_COMMENTS    :: set to "yes" if comments should be skipped
 
-BEGIN {
-   skip = "no"
+BEGIN { skip = "no" }
 
-   # We're stripping the shebang from each file. Add one here for the
-   # concatenated result.
-   print "#!/usr/bin/env bash"
-}
+# Skips shebangs after the initial file's.
+/^#!/ && (FNR == 1) && (FNR != NR) { next }
 
 # Clean up EOL whitespace
 { sub(/\s*$/, "") }

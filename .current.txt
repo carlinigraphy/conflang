@@ -1,4 +1,4 @@
-# vim: ft=conf
+# vim: ft=conf tw=80
 
 2022-11-25
    1. [x] Throw away `constrain` stuff
@@ -16,32 +16,66 @@
    nonsense.
 
 
-2022-11-27
-   Wondering about `import ... as ...;`. There is no way to then put the
-   imported section into the file. Sections are not expressions. Merely a
-   collection of declarations.
+2022-12-10
+   # TODO:
+   Decide on the cleanest / most elegant way to handle importing files.
 
-   Can either:
-      1. Allow `as <name>` to bind to a symbol, or not to concatenate into the
-         file, or
-      2. Only use the `as <name>` form, and require use of a keyword to place
-         it in the file
+   Makes sense to have global IMPORTS[] array.
+   - Ensure files are imported & merged in the correct order
 
-   I worry about binding to a name, as it's easy for a downstream file to
-   inadvertanly stomp on the name.
+   Makes sense for FILES to be an indexed array.
+   - Easier merging ASTs left, as there is an order
 
-   Hmm. Should be caught by typechecking though. Pulling in the values of a
-   section with a `from <name>;` statement or something only may take a section.
+   Makes sense for FILES to be an associative array.
+   - Can map from an absolute path in IMPORTS[] to its FILE obj. in FILES[]
 
-   I think for now we ignore this. Concatenation only. Can look at it again down
-   the line.
+   May be able to use global IMPORTS[] as the ordered version. If the first
+   passed in file path is also added to the IMPORTS, it is the order we need.
 
-   What may be overwritten in a symbol when included?
-      - Expressions
-      - Types may be declared with equal or greater specificity
+   IMPORTS[] holds the order of absolute file paths
+   FILES{} maps a file path to its FILE object
+
+   
+   Think I'm going to need to kinda just stream of consciousness on this one
+   until I work out a good idea, or have some sorta brain blast.
 
 
-   After the parsing & symbol table phases, I don't think we actually need to
-   parse the entirety of the AST. Can just do sections, starting with the
-   %container. The header information is unnecessary after imports, and typedefs
-   (which are handled in the symtab phase).
+   Need a level-order tree traversal for imports. Still think likely easiest
+   with flat map appended to as each statement is hit.
+
+   Barfies.
+
+   Feel like it should not be this hard to think of how to import and parse
+   files.
+
+
+2022-12-11
+   Did some journaling on napkins. Always the best way to work through problems.
+   The solution:
+
+   > function resolve (path)
+   >    global files = {}
+   >    path = $( realpath path )
+   >    files[path] = new File()
+   >    return path
+   > end
+
+   > # Initial file passed in on the CLI
+   > imports.push( resolve($1) )
+
+   > for (path in imports)
+   >    file = files[path]
+   >    {ast, symtab} = parse(path)
+
+   >    file['ast']    = ast
+   >    file['symtab'] = symtab
+
+   >    imports.push([ node.ident.value
+   >          for node in ast.header
+   >          if node.type == 'import' ])
+   > end
+
+   Has a minimal amount of handling the inital case specially.
+
+   If the "resolve" function also adds the function to IMPORTS, then only need
+   to call `file:resolve $INPUT`, and begin the loop.

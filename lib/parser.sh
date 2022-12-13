@@ -1,17 +1,15 @@
 #!/bin/bash
 
-declare -gi _NODE_NUM=0
-declare -gA TYPEOF=()
+#===============================================================================
+# @section                            AST
+# @description               Generating tree nodes.
+#-------------------------------------------------------------------------------
 
 # ast:new()
 # @description
 #  Helper function wrapping all the below AST node creation functions.
 #
-# @example
-#  ast:new 'decl_section'
-#  local -n section_r="$NODE"
-#
-# @arg $1 str AST node's name to create
+# @arg   $1    :str     AST node's name to create
 function ast:new { _ast_new_"$1" ;}
 
 
@@ -92,11 +90,13 @@ function _ast_new_container {
 
    location:new
    local -n loc_r="$LOCATION"          #--^ name's location info
-   loc_r['file']="$FILE_IDX"
    loc_r['start_ln']=1
    loc_r['start_col']=1
    loc_r['end_ln']=1
    loc_r['end_col']=1
+
+   local -n file_r="$FILE"
+   loc_r['file']="${file_r[path]}"
 
    ast:new decl_section                # section:  %container
    local node="$NODE"
@@ -107,7 +107,7 @@ function _ast_new_container {
    local -n loc_r="$LOCATION"
    loc_r['start_ln']=1
    loc_r['start_col']=1
-   loc_r['file']="$FILE_IDX"
+   loc_r['file']="${file_r[path]}"
 }
 
 
@@ -355,7 +355,89 @@ function _ast_new_env_var {
 }
 
 
-#──────────────────────────────────( utils )────────────────────────────────────
+#===============================================================================
+# @section                        parser utils
+#-------------------------------------------------------------------------------
+
+# location:new()
+# @set   LOCATION
+# @set   _LOC_NUM
+# @noargs
+function location:new {
+   (( ++_LOC_NUM ))
+   local loc="LOC_${_LOC_NUM}"
+   declare -gA "$loc"
+   declare -g  LOCATION="$loc"
+
+   local -n loc_r="$loc"
+   loc_r['start_ln']=
+   loc_r['start_col']=
+   loc_r['end_ln']=
+   loc_r['end_col']=
+
+   local -n file_r="$FILE"
+   loc_r['file']="${file_r[path]}"
+}
+
+
+# location:copy()
+# @description
+#  Copies the properties from `$1`'s location node to `$2`'s. If no properties
+#  are specified copy all of them. May only operate on `TOKEN`s and `NODE`s.
+#
+# @arg   $1    :NODE    Source location-containing node
+# @arg   $2    :NODE    Destination location-containing node
+function location:copy {
+   local -n from_r="$1" ; shift
+   local -n to_r="$1"   ; shift
+   local -a props=( "$@" )
+
+   local -n from_loc_r="${from_r[location]}"
+   local -n to_loc_r="${to_r[location]}"
+
+   if (( ! ${#props[@]} )) ; then
+      props=( "${!from_loc_r[@]}" )
+   fi
+
+   local k v
+   for k in "${props[@]}" ; do
+      v="${from_loc_r[$k]}"
+      to_loc_r["$k"]="$v"
+   done
+}
+
+
+# location:cursor()
+# @description
+#  Convenience function to create a location at the current cursor's position.
+#  Cleans up otherwise messy and repetitive code in the lexer.
+#
+# @set  LOCATION
+# @env  CURSOR
+#
+# @noargs
+function location:cursor {
+   location:new
+   local -n loc_r="$LOCATION"
+   loc_r['start_ln']="${CURSOR[lineno]}"
+   loc_r['start_col']="${CURSOR[colno]}"
+   loc_r['end_ln']="${CURSOR[lineno]}"
+   loc_r['end_col']="${CURSOR[colno]}"
+
+   local -n file_r="$FILE"
+   loc_r['file']="${file_r[path]}"
+}
+
+
+# parser:init()
+# @description
+#  Resets elements of the parser that cannot carry from run to run.
+#
+# @set   IDX
+# @set   TOKEN
+# @set   TOKEN_r
+# @set   NODE
+# @noargs
 function parser:init {
    declare -gi IDX=0
    declare -g  TOKEN=''  TOKEN_r=''
@@ -376,12 +458,12 @@ function parser:advance {
 #  Holdover until I wire up synchronization function. Called by parser:advance()
 #  to advance current global Token and nameref pointers.
 #
-# @see parser:advance
+# @see   parser:advance
 #
 # @env   TOKENS
 # @env   IDX
-# @sets  TOKEN
-# @sets  TOKEN_r
+# @set   TOKEN
+# @set   TOKEN_r
 # @noargs
 function parser:_advance {
    if (( $IDX < ${#TOKENS[@]} )) ; then
@@ -425,14 +507,16 @@ function parser:parse {
    parser:program
 }
 
-#────────────────────────────( grammar functions )──────────────────────────────
+#===============================================================================
+# @section                     Grammar functions
+#-------------------------------------------------------------------------------
 
 # parser:program()
 # @description
 #  program  -> header container EOF
 #
 # @env   NODE
-# @sets  NODE
+# @set   NODE
 # @noargs
 function parser:program {
    parser:header
@@ -460,8 +544,8 @@ function parser:program {
 # @see   parser:typedef
 #
 # @env   NODE
-# @sets  NODE
-# @sets  ANCHOR
+# @set   NODE
+# @set   ANCHOR
 # @noargs
 function parser:header {
    ast:new header
@@ -470,21 +554,21 @@ function parser:header {
    local -n items_r="${node_r[items]}"
 
    while parser:check 'IMPORT,TYPEDEF' ; do
-      parser:_header
+      declare -g ANCHOR="${TOKEN_r[location]}"
+      local open="$TOKEN"
+
+      if parser:match 'IMPORT' ; then
+         parser:import "$open"
+      elif parser:match 'TYPEDEF' ; then
+         parser:typedef "$open"
+      fi
+
       items_r+=( "$NODE" )
    done
 
    declare -g NODE="$node"
 }
-function parser:_header {
-   declare -g ANCHOR="${TOKEN_r[location]}"
 
-   if parser:match 'IMPORT' ; then
-      parser:import
-   elif parser:match 'TYPEDEF' ; then
-      parser:typedef
-   fi
-}
 
 # parser:container()
 # @description
@@ -493,7 +577,7 @@ function parser:_header {
 # @see   parser:declaration
 #
 # @env   NODE
-# @sets  NODE
+# @set   NODE
 # @noargs
 function parser:container {
    ast:new container
@@ -509,15 +593,19 @@ function parser:container {
    declare -g NODE="$node"
 }
 
+
 # parser:import()
 # @description
 #  import  ->  "import"  IDENTIFIER  ";"
 #
 # @env   NODE
 # @env   TOKEN
-# @sets  NODE
-# @noargs
+# @set   NODE
+#
+# @arg   $1    :LOCATION   Location for `import` keyword
 function parser:import {
+   local open="$1"
+
    parser:path "$TOKEN"
    local path="$NODE"
    parser:munch 'PATH'  'expecting import path'
@@ -527,8 +615,13 @@ function parser:import {
    local -n node_r="$node"
    node_r['path']="$path"
 
+   local close="$TOKEN"
    parser:munch 'SEMI' "expecting \`;' after import"
+
+   location:copy "$open"   "$node"  'file'  'start_ln'  'start_col'
+   location:copy "$close"  "$node"  'file'  'end_ln'    'end_col'
 }
+
 
 # parser:typedef()
 # @description
@@ -540,9 +633,12 @@ function parser:import {
 #
 # @env   NODE
 # @env   TOKEN
-# @sets  NODE
-# @noargs
+# @set   NODE
+#
+# @arg   $1    :LOCATION   Location for `import` keyword
 function parser:typedef {
+   local open="$1"
+
    parser:type
    local type="$NODE"
 
@@ -560,6 +656,7 @@ function parser:typedef {
    parser:munch 'SEMI' "expecting \`;' after typedef"
 }
 
+
 # parser:declaration()
 # @description
 #  declaration -> decl_section
@@ -570,7 +667,7 @@ function parser:typedef {
 #
 # @env   TOKEN
 # @env   NODE
-# @sets  NODE
+# @set   NODE
 # @noargs
 function parser:declaration {
    if parser:check 'IMPORT,TYPEDEF' ; then
@@ -591,6 +688,7 @@ function parser:declaration {
    fi
 }
 
+
 # parser:decl_section()
 # @description
 #  decl_section -> declaration*
@@ -601,8 +699,8 @@ function parser:declaration {
 # @env   TOKEN
 # @env   ANCHOR
 #
-# @sets  NODE
-# @sets  ANCHOR
+# @set   NODE
+# @set   ANCHOR
 # @noargs
 function parser:decl_section {
    local ident="$NODE"
@@ -631,19 +729,20 @@ function parser:decl_section {
    declare -g NODE="$node"
 }
 
+
 # parser:decl_variable()
 # @description
 #  decl_variable -> IDENTIFIER ("@" type)?  expression?  ";"
 #
-# @see parser:type
-# @see parser:expression
+# @see   parser:type
+# @see   parser:expression
 #
 # @env   NODE
 # @env   TOKEN
 # @env   ANCHOR
 #
-# @sets  NODE
-# @sets  ANCHOR
+# @set   NODE
+# @set   ANCHOR
 # @noargs
 function parser:decl_variable {
    # Variable declaration must be preceded by an identifier.
@@ -661,7 +760,7 @@ function parser:decl_variable {
    node_r['name']="$ident"
 
    # Type declaration.
-   local open="${TOKEN_r[location]}"
+   local open="$TOKEN"
    if parser:match 'AT' ; then
       declare -g ANCHOR="$open"
       parser:type
@@ -726,7 +825,7 @@ function parser:decl_variable {
 #
 # @env   NODE
 # @env   TOKEN
-# @sets  NODE
+# @set   NODE
 # @noargs
 function parser:type {
    parser:identifier "$TOKEN"
@@ -739,7 +838,7 @@ function parser:type {
    node_r['kind']="$ident"
 
    local anchor="$ANCHOR"
-   local open="${TOKEN_r[location]}"
+   local open="$TOKEN"
 
    if parser:match 'L_BRACKET' ; then
       declare -g ANCHOR="$open"
@@ -760,10 +859,10 @@ function parser:type {
 # @description
 #  typelist ->  type ("," type)+
 #
-# @see parser:type
+# @see   parser:type
 #
 # @env   NODE
-# @sets  ANCHOR
+# @set   ANCHOR
 # @noargs
 function parser:typelist {
    parser:type
@@ -942,13 +1041,14 @@ function parser:unary {
    declare -g NODE="$node"
 }
 
+
 # parser:concat()
 # @description
 #  String interpolation is parsed as a high left-associative infix operator.
 #
-# @arg $1 Expression  LHS expression
-# @arg $2 str         Concatenation operator
-# @arg $3 int         Right binding power
+# @arg   $1    :Expression    LHS expression
+# @arg   $2    :str           Concatenation operator
+# @arg   $3    :int           Right binding power
 function parser:concat {
    local lhs="$1"  _=$2  rbp="$3"
                     # ^-- ignore operator

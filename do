@@ -25,17 +25,17 @@ exit "$1"
 
 
 case "$1" in
-   'run')   shift ; exec "${PROGDIR}"/bin/confc "$@"
+   'run')   shift ; "${PROGDIR}"/bin/confc "$@"
             ;;
 
-   'rundb') shift ; CONFC_TRACEBACK='sure' exec "${PROGDIR}"/bin/confc "$@"
+   'rundb') shift ; CONFC_TRACEBACK='sure' "${PROGDIR}"/bin/confc "$@"
             ;;
 
    'test')  shift ; args=( "$@" )
             if [[ ! "$args" ]] ; then
                args=( "${PROGDIR}"/test )
             fi
-            exec bats -r "${args[@]}"
+            bats -r "${args[@]}"
             ;;
 
 
@@ -50,7 +50,7 @@ case "$1" in
                bats -r --pretty
             )
             kcov "${kargs[@]}" "${args[@]}" 2>/dev/null
-            exec xdg-open "${PROGDIR}"/.coverage/index.html
+            xdg-open "${PROGDIR}"/.coverage/index.html
             ;;
 
 
@@ -61,7 +61,7 @@ case "$1" in
                   "${PROGDIR}"/lib/*.sh
                )
             fi
-            exec shellcheck -s bash -x "${args[@]}"
+            shellcheck -s bash -x "${args[@]}"
             ;;
 
 
@@ -69,7 +69,7 @@ case "$1" in
                "${PROGDIR}"/bin/*
                "${PROGDIR}"/lib/*
             )
-            exec wc -l "${files[@]}"
+            wc -l "${files[@]}"
             ;;
 
 
@@ -79,7 +79,7 @@ case "$1" in
                -type  f
                -regex '.*.\(bats\|conf\)'
             )
-            exec wc -l $(find "${params[@]}")
+            wc -l $(find "${params[@]}")
             ;;
 
 
@@ -91,6 +91,35 @@ case "$1" in
             )
             exec nvim -O3 "${order[@]}"
             ;;
+
+   'doc')   order=(
+               "${PROGDIR}"/bin/confc
+               "${PROGDIR}"/lib/utils.sh
+               "${PROGDIR}"/lib/{lexer,parser,symbols,imports}.sh
+               "${PROGDIR}"/lib/{semantics,compiler}.sh
+               "${PROGDIR}"/lib/{errors,debug,ffi}.sh
+            )
+            AWKDOC_LOG_LEVEL=1 awkdoc "${order[@]}"
+            ;;
+
+   'html')  order=(
+               "${PROGDIR}"/bin/confc
+               "${PROGDIR}"/lib/utils.sh
+               "${PROGDIR}"/lib/{lexer,parser,symbols,imports}.sh
+               "${PROGDIR}"/lib/{semantics,compiler}.sh
+               "${PROGDIR}"/lib/{errors,debug,ffi}.sh
+            )
+            AWKDOC_LOG_LEVEL=1 awkdoc "${order[@]}" > "${PROGDIR}/doc/out.md"
+
+            args=(
+               --standalone
+               --highlight-style monochrome
+               --metadata title="documentation"
+               -o "${PROGDIR}/doc/out.html"
+            )
+            pandoc "${args[@]}"  "${PROGDIR}/doc/out.md"
+            ;;
+
 
    *) usage 1 ;;
 esac

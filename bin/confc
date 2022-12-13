@@ -31,6 +31,66 @@ exit "$1"
 }
 
 
+function globals:init {
+   # Compiled output tree file location.
+   declare -g OUTPUT=/dev/stdout
+
+   # The root of the compiled output.
+   declare -g _SKELLY_ROOT=
+
+   # Array of "file objects", containing tuple of {AST, Symtab} pointers.
+   declare -gA FILES=()
+   #
+   # @type
+   declare -g  FILE
+   declare -gi _FILE_NUM=0
+   declare -gi _FILE_LINES_NUM=0
+
+   # Array of absolute file paths to parse. Preserves order of imports, as
+   # FILES is an associative array.
+   declare -ga IMPORTS=()
+
+   # Poor man's `type()` function.
+   declare -gA TYPEOF=()
+
+   # @type
+   declare -g  TOKEN
+   declare -gi _TOKEN_NUM=0
+
+   # @type
+   declare -g  NODE
+   declare -gi _NODE_NUM=0
+
+   # @type
+   declare -g  LOCATION=
+   declare -gi _LOC_NUM=0
+
+   # @type
+   declare -g  TYPE=
+   declare -gi _TYPE_NUM=0
+
+   # @type
+   declare -g  SYMBOL=
+   declare -gi _SYMBOL_NUM=0
+
+   # @type
+   declare -g  SYMTAB=
+   declare -gi _SYMTAB_NUM=0
+
+   # Maps a symtab node to its parent.
+   declare -gA SYMTAB_PARENT=()
+
+   # Drops anchor at the start of a declaration, expression, etc. For error
+   # reporting.
+   # @type
+   declare -g  ANCHOR=''
+
+   # Results of the parsing, symtab, and import phases.
+   declare -g  FINAL_AST
+   declare -g  FINAL_SYMTAB
+}
+
+
 function argparse {
    local -a positional=()
    local -a invalid=()
@@ -67,6 +127,63 @@ function argparse {
 }
 
 
+# main()
+# @description
+#  Wrapper function to kick off the whole parse, typcheck, and evaluation
+#  pieline.
+#
+# @env   INPUT
+# @set   FILE
+# @set   IMPORTS[]
+function main {
+   globals:init
+   file:new ; file:resolve "$INPUT"  "$PWD"
+
+   for (( idx = 0 ; idx < ${#IMPORTS[@]} ; ++idx )) ; do
+      local path="${IMPORTS[$idx]}"
+      local file="${FILES[$path]}"
+      local -n file_r="$file"
+
+      echo "$path"
+
+      file:parse "$file"
+
+      local -n ast_r="$NODE"
+      local -n header_r="${ast_r[header]}"
+      local -n items_r="${header_r[items]}"
+
+      for node in "${items_r[@]}" ; do
+         if [[ "${TYPEOF[$node]}" == import ]] ; then
+            local -n node_r="$node"
+            local -n import_path_r="${node_r[path]}"
+            local import_path="${import_path_r[value]}"
+
+            # Location node of the import statement, for error reporting.
+            local loc="${node_r[location]}"
+
+            # The file the import is relative *to*, i.e. the dirname of the
+            # calling file.
+            local -n loc_r="$loc"
+            local parent="${loc_r[file]%/*}"
+
+            file:new
+            file:resolve  "$import_path"  "$parent"  "$loc"
+         fi
+      done
+   done
+
+   #walk:flatten "$NODE"
+   #dependency_to_map
+   #dependency_sort
+
+   #for ast_node in "${ORDERED_DEPS[@]}" ; do
+   #   walk:semantics "$ast_node"
+   #done
+
+   #walk:compiler "$NODE"
+}
+
+
 # If sourced, exit. Equiv. to Python's >if __name__ == '__main__'
 # Nothing below this line will run if sourced, only if invoked directly.
 if [[ ! "${BASH_SOURCE[0]}" == "$0" ]] ; then
@@ -80,9 +197,6 @@ declare -g LIBDIR="${PROGDIR}/../lib"
 
 # shellcheck source=./lib/errors.sh
 source "${LIBDIR}"/errors.sh
-
-# shellcheck source=./lib/utils.sh
-source "${LIBDIR}"/utils.sh
 
 # shellcheck source=./lib/lexer.sh
 source "${LIBDIR}"/lexer.sh
@@ -106,7 +220,7 @@ source "${LIBDIR}"/compiler.sh
 source "${LIBDIR}"/api.sh
 
 argparse "$@"
-evaluate "$INPUT"
+main
 
 #declare -f conf > "$OUTPUT"
 [[ ${!_SKELLY_*} ]] && declare -p ${!_SKELLY_*} > "$OUTPUT"  ||:

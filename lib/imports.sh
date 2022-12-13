@@ -1,9 +1,132 @@
 #!/bin/bash
 #===============================================================================
-# @section                        Merge trees
+# @section                           Utils
 # @description
-#  Functions for merging a right hand side (RHS) {AST,Symtab} tuple into the
-#  left hand side (LHS) tuple.
+#  All of the utilities that tie together functionality from the lexer, parser,
+#  and compiler. Allows re-entering the parser for each included file, and
+#  concatenating (not literally, but in spirt) imported files.
+#-------------------------------------------------------------------------------
+
+# file:new()
+# @description
+#  Creates new object representing "files".
+#
+# @env   _FILE_NUM
+# @env   _FILE_LINES_NUM
+#
+# @set   FILE
+# @set   _FILE_NUM
+# @set   _FILE_LINES_NUM
+# @noargs
+function file:new {
+   (( ++_FILE_NUM ))
+   local file="FILE_${_FILE_NUM}"
+   declare -gA "$file"
+   declare -g FILE="$file"
+
+   (( ++_FILE_LINES_NUM ))
+   local lines="FILE_LINES_${_FILE_LINES_NUM}"
+   declare -ga "$lines"
+
+   local -n file_r="$file"
+   file_r['path']=''             #< absolute path to file
+   file_r['symtab']=''           #< root symbol table for file
+   file_r['container']=''        #< .container node of AST
+   file_r['lines']="$lines"
+}
+
+
+# file:resolve()
+# @description
+#  Throws error on circular imports, resolves relative paths to fully qualified
+#  path.
+#
+# @env   FILE
+# @set   FILES{}
+#
+# @arg   $1    :str        Relative or absolute path to the file
+# @arg   $2    :str        Parent to which this file is relative
+# @arg   $3    :LOCATION   For error reporting invalid import statements
+function file:resolve {
+   local path="$1"
+   local parent="$2"
+   local location="$3"
+   if [[ "$location" ]] ; then
+      local -n location_r="$location"
+   fi
+
+   local fq_path
+   case "$path" in
+      # Absolute paths.
+      /*) fq_path="${path}"           ;;
+      ~*) fq_path="${path/\~/$HOME}"  ;;
+
+      # Paths relative to the calling file.
+      *)  fq_path=$( realpath -m "${parent}/${path}" -q )
+          ;;
+   esac
+
+   # throw:  circular_import
+   if [[ "${FILES[$fq_path]}" ]] ; then
+      e=( circular_import
+         --anchor "${location_r[location]}"
+         --caught "${location_r[location]}"
+         "$path"
+      ); raise "${e[@]}"
+   fi
+
+   # throw:  missing_file
+   if [[ ! -e "$fq_path" ]] ||
+      [[ ! -r "$fq_path" ]] ||
+      [[   -d "$fq_path" ]]
+   then
+      e=( missing_file
+         --anchor "${location_r[location]}"
+         --caught "${location_r[location]}"
+         "$fq_path"
+      ); raise "${e[@]}"
+   fi
+
+   local -n file_r="$FILE"
+   file_r['path']="$fq_path"
+
+   FILES["$fq_path"]="$FILE"
+   IMPORTS+=( "$fq_path" )
+}
+
+
+# file:parse()
+# @description
+#  Generates the AST & symbol table for a single file.
+#
+# @set   NODE
+# @set   SYMTAB
+# @env   FILE
+#
+# @arg   $1    :FILE    Globally sets $FILE pointer for lexer & parser
+function file:parse {
+   local file="$1"
+   local -n file_r="$file"
+   declare -g FILE="$file"
+
+   lexer:init
+   lexer:scan
+
+   parser:init
+   parser:parse
+   local -n node_r="$NODE"
+   file_r['ast']="${node_r[container]}"
+
+   walk:symtab "$NODE"
+   file_r['symtab']="$SYMTAB"
+}
+
+
+#===============================================================================
+# @section                          Imports
+# @description
+#  Pulls out `import` statements from each AST, parses, folds into resulting
+#  tree & symtab tuple.
 #-------------------------------------------------------------------------------
 
 # imports:parse()
@@ -11,97 +134,151 @@
 #  Identifies and calls `utils:parse` on all import statements.
 #
 # @see   utils:parse
-#
-# @arg   $1    NODE     Root AST node for a file
+# @arg   $1    :NODE     Root AST node for a file
 function imports:parse {
    local node="$1"
+
+   # Drill down to node.header[].import
    local -n node_r="$node"
    local -n header_r="${node_r[header]}"
-   local -n container_r="${node_r[container]}"
+   local -n items_r="${header_r[items]}"
 
    local path location
-   for h in "${header_r[@]}" ; do
+   for h in "${items_r[@]}" ; do
       if [[ ! ${TYPEOF[$h]} == import ]] ; then
          continue
       fi
       local -n h_r="$h"
-      utils:parse "${h_r[path]}"  "${h_r[location]}"
+      local -n ident_r="${h_r[path]}"  
+      utils:parse "${ident_r[value]}"  "${h_r[location]}"
    done
 }
 
 
 # imports:fold()
 # @description
-#  Thanks FP, you've come in handy! Effectively:
-#  ```erlang
-#  {Rv_Ast, Rv_Symtab} = fold(merge, {AST:new(), Symtab:new()}, FILE_TUPLES)
-#  ```
-# @env   FILE_TUPLES[]
-# @sets  FINAL_AST
-# @sets  FINAL_SYMTAB
-# @sets  ACCUM_TUPLE
+#  Not technically a fold, but in spirit. Iter each item in `FILE_TUPLES[]`,
+#  merges into the current resulting `ACCUM_TUPLE`.
+#
+# @set   FINAL_AST
+# @set   FINAL_SYMTAB
+# @set   ACCUM_TUPLE
+# @noargs
 function imports:fold {
-   if (( ${#FILE_TUPLES[@]} )) ; then
-      local -n tuple_r="${FILE_TUPLES[0]}"
-      declare -g FINAL_AST="${tuple_r[node]}"
-      declare -g FINAL_SYMTAB="${tuple_r[symtab]}"
-      return
-   fi
+   declare -g ACCUM_TUPLE="${FILE_TUPLES[0]}"
+   for t in "${FILE_TUPLES[@]:1}" ; do
+      merge "$t"
+   done
 
-   ast:new program ; symtab new
-   utils:mk_tuple "$NODE" "$SYMTAB"
-   declare -g ACCUM_TUPLE="$TUPLE"
+   local -n tuple_r="${FILE_TUPLES[0]}"
+   declare -g FINAL_AST="${tuple_r[node]}"
+   declare -g FINAL_SYMTAB="${tuple_r[symtab]}"
+}
 
-   for t in "${FILE_TUPLES[@]}" ; do
-      imports:merge "$ACCUM_TUPLE"  "$t"
+
+#===============================================================================
+# @section                        Merge trees
+# @description
+#  Functions for merging a right hand side (RHS) {AST,Symtab} tuple into the
+#  left hand side (LHS) tuple.
+#-------------------------------------------------------------------------------
+
+# merge()
+# @description
+#  Merges two files by the rules below:
+#  - Expressions maybe overwritten
+#  - Types may be imported with equal or greater specificity
+#    - [GOOD]: `arr @list;`  ->  `arr @list[str];`
+#    - [BAD]: `arr @list[str]`  ->  `arr @list[int];`
+#    - [BAD]: `arr @list[str];`  ->  `arr @str;`
+#
+# @see   merge:symtab
+# @see   merge:section
+# @see   merge:variable
+# @see   merge:type
+#
+# @set   ACCUM_TUPLE
+# @arg   $1    :TUPLE    RHS tuple, merged into $ACCUM_TUPLE
+function merge {
+   local -n l_tuple_r="$ACCUM_TUPLE"
+   local l_container="${l_tuple_r[container]}"
+   local l_symtab="${l_tuple_r[symtab]}"
+
+   local -n r_tuple_r="$1"
+   local r_container="${r_tuple_r[container]}"
+   local r_symtab="${r_tuple_r[symtab]}"
+
+   merge:symtab "$l_symtab"  "$l_container"  "$r_symtab"  "$r_container"
+}
+
+
+function merge:symtab {
+   local lhs_symtab="$1"
+   local lhs_container="$2"
+   local -n lhs_symtab_r="$lhs_symtab"
+   local -n lhs_container_r="$lhs_container"
+
+   local rhs_symtab="$3"
+   local rhs_container="$4"
+   local -n rhs_symtab_r="$rhs_symtab"
+   local -n rhs_containerhs_r="$rhs_container"
+
+   # As iterating symtab, unset all keys if also found in the left container.
+   # What's left is: set(rhs) - set(lhs). Then copy these over.
+   local -a overflow=( "${!rhs_container[@]}" )
+
+   # Checks at the symtab level:
+   # - If not present in RHS , skip
+   # - If type inequality    , throw error
+   # - If variable           , merge:variable && walk:merge
+   # - If section            , descend and call merge:symtab on sub-scope
+   #
+   # Must always update .symtab reference in the node. This may require a
+   # walk:merge to reach identifiers in expressions
+   #
+   for symbol_name in "${!lhs_symtab_r[@]}" ; do
+      local lhs_sym="${lhs_symtab_r[$symbol_name]}"
+      local -n lhs_sym_r="$lhs_sym"
+      local lhs_type="${lhs_sym_r[type]}"
+
+      # case 1:  variable not declared in rhs, nothing to do
+      if [[ ! "${rhs_symtab_r[$symbol_name]}" ]] ; then
+         continue
+      fi
+
+      unset 'overflow[$symbol_name]'
+
+      local -n rhs_sym_r="$rhs_sym"
+      local rhs_type="${rhs_sym_r[type]}"
+
+      # case 2:  type inequality
+      if ! merge:type  "$lhs_type"  "$rhs_type" ; then
+         :;
+      fi
+
+      # TODO: copy type across if met equality check
+
+      # TODO: if section, iter its scopes and whatnot
+
+      # TODO: need to also copy the names/symbols themselves from the rhs to lhs
+      # with respect to name collisions.
    done
 }
 
 
-# imports:merge()
-# @description
-#  Merges a pair of {AST/Symtab} together. When `import`ing files, users may not
-#  overwrite typedefs with less specificity, or overwrite an expression with a
-#  different type.
-#
-# @sets  ACCUM_TUPLE
-# @arg   $1    TUPLE    LHS tuple
-# @arg   $2    TUPLE    RHS tuple, merged into LHS
-function imports:merge {
-   local left_tuple="$1"
-   local -n l_tuple_r="$left_tuple"
-
-   local right_tuple="$2"
-   local -n r_tuple_r="$right_tuple"
-
-   # TODO:
-   # Not quite sure how the trees should be merged. One of two approaches.
-   #  (1) Merge symbol tables.
-   # As every element of the %container is a declaration, every element has a
-   # Symbol at its Section's scope. Iterating each scope yields each decl.
-   #  (2) Walk AST, merge trees.
-   # Takes a little more--
-   #
-   # brain blast.
-   #
-   # Pretty sure we need to walk the symbol table, then use it to descend into
-   # each new section. Similar to the approach below. Cannot iterate the ASTs
-   # directly, because there's no way to compare *names* between LHS & RHS.
-   # Section is just a collection of declarations, doesn't have indices.
-   #
-   # 1. Merge "global" section of thesymtab, containing typedefs.
-   # 2. Select %container section
-   # 3. Walk sections, compare keys & overflow
-   # 4. Disallow changing Section > var, or var -> Section
-   # 5. Disallow changing the type of variable declarations nodes to be *less*
-   #    specific. Must be an equal type, or one with greater specificity
-   # 6. Create a new AST and Symtab on every merge? or continuously fold into
-   #    the left.
+function merge:section {
+   :;
 }
 
 
+function merge:variable {
+   :;
+}
 
 
+function merge:type {
+   :;
+}
 
 
 
@@ -126,7 +303,6 @@ function merge_symtab {
    # copy. Anything left is a duplicate that must be merged.
    local -A overflow=()
    for k in "${!c_symtab_r[@]}" ; do
-      echo ":[ $k ]"
       overflow["$k"]=
    done
 
