@@ -13,7 +13,7 @@ disable=SC1003
 #     backslash character as '\'.
 #
 
-#disable=SC2034
+disable=SC2034
 #  "... appears unused"
 #     This is almost always in the context of a nameref initializing attributes
 #     of a Token, Node, or some pseudo-class.

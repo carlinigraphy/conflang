@@ -1,4 +1,7 @@
 #!/bin/bash
+#===============================================================================
+# @section                        Lexer utils
+#-------------------------------------------------------------------------------
 
 declare -gA KEYWORD=(
    ['true']=true
@@ -29,13 +32,13 @@ function lexer:init {
 
 # token:new()
 # @description
-#  Creates new Token object, appending to TOKENS[]. Store location information
+#  Creates new Token object, appending to `TOKENS[]`. Store location information
 #  via frozen start line/col, and ending line/col.
 #
 # @env   LOCATION
 # @set   TOKENS[]
-# @set   TOKEN_*
-# @arg   $1    :str   Type of Token ('INTEGER', 'STRING', ...)
+# @set   TOKEN
+# @arg   $1    :str   Type of Token (`INTEGER`, `STRING`, ...)
 # @arg   $2    :str   Value of Token (character, string, identifier, ...)
 function token:new {
    local type=$1  value=$2
@@ -65,6 +68,10 @@ function token:new {
    loc_r['file']="${file_r[path]}"
 }
 
+
+#===============================================================================
+# @section                           Lexer
+#-------------------------------------------------------------------------------
 
 function lexer:scan {
    local -n file_r="$FILE"
@@ -171,11 +178,10 @@ function lexer:scan {
 
       token:new 'ERROR'
       local -n t_r="${TOKENS[-1]}"
-      e=( syntax_error
-         --anchor "${t_r[location]}"
-         --caught "${t_r[location]}"
+      e=( --anchor "${t_r[location]}"
+          --caught "${t_r[location]}"
           "invalid character [$CHAR]"
-      ); raise "${e[@]}"
+      ); raise syntax_error "${e[@]}"
    done
 
    FREEZE[lineno]="${CURSOR[lineno]}"
@@ -245,7 +251,7 @@ function lexer:string {
          # Misidentified error.
          if [[ $buffer && ${buffer[-1]} == '\' ]] ; then
             # shellcheck disable=SC2184
-            unset buffer[-1]
+            unset 'buffer[-1]'
          else
             break
          fi
@@ -275,7 +281,7 @@ function lexer:path {
          # Misidentified error.
          if [[ $buffer && ${buffer[-1]} == '\' ]] ; then
             # shellcheck disable=SC2184
-            unset buffer[-1]
+            unset 'buffer[-1]'
          else
             break
          fi
@@ -342,11 +348,10 @@ function lexer:interpolation {
 
       token:new 'ERROR'
       local -n t_r="${TOKENS[-1]}"
-      e=( invalid_interpolation_char
-         --anchor "$anchor"
-         --caught "${t_r[location]}"
-         "invalid character in fstring [$CHAR]"
-      ); raise "${e[@]}"
+      e=( --anchor "$anchor"
+          --caught "${t_r[location]}"
+          "invalid character in fstring [$CHAR]"
+      ); raise invalid_interpolation_char "${e[@]}"
    done
 }
 
@@ -369,24 +374,23 @@ function lexer:fstring {
       # When used outside an expression, closing braces must be escaped.
       if [[ $CHAR == '}' ]] ; then
          if [[ $buffer && "${buffer[-1]}" == '\' ]] ; then
-            unset buffer[-1]
+            unset 'buffer[-1]'
             buffer+=( "$CHAR" )
             continue
          else
             token:new 'ERROR'
             local -n t_r="${TOKENS[-1]}"
             location:cursor
-            e=( unescaped_interpolation_brace
-               --anchor "${t_r[location]}"
-               --caught "$LOCATION"
-            ); raise "${e[@]}"
+            e=( --anchor "${t_r[location]}"
+                --caught "$LOCATION"
+            ); raise unescaped_interpolation_brace "${e[@]}"
          fi
       fi
 
       # Start of f-string.
       if [[ $CHAR == '{' ]] ; then
          if [[ $buffer && "${buffer[-1]}" == '\' ]] ; then
-            unset buffer[-1]
+            unset 'buffer[-1]'
             buffer+=( "$CHAR" )
             continue
          fi
@@ -455,24 +459,23 @@ function lexer:fpath {
       # When used outside an expression, closing braces must be escaped.
       if [[ $CHAR == '}' ]] ; then
          if [[ $buffer && "${buffer[-1]}" == '\' ]] ; then
-            unset buffer[-1]
+            unset 'buffer[-1]'
             buffer+=( "$CHAR" )
             continue
          else
             token:new 'ERROR'
             local -n t_r="${TOKENS[-1]}"
             location:cursor
-            e=( unescaped_interpolation_brace
-               --anchor "${t_r[location]}"
-               --caught "$LOCATION"
-            ); raise "${e[@]}"
+            e=( --anchor "${t_r[location]}"
+                --caught "$LOCATION"
+            ); raise unescaped_interpolation_brace "${e[@]}"
          fi
       fi
 
       # Start of f-path.
       if [[ $CHAR == '{' ]] ; then
          if [[ $buffer && "${buffer[-1]}" == '\' ]] ; then
-            unset buffer[-1]
+            unset 'buffer[-1]'
             buffer+=( "$CHAR" )
             continue
          fi

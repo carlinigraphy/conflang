@@ -356,12 +356,11 @@ function _ast_new_env_var {
 
 
 #===============================================================================
-# @section                        parser utils
+# @section                        Parser utils
 #-------------------------------------------------------------------------------
 
 # location:new()
 # @set   LOCATION
-# @set   _LOC_NUM
 # @noargs
 function location:new {
    (( ++_LOC_NUM ))
@@ -493,11 +492,10 @@ function parser:munch {
    if parser:check "$1" ; then
       parser:advance
    else
-      e=( munch_error
-         --anchor "$ANCHOR"
-         --caught "${TOKEN_r[location]}"
-         "${1,,}"  "${TOKEN_r[type],,}"  "$2"
-      ); raise "${e[@]}"
+      e=( --anchor "$ANCHOR"
+          --caught "${TOKEN_r[location]}"
+          "${1,,}"  "${TOKEN_r[type],,}"  "$2"
+      ); raise munch_error "${e[@]}"
    fi
 }
 
@@ -653,7 +651,11 @@ function parser:typedef {
    node_r['type']="$type"
    node_r['name']="$ident"
 
-   parser:munch 'SEMI' "expecting \`;' after typedef"
+   local close="$TOKEN"
+   parser:munch 'SEMI' "expecting \`;' after import"
+
+   location:copy "$open"   "$node"  'file'  'start_ln'  'start_col'
+   location:copy "$close"  "$node"  'file'  'end_ln'    'end_col'
 }
 
 
@@ -671,11 +673,10 @@ function parser:typedef {
 # @noargs
 function parser:declaration {
    if parser:check 'IMPORT,TYPEDEF' ; then
-      e=( parse_error
-         --anchor "${TOKEN_r[location]}"
-         --caught "${TOKEN_r[location]}"
-         'import statements may only occur at the top of a file'
-      ); raise "${e[@]}"
+      e=( --anchor "${TOKEN_r[location]}"
+          --caught "${TOKEN_r[location]}"
+          'import statements may only occur at the top of a file'
+      ); raise parse_error "${e[@]}"
    fi
 
    parser:identifier "$TOKEN"
@@ -779,11 +780,10 @@ function parser:decl_variable {
       parser:expression
       node_r['expr']=$NODE
    elif parser:check "$expr_types" ; then
-      e=( parse_error
-         --anchor "$ANCHOR"
-         --caught "${TOKEN_r[location]}"
-         "expecting \`:' before expression"
-      ); raise "${e[@]}"
+      e=( --anchor "$ANCHOR"
+          --caught "${TOKEN_r[location]}"
+          "expecting \`:' before expression"
+      ); raise parse_error "${e[@]}"
    fi
 
    local close="$TOKEN"
@@ -806,7 +806,7 @@ function parser:decl_variable {
 #  list to the .next slot. The pointer to the parameters themselves is in the
 #  .params slot.
 #
-# @example
+#  Example:
 #  ```python
 #  class Type():
 #     def __init__(self, kind: str, param: Type, next: Type):
@@ -941,11 +941,10 @@ function parser:expression {
    local fn="${NUD[$type]}"
    if [[ ! $fn ]] ; then
       local -n token_r="$token"
-      e=( parse_error
-         --anchor "$ANCHOR"
-         --caught "${token_r[location]}"
-         "expecting an expression"
-      ); raise "${e[@]}"
+      e=( --anchor "$ANCHOR"
+          --caught "${token_r[location]}"
+          "expecting an expression"
+      ); raise parse_error "${e[@]}"
       return
    fi
 
@@ -964,11 +963,10 @@ function parser:expression {
          fn="${RID[${TOKEN_r[type]}]}"
 
          if [[ ! $fn ]] ; then
-            e=( parse_error
-               --anchor "$ANCHOR"
-               --caught "${token_r[location]}"
-               "expecting a postfix expression"
-            ); raise "${e[@]}"
+            e=( --anchor "$ANCHOR"
+                --caught "${token_r[location]}"
+                "expecting a postfix expression"
+            ); raise parse_error "${e[@]}"
          fi
 
          $fn "$lhs" "$rbp"
@@ -989,11 +987,10 @@ function parser:expression {
 
       fn=${LED[$op_type]}
       if [[ ! $fn ]] ; then
-         e=( parse_error
-            --anchor "$ANCHOR"
-            --caught "${token_r[location]}"
-            "expecting an infix expression"
-         ); raise "${e[@]}"
+         e=( --anchor "$ANCHOR"
+             --caught "${token_r[location]}"
+             "expecting an infix expression"
+         ); raise parse_error "${e[@]}"
       fi
 
       $fn  "$lhs"  "$op_type"  "$rbp"

@@ -16,7 +16,9 @@ commands
    check       Run \`shellcheck\`
    wc          Lines of bash
    wc-tests    Lines of BATS
-   edit        Opens src files in vim
+   edit        Opens src files in nvim
+   doc         Generates .md docs w/ \`awkdoc\`
+   html        Generates .html docs w/ `awkdoc | pandoc`.
 
 EOF
 
@@ -29,6 +31,14 @@ case "$1" in
             ;;
 
    'rundb') shift ; CONFC_TRACEBACK='sure' "${PROGDIR}"/bin/confc "$@"
+            ;;
+
+   'edit')  order=(
+               "${PROGDIR}"/bin/confc
+               "${PROGDIR}"/lib/{lexer,parser,merge}.sh
+               "${PROGDIR}"/lib/{semantics,compiler,errors}.sh
+            )
+            exec nvim -O3 "${order[@]}"
             ;;
 
    'test')  shift ; args=( "$@" )
@@ -57,11 +67,15 @@ case "$1" in
    'check') shift ; args=( "$@" )
             if [[ ! "$args" ]] ; then
                args=(
+                  --color=always
+                  --shell=bash
+                  --severity=warning
+                  --external-sources 
                   "${PROGDIR}"/bin/confc
                   "${PROGDIR}"/lib/*.sh
                )
             fi
-            shellcheck -s bash -x "${args[@]}"
+            shellcheck "${args[@]}" | less -R
             ;;
 
 
@@ -82,20 +96,9 @@ case "$1" in
             wc -l $(find "${params[@]}")
             ;;
 
-
-   'edit')  order=(
-               "${PROGDIR}"/bin/confc
-               "${PROGDIR}"/lib/utils.sh
-               "${PROGDIR}"/lib/{lexer,parser,semantics,compiler}.sh
-               "${PROGDIR}"/lib/{errors,debug,ffi}.sh
-            )
-            exec nvim -O3 "${order[@]}"
-            ;;
-
    'doc')   order=(
                "${PROGDIR}"/bin/confc
-               "${PROGDIR}"/lib/utils.sh
-               "${PROGDIR}"/lib/{lexer,parser,symbols,imports}.sh
+               "${PROGDIR}"/lib/{lexer,parser,symbols,merge}.sh
                "${PROGDIR}"/lib/{semantics,compiler}.sh
                "${PROGDIR}"/lib/{errors,debug,ffi}.sh
             )
@@ -104,8 +107,7 @@ case "$1" in
 
    'html')  order=(
                "${PROGDIR}"/bin/confc
-               "${PROGDIR}"/lib/utils.sh
-               "${PROGDIR}"/lib/{lexer,parser,symbols,imports}.sh
+               "${PROGDIR}"/lib/{lexer,parser,symbols,merge}.sh
                "${PROGDIR}"/lib/{semantics,compiler}.sh
                "${PROGDIR}"/lib/{errors,debug,ffi}.sh
             )

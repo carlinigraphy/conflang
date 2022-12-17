@@ -1,4 +1,7 @@
 #!/bin/bash
+#===============================================================================
+# @section                           Main
+#-------------------------------------------------------------------------------
 set -eo pipefail
 
 if [[ $CONFC_TRACEBACK ]] ; then
@@ -77,6 +80,10 @@ function globals:init {
    declare -g  SYMTAB=
    declare -gi _SYMTAB_NUM=0
 
+   # @type
+   declare -g  ERROR=''
+   declare -gi _ERROR_NUM=0
+
    # Maps a symtab node to its parent.
    declare -gA SYMTAB_PARENT=()
 
@@ -84,16 +91,11 @@ function globals:init {
    # reporting.
    # @type
    declare -g  ANCHOR=''
-
-   # Results of the parsing, symtab, and import phases.
-   declare -g  FINAL_AST
-   declare -g  FINAL_SYMTAB
 }
 
 
 function argparse {
    local -a positional=()
-   local -a invalid=()
 
    while [[ $# -gt 0 ]] ; do
       case "$1" in
@@ -144,8 +146,6 @@ function main {
       local file="${FILES[$path]}"
       local -n file_r="$file"
 
-      echo "$path"
-
       file:parse "$file"
 
       local -n ast_r="$NODE"
@@ -171,6 +171,9 @@ function main {
          fi
       done
    done
+
+   # Reduces all the IMPORTS[] to a single {Symtab,AST}.
+   fold
 
    #walk:flatten "$NODE"
    #dependency_to_map
@@ -204,19 +207,22 @@ source "${LIBDIR}"/lexer.sh
 # shellcheck source=./lib/parser.sh
 source "${LIBDIR}"/parser.sh
 
-# shellcheck source=./lib/imports.sh
-source "${LIBDIR}"/imports.sh
+# shellcheck source=./lib/files.sh
+source "${LIBDIR}"/files.sh
+
+# shellcheck source=./lib/merge.sh
+source "${LIBDIR}"/merge.sh
 
 # shellcheck source=./lib/symbols.sh
 source "${LIBDIR}"/symbols.sh
 
-# shellcheck source=./lib/pre-compile.sh
+# shellcheck source=./lib/semantics.sh
 source "${LIBDIR}"/semantics.sh
 
 # shellcheck source=./lib/compiler.sh
 source "${LIBDIR}"/compiler.sh
 
-# shellcheck source=./lib/compiler.sh
+# shellcheck source=./lib/api.sh
 source "${LIBDIR}"/api.sh
 
 argparse "$@"

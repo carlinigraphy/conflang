@@ -42,7 +42,9 @@ function populate_globals {
       [str]='STRING'
       [bool]='BOOLEAN'
       [path]='PATH'
-      [section]='SECTION'
+      [%section]='SECTION'
+      #--^ User isn't allowed to declare a section. They're a logical grouping,
+      # not an expression.
    )
 
    local -A complex=(
@@ -266,12 +268,23 @@ function symtab_typedef {
    local symbol="$SYMBOL"
    local -n symbol_r="$symbol"
 
-   local -n node_r="$NODE"
-   walk:symtab "${node_r[type]}"
-   symbol_r['type']="$TYPE"
+   # Save node name in symbol.
+   symbol_r['node']="$NODE"
 
+   local -n node_r="$NODE"
    local -n name_r="${node_r[name]}"
    symbol_r['name']="${name_r[value]}"
+
+   walk:symtab "${node_r[type]}"
+   local type="$TYPE"
+
+   # Create Type representing Types.
+   mk_type
+   local metatype="$TYPE"
+   local -n metatype_r="$TYPE"
+   metatype_r['kind']='TYPE'
+   metatype_r['subtype']="$type"
+   symbol_r['type']="$metatype"
 
    symtab set "$symbol"
 }
@@ -293,11 +306,10 @@ function symtab_decl_section {
    symbol_r['name']="${ident_r[value]}"
 
    if symtab strict "$name" ; then
-      e=( name_collision 
-         --anchor "${node_r[location]}"
-         --caught "${node_r[location]}"
-         "$name"
-      ); raise "${e[@]}"
+      e=( --anchor "${node_r[location]}"
+          --caught "${node_r[location]}"
+          "$name"
+      ); raise name_collision "${e[@]}"
    else
       symtab set "$symbol"
    fi
@@ -344,11 +356,10 @@ function symtab_decl_variable {
    symbol_r['name']="$name"
 
    if symtab strict "$name" ; then
-      e=( name_collision 
-         --anchor "${node_r[location]}"
-         --caught "${node_r[location]}"
-         "$name"
-      ); raise "${e[@]}"
+      e=( --anchor "${node_r[location]}"
+          --caught "${node_r[location]}"
+          "$name"
+      ); raise name_collision "${e[@]}"
    else
       symtab set "$symbol"
    fi
@@ -377,11 +388,10 @@ function symtab_type {
    local name="${name_r[value]}"
 
    if ! symtab get "$name" ; then
-      e=( undefined_type
-         --anchor "${name_r[location]}"
-         --caught "${name_r[location]}"
-         "$name"
-      ); raise "${e[@]}"
+      e=( --anchor "${name_r[location]}"
+          --caught "${name_r[location]}"
+          "$name"
+      ); raise undefined_type "${e[@]}"
    fi
 
    local -n symbol_r="$SYMBOL"
@@ -393,11 +403,10 @@ function symtab_type {
    #  ┌── doesn't know about dynamically created $_TYPE (confused with $TYPE).
    # shellcheck disable=SC2153,SC2154
    if ! type_equality  "$_TYPE"  "$outer_type" ; then
-      e=( not_a_type
-         --anchor "${name_r[location]}"
-         --caught "${name_r[location]}"
-         "$name"
-      ); raise "${e[@]}"
+      e=( --anchor "${name_r[location]}"
+          --caught "${name_r[location]}"
+          "$name"
+      ); raise not_a_type "${e[@]}"
    fi
 
    local -n outer_type_r="$outer_type"
@@ -410,11 +419,10 @@ function symtab_type {
       # type has an unset .subtype field (indicating non-complex type).
       if [[ ! "${type_r[subtype]+_}" ]] ; then
          local -n subtype_r="${node_r[subtype]}"
-         e=( type_error
-            --anchor "${name_r[location]}"
-            --caught "${subtype_r[location]}"
-            "primitive types are not subscriptable"
-         ); raise "${e[@]}"
+         e=( --anchor "${name_r[location]}"
+             --caught "${subtype_r[location]}"
+             "primitive types are not subscriptable"
+         ); raise type_error "${e[@]}"
       fi
 
       walk:symtab "${node_r[subtype]}"
@@ -463,6 +471,8 @@ function symtab_list {
 function symtab_identifier {
    local -n node_r="$NODE"
    node_r['symtab']="$SYMTAB"
+
+   # TODO: may need to throw name_error's here.
 }
 
 function symtab_import  { :; }
@@ -471,5 +481,3 @@ function symtab_integer { :; }
 function symtab_string  { :; }
 function symtab_path    { :; }
 function symtab_env_var { :; }
-
-

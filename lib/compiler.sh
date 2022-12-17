@@ -24,9 +24,6 @@ function walk:compiler {
    declare -g _SKELLY_ROOT="$_SKELLY_1"
    undead_yoga "$_SKELLY_ROOT"
 
-   # Clean up the generated output. The nodes _SKELLY_{1,2} are uselessly
-   # referring to the '%container' implicit section. Can't unset during
-   # `undead_yoga`, as two references may point to the same intermediate node.
    # Clean up my skeleton army afterwards.
    for skelly in "${DISPOSABLE_SKELETONS[@]}" ; do
       unset "$skelly"
@@ -129,6 +126,7 @@ function skelly_decl_section {
    done
 
    declare -g SKELLY="$middle_skelly"
+   declare -g SYMTAB="$symtab"
 }
 
 

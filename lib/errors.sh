@@ -1,5 +1,9 @@
 #!/bin/bash
 
+#===============================================================================
+# @section                           Errors
+#-------------------------------------------------------------------------------
+
 function traceback {
    local -i depth="$1"
    local -i len=${#FUNCNAME[@]}-1
@@ -52,12 +56,11 @@ declare -gA ERROR_CODE=(
 )
 
 
-declare -g  ERROR=''
-declare -gi ERROR_NUM=0
-
+# @set ERROR
+# @noargs
 function error:new {
-   (( ++ERROR_NUM ))
-   local err="ERROR_${ERROR_NUM}"
+   (( ++_ERROR_NUM ))
+   local err="ERROR_${_ERROR_NUM}"
    declare -gA "$err"
    declare -g  ERROR="$err"
 
@@ -109,8 +112,9 @@ function raise {
 #
 # @description
 #  Compiles the start line/column of the anchor & caught positions into a single
-#  ERROR{} object.
+#  `ERROR{}` object.
 #
+# @set   ERROR
 # @arg   $1    :LOCATION   Node for the `start_ln` and `start_col`
 # @arg   $2    :LOCATION   Node for the `end_ln` and `end_col`
 function build_error_location {
@@ -120,17 +124,17 @@ function build_error_location {
 
    local anchor_file_name="${anchor_r[file]}"
    local -n anchor_file_r="${FILES[$anchor_file_name]}"
-   error_r[anchor_file_name]="$anchor_file_name"
-   error_r[anchor_file_lines]="${anchor_file_r[lines]}"
-   error_r[anchor_ln]="${anchor_r[start_ln]}"
-   error_r[anchor_col]="${anchor_r[start_col]}"
+   error_r['anchor_file_name']="$anchor_file_name"
+   error_r['anchor_file_lines']="${anchor_file_r[lines]}"
+   error_r['anchor_ln']="${anchor_r[start_ln]}"
+   error_r['anchor_col']="${anchor_r[start_col]}"
 
    local caught_file_name="${caught_r[file]}"
    local -n caught_file_r="${FILES[$caught_file_name]}"
-   error_r[caught_file_name]="$caught_file_name"
-   error_r[caught_file_lines]="${caught_file_r[lines]}"
-   error_r[caught_ln]="${caught_r[start_ln]}"
-   error_r[caught_col]="${caught_r[start_col]}"
+   error_r['caught_file_name']="$caught_file_name"
+   error_r['caught_file_lines']="${caught_file_r[lines]}"
+   error_r['caught_ln']="${caught_r[start_ln]}"
+   error_r['caught_col']="${caught_r[start_col]}"
 }
 
 

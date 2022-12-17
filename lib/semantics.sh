@@ -204,7 +204,7 @@ function type_equality {
    [[ "$2" ]] || return 1
    local -n t2_r="$2"
 
-   if [[ ${t1_r[kind]} != ${t2_r[kind]} ]] ; then
+   if [[ ${t1_r[kind]} != "${t2_r[kind]}" ]] ; then
       return 1
    fi
 
