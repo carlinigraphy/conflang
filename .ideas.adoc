@@ -1,0 +1,38 @@
+= ideas.
+
+As ideas come up, they're documented here.
+Maybe to implement later.
+Maybe not.
+
+== AWK pre-processor
+=== Topics
+Add in "subscribe" statements, to enable specific debugging information.
+E.g.,
+
+[source,bash]
+----
+function type:new {
+   #<<TOPIC TYPES
+   printf "[%8s] Created type: ${type_r[kind]}, with subtypes:\n"
+   printf "%15s- %s\n" "${subtype_r[kind]}"
+   printf "\n"
+   #>>TOPIC
+}
+----
+
+Then if you pre-process with:  CONFC_SUBSCRIBE='TYPES' awk -f build.awk src/*
+it enables all of the `TYPES` topics, while ignoring the rest of them.
+
+Can subscribe to multiple by comma delimiting:  CONF_SUBSCRIBE='TYPES,FILES,DEBUG'
+
+Helps for a bit more targeted debugging information.
+
+=== Enable "dot" syntax
+Largely completed already in the draft of `shmacros`.
+Should be trivial to port into the existing pre-processor.
+
+
+== Bash pre-processor
+The AWK version is linewise, and very limited.
+
+Want to learn to write a "`real`" pre-processor, operating on Tokens instead of regex'ing lines.
