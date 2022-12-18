@@ -2,80 +2,23 @@
 
 2022-11-25
    1. [x] Throw away `constrain` stuff
-   2. [ ] Refactor all `add_file` and related functions
+   2. [x] Refactor all `add_file` and related functions
    3. [x] Include statement in the HEADER section
    4. [ ] New parsing structure, make independent tuples of {AST,Symtab}
          - Much more testable
          - Easier to merge
    5. [ ] New `merge` that respects new import rules
-   6. [ ] Includes use `as`, enter the identifier into the symtab
+   6. [x] Includes use `as`, enter the identifier into the symtab
    7. [ ] Records, arrays as single-type-only, typedefs
 
-   Part of this refactoring is going to be cleaning up the lib/utils.sh. All of
-   the `file`-based functions are kinda janky. Need to clean up just all that
-   nonsense.
-
-
-2022-12-10
-   # TODO:
-   Decide on the cleanest / most elegant way to handle importing files.
-
-   Makes sense to have global IMPORTS[] array.
-   - Ensure files are imported & merged in the correct order
-
-   Makes sense for FILES to be an indexed array.
-   - Easier merging ASTs left, as there is an order
-
-   Makes sense for FILES to be an associative array.
-   - Can map from an absolute path in IMPORTS[] to its FILE obj. in FILES[]
-
-   May be able to use global IMPORTS[] as the ordered version. If the first
-   passed in file path is also added to the IMPORTS, it is the order we need.
-
-   IMPORTS[] holds the order of absolute file paths
-   FILES{} maps a file path to its FILE object
-
+2022-12-18
+   Revert types to use a linked list again. It's easier in bash to reason about
+   as there are fewer namerefs, and empty arrays and whatnot. More
+   introspect-able, as some _TYPE_NUM's are not being used for the arrays, etc.
    
-   Think I'm going to need to kinda just stream of consciousness on this one
-   until I work out a good idea, or have some sorta brain blast.
-
-
-   Need a level-order tree traversal for imports. Still think likely easiest
-   with flat map appended to as each statement is hit.
-
-   Barfies.
-
-   Feel like it should not be this hard to think of how to import and parse
-   files.
-
-
-2022-12-11
-   Did some journaling on napkins. Always the best way to work through problems.
-   The solution:
-
-   > function resolve (path)
-   >    global files = {}
-   >    path = $( realpath path )
-   >    files[path] = new File()
-   >    return path
-   > end
-
-   > # Initial file passed in on the CLI
-   > imports.push( resolve($1) )
-
-   > for (path in imports)
-   >    file = files[path]
-   >    {ast, symtab} = parse(path)
-
-   >    file['ast']    = ast
-   >    file['symtab'] = symtab
-
-   >    imports.push([ node.ident.value
-   >          for node in ast.header
-   >          if node.type == 'import' ])
-   > end
-
-   Has a minimal amount of handling the inital case specially.
-
-   If the "resolve" function also adds the function to IMPORTS, then only need
-   to call `file:resolve $INPUT`, and begin the loop.
+   Need this change to be reflected in the...
+   - [ ] parser
+   - [ ] symtab   phase
+   - [ ] merge    phase
+   - [ ] semantic phase
+   - [ ] compiler phase

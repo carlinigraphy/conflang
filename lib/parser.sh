@@ -65,6 +65,18 @@ function _ast_new_import {
 }
 
 
+# _ast_new_typedef
+# @description
+#  Called as `ast:new typedef`
+#
+# @set   LOCATION
+# @set   NODE
+# @set   TYPEOF{}
+#
+# @see   ast:new
+# @see   _ast_new_type
+# @see   parser:type
+# @noargs
 function _ast_new_typedef {
    (( ++_NODE_NUM ))
    local node="NODE_${_NODE_NUM}"
@@ -680,7 +692,7 @@ function parser:declaration {
    if parser:check 'IMPORT,TYPEDEF' ; then
       e=( --anchor "${TOKEN_r[location]}"
           --caught "${TOKEN_r[location]}"
-          'import statements may only occur at the top of a file'
+          'import/typedef statements may only occur at the top of a file'
       ); raise parse_error "${e[@]}"
    fi
 

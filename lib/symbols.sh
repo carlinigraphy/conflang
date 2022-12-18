@@ -31,15 +31,16 @@ function symtab {
    _symtab_"$cmd" "$@"
 }
 
-# new()  :: creates new symtab, assigns previous one as its parent.
+# new()  :: creates new symtab
 function _symtab_new {
    (( ++_SYMTAB_NUM ))
    local symtab="SYMTAB_${_SYMTAB_NUM}"
-   local old_symtab="$SYMTAB"
-
    declare -gA "$symtab"
    declare -g  SYMTAB="$symtab"
-   SYMTAB_PARENT[$symtab]="$old_symtab"
+
+   if [[ "$1" == --parent ]] ; then
+      SYMTAB_PARENT[$symtab]="$2"
+   fi
 
    # Without a value, this isn't glob matched by ${!_SYMTAB_*} expansion
    local -n s="$symtab" ; s=()
@@ -77,7 +78,7 @@ function _symtab_init_globals {
    # Create symbols for primitive types.
    for short in "${!primitive[@]}" ; do
       local long="${primitive[$short]}"
-      mk_metatype "$short"  "$long"
+      type:new_meta "$short"  "$long"
       symtab set "$SYMBOL"
       declare -g "_${long}"="$TYPE"
    done
@@ -85,7 +86,7 @@ function _symtab_init_globals {
    # Create symbols for complex types.
    for short in "${!complex[@]}" ; do
       local long="${complex[$short]}"
-      mk_metatype "$short"  "$long"  'complex'
+      type:new_meta "$short"  "$long"  'complex'
       symtab set "$SYMBOL"
       declare -g "_${long}"="$TYPE"
    done
@@ -161,46 +162,41 @@ function mk_symbol {
 # @section                       Type functions
 #-------------------------------------------------------------------------------
 
-# TODO: rename -> type:new
-function mk_type {
+function type:new {
+   local complex="$1"
+
    (( ++_TYPE_NUM ))
    local type="TYPE_${_TYPE_NUM}"
    declare -gA "$type"
    declare -g  TYPE="$type"
 
-   # Subtype array.
-   (( ++_TYPE_NUM ))
-   local items="TYPE_${_TYPE_NUM}"
-   declare -ga "$items"
-
    local -n t_r="$type"
-   t_r['kind']=''
-   t_r['subtype']="$items"
+   t_r['kind']=''          #< :str
+   t_r['params']=''        #< :TYPE, initial node of a paramlist
+   t_r['next']=''          #< :TYPE, subsequent node of a paramlist
+
+   if [[ "$complex" ]] ; then
+      t_r['complex']='yes'
+   fi
 }
 
 
-# TODO: rename -> type:new_meta
-function mk_metatype() {
+function type:new_meta {
    local name="$1"
    local kind="$2"
-   local complex="$3"
+   local complex="$1"
 
-   mk_type
+   type:new "$complex"
    local type="$TYPE"
    local -n type_r="$TYPE"
    type_r['kind']="$kind"
 
-   if [[ "$complex" ]] ; then
-      type_r['complex']='yes'
-   fi
-
    # Create Type representing Types.
-   mk_type
+   type:new 'complex'
    local metatype="$TYPE"
    local -n metatype_r="$TYPE"
    metatype_r['kind']='TYPE'
-   local -n metatype_items_r="${metatype_r[subtype]}"
-   metatype_items_r+=( "$type" )
+   metatype_r['params']="$type"
 
    mk_symbol
    local -n symbol_r="$SYMBOL"
@@ -211,11 +207,10 @@ function mk_metatype() {
 }
 
 
-# TODO: rename -> type:copy
-function copy_type {
+function type:copy {
    local -n t0_r="$1"
 
-   mk_type
+   type:new
    local t1="$TYPE"
    local -n t1_r="$TYPE"
    t1_r['kind']="${t0_r[kind]}"
@@ -224,7 +219,7 @@ function copy_type {
    local -n t1_items_r="${t1_r[subtype]}"
 
    for t in "${t0_items_r[@]}" ; do
-      copy_type "$t"
+      type:copy "$t"
       t1_items_r+=( "$TYPE" )
    done
 
@@ -232,8 +227,7 @@ function copy_type {
 }
 
 
-# TODO: rename -> type:equality
-function type_equality {
+function type:equality {
    local -n t1_r="$1"
 
    if [[ ${t1_r[kind]} == 'ANY' ]] ; then
@@ -243,7 +237,7 @@ function type_equality {
    # In the case of...
    #  t1(type: list, subtype: any)
    #  t2(type: list, subtype: None)
-   # ...the first type_equality() on their .type will match, but the second must
+   # ...the first type:equality() on their .type will match, but the second must
    # not throw an exception. It is valid to have a missing (or different) type,
    # if the principal type is ANY.
    [[ "$2" ]] || return 1
@@ -297,7 +291,7 @@ function walk:symtab {
 
 
 function symtab_program {
-   symtab new
+   symtab new --parent "$SYMTAB"
    local symtab="$SYMTAB"
 
    local node="$NODE"
@@ -335,14 +329,26 @@ function symtab_typedef {
    walk:symtab "${node_r[type]}"
    local type="$TYPE"
 
+   ## TODO: uncomment when typedefs are list-based
+   #
+   #local -n items_r"${metatype_r[subtype]}"
+   #if (( ! ${#items_r[@]} == 1 )) ; then
+   #   e=( --anchor "${name_r[location]}"
+   #       --caught "${subtype_r[location]}"
+   #       "${metatype_r[kind]}"
+   #   ); raise too_many_subtypes "${e[@]}"
+   #fi
+
    # Create Type representing Types.
-   mk_type
+   type:new
    local metatype="$TYPE"
    local -n metatype_r="$TYPE"
    metatype_r['kind']='TYPE'
+   
+   local -n items_r="${metatype_r[subtype]}"
    metatype_r['subtype']="$type"
-   symbol_r['type']="$metatype"
 
+   symbol_r['type']="$metatype"
    symtab set "$symbol"
 }
 
@@ -373,11 +379,11 @@ function symtab_decl_section {
 
    #  ┌── doesn't know about dynamically created $_SECTION var.
    # shellcheck disable=SC2154
-   copy_type "$_SECTION"
+   type:copy "$_SECTION"
    symbol_r['type']="$TYPE"
 
    local symtab="$SYMTAB"
-   symtab new
+   symtab new --parent "$SYMTAB"
 
    # Save reference to the symbol table at the current scope. Needed in the
    # linear evaluation phase.
@@ -427,7 +433,7 @@ function symtab_decl_variable {
       walk:symtab "${node_r[type]}"
    else
       # shellcheck disable=SC2154
-      copy_type "$_ANY"
+      type:copy "$_ANY"
    fi
    symbol_r['type']="$TYPE"
 
@@ -452,37 +458,42 @@ function symtab_type {
    fi
 
    local -n symbol_r="$SYMBOL"
-   local outer_type="${symbol_r[type]}"
-   # Types themselves are defined as such:
-   #> int = Type('TYPE', subtype: Type('INTEGER'))
-   #> str = Type('TYPE', subtype: Type('STRING'))
+   local metatype="${symbol_r[type]}"
+   local -n metatype_r="$metatype"
 
    #  ┌── doesn't know about dynamically created $_TYPE (confused with $TYPE).
    # shellcheck disable=SC2153,SC2154
-   if ! type_equality  "$_TYPE"  "$outer_type" ; then
+   if [[ ! "${metatype_r[kind]}" == TYPE ]] ; then
       e=( --anchor "${name_r[location]}"
           --caught "${name_r[location]}"
           "$name"
       ); raise not_a_type "${e[@]}"
    fi
 
-   local -n outer_type_r="$outer_type"
-   copy_type "${outer_type_r[subtype]}"
-   local type="$TYPE"
-   local -n type_r="$type"
+   #local -n items_r"${metatype_r[subtype]}"
+   #if (( ! ${#items_r[@]} == 1 )) ; then
+   #   e=( --anchor "${name_r[location]}"
+   #       --caught "${subtype_r[location]}"
+   #       "${metatype_r[kind]}"
+   #   ); raise too_many_subtypes "${e[@]}"
+   #fi
 
-   if [[ "${node_r[subtype]}" ]] ; then
-      if [[ ! "${type_r[complex]}" ]] ; then
-         local -n subtype_r="${node_r[subtype]}"
-         e=( --anchor "${name_r[location]}"
-             --caught "${subtype_r[location]}"
-             "primitive types are not subscriptable"
-         ); raise type_error "${e[@]}"
-      fi
+   #type:copy
+   #local type="$TYPE"
+   #local -n type_r="$type"
 
-      walk:symtab "${node_r[subtype]}"
-      type_r['subtype']="$TYPE"
-   fi
+   #if [[ "${node_r[subtype]}" ]] ; then
+   #   if [[ ! "${type_r[complex]}" ]] ; then
+   #      local -n subtype_r="${node_r[subtype]}"
+   #      e=( --anchor "${name_r[location]}"
+   #          --caught "${subtype_r[location]}"
+   #          "primitive types are not subscriptable"
+   #      ); raise type_error "${e[@]}"
+   #   fi
+
+   #   walk:symtab "${node_r[subtype]}"
+   #   type_r['subtype']="$TYPE"
+   #fi
 
    declare -g TYPE="$type"
 }

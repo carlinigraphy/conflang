@@ -237,7 +237,7 @@ function semantics_decl_variable {
    fi
    local target="$TYPE"
 
-   if ! type_equality  "$target"  "$actual" ; then
+   if ! type:equality  "$target"  "$actual" ; then
       local -n type_r="${node_r[type]}"
       local -n expr_r="${node_r[expr]}"
 
@@ -266,7 +266,7 @@ function semantics_type {
    #> str = Type('TYPE', subtype: Type('STRING'))
 
    local -n outer_type_r="$outer_type"
-   copy_type "${outer_type_r[subtype]}"
+   type:copy "${outer_type_r[subtype]}"
    local type="$TYPE"
    local -n type_r="$type"
 
@@ -302,7 +302,7 @@ function semantics_member {
 
    #  ┌── doesn't know about dynamically created $_SECTION var.
    # shellcheck disable=SC2154
-   if ! type_equality  "$_SECTION"  "$TYPE" ; then
+   if ! type:equality  "$_SECTION"  "$TYPE" ; then
       e=( type_error
          --anchor "${node_r[location]}"
          --caught "${right_r[location]}"
@@ -347,7 +347,7 @@ function semantics_index {
 
    #  ┌── doesn't know about dynamically created $_LIST var.
    # shellcheck disable=SC2154
-   if ! type_equality  "$_LIST"  "$TYPE" ; then
+   if ! type:equality  "$_LIST"  "$TYPE" ; then
       local msg='the left hand side must evaluate to an list.'
       raise type_error "${node_r[left]}"  "$msg"
    fi
@@ -357,7 +357,7 @@ function semantics_index {
 
    #  ┌── doesn't know about dynamically created $_INTEGER var.
    # shellcheck disable=SC2154
-   if ! type_equality "$_INTEGER"  "$TYPE" ; then
+   if ! type:equality "$_INTEGER"  "$TYPE" ; then
       local loc="${node_r[right]}"
       local msg="list indexes must evaluate to an integer."
       raise type_error  "$loc"  "$msg"
@@ -382,14 +382,14 @@ function semantics_unary {
 
    #  ┌── doesn't know about dynamically created $_INTEGER var.
    # shellcheck disable=SC2154
-   if ! type_equality  "$_INTEGER"  "$TYPE" ; then
+   if ! type:equality  "$_INTEGER"  "$TYPE" ; then
       local loc="${node_r[right]}"
       local msg="may only negate integers."
       raise type_error  "$loc"  "$msg"
    fi
 
    # If it hasn't exploded, it's an integer.
-   copy_type "$_INTEGER"
+   type:copy "$_INTEGER"
 }
 
 
@@ -398,7 +398,7 @@ function semantics_list {
    local -n items_r="${node_r[items]}"
 
    # shellcheck disable=SC2154
-   copy_type "$_LIST"
+   type:copy "$_LIST"
    local type="$TYPE"
    local -n type_r="$TYPE"
 
@@ -421,7 +421,7 @@ function semantics_list {
    if [[ ${#types_found[@]} -gt 1 ]] ; then
       #  ┌── doesn't know about dynamically created $_ANY var.
       # shellcheck disable=SC2154
-      copy_type "$_ANY"
+      type:copy "$_ANY"
       type_r['subtype']="$TYPE"
    fi
 

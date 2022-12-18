@@ -144,6 +144,7 @@ function main {
    local globals="$SYMTAB"
 
    file:new ; file:resolve "$INPUT"  "$PWD"
+   #--^ Adds initial file to IMPORTS[]
 
    for (( idx = 0 ; idx < ${#IMPORTS[@]} ; ++idx )) ; do
       local path="${IMPORTS[$idx]}"

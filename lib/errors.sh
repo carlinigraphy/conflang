@@ -43,13 +43,14 @@ declare -gA ERROR_CODE=(
    [undefined_type]='21,Type Error'
    [not_a_type]='22,Type Error'
    [symbol_mismatch]='23,Type Error'
+   [too_many_subtypes]='24,Type Error'
 
    # Key errors
-   [index_error]='24,Name Error'
-   [name_collision]='25,Name Error'
-   [missing_env_var]='26,Name Error'
-   [missing_var]='27,Name Error'
-   [missing_required]='28,Name Error'
+   [index_error]='25,Name Error'
+   [name_collision]='26,Name Error'
+   [missing_env_var]='27,Name Error'
+   [missing_var]='28,Name Error'
+   [missing_required]='29,Name Error'
 
    # Misc. errors
    [idiot_programmer]='255,Idiot Programmer Error'
@@ -101,7 +102,7 @@ function raise {
       build_error_location  "$anchor"  "$caught"
    fi
 
-   _"${type}"  "${args[@]}"
+   raise_"${type}"  "${args[@]}"
 
    error:print  "$ERROR"
    exit "$code"
@@ -277,108 +278,113 @@ function error:_multi_file_context {
 }
 
 #───────────────────────────────( I/O errors )──────────────────────────────────
-function _no_input {
+function raise_no_input {
    local -n error_r="$ERROR"
    error_r[msg]='no input file'
 }
 
 
-function _missing_file {
+function raise_missing_file {
    local -n error_r="$ERROR"
    error_r[msg]="missing or unreadable source file [${1##*/}]"
 }
 
 
-function _missing_constraint {
+function raise_missing_constraint {
    local -n error_r="$ERROR"
    error_r[msg]="no %constrain file exists"
 }
 
 
-function _circular_import {
+function raise_circular_import {
    local -n error_r="$ERROR"
    error_r[msg]="cannot source [${1##*/}], circular import"
 }
 
 #──────────────────────────────( syntax errors )────────────────────────────────
-function _syntax_error {
+function raise_syntax_error {
    local -n error_r="$ERROR"
    error_r[msg]="${1}"
 }
 
 
-function _invalid_interpolation_char {
+function raise_invalid_interpolation_char {
    local -n error_r="$ERROR"
    error_r[msg]="${1}"
 }
 
-function _unescaped_interpolation_brace {
+function raise_unescaped_interpolation_brace {
    local -n error_r="$ERROR"
    error_r[msg]="single \`}' not allowed in f-string."
 }
 
 #───────────────────────────────( parse errors )────────────────────────────────
-function _parse_error {
+function raise_parse_error {
    local -n error_r="$ERROR"
    error_r[msg]="${1}"
 }
 
-function _munch_error {
+function raise_munch_error {
    local -n error_r="$ERROR"
    error_r[msg]="expected [${1}], received [${2}], $3"
 }
 
 
 #───────────────────────────────( type errors )─────────────────────────────────
-function _type_error {
+function raise_type_error {
    local -n error_r="$ERROR"
    error_r[msg]="$1"
 }
 
-function _undefined_type {
+function raise_undefined_type {
    local -n error_r="$ERROR"
    error_r[msg]="[${1}] not a defined type"
 }
 
-function _not_a_type {
+function raise_not_a_type {
    local -n error_r="$ERROR"
    error_r[msg]="[${1}] is not a type"
 }
 
-function _symbol_mismatch {
+function raise_symbol_mismatch {
    local -n error_r="$ERROR"
    error_r[msg]="does not match parent's type"
 }
 
+function raise_too_many_subtypes {
+   local -n error_r="$ERROR"
+   error_r[msg]="[${1,,}] only takes one subtype"
+}
+
 #────────────────────────────────( key errors )─────────────────────────────────
-function _index_error {
+function raise_index_error {
    local -n error_r="$ERROR"
    error_r[msg]="[${1}] not found"  
 }
 
-function _name_collision {
+function raise_name_collision {
    local -n error_r="$ERROR"
    declare -p $ERROR
    error_r[msg]="[${1}] already defined in this scope"  
 }
 
-function _missing_env_var {
+function raise_missing_env_var {
    local -n error_r="$ERROR"
    error_r[msg]="[${1}] undefined"  
 }
 
-function _missing_var {
+function raise_missing_var {
    local -n error_r="$ERROR"
    error_r[msg]="[${1}] undefined"
 }
 
-function _missing_required {
+function raise_missing_required {
    local -n error_r="$ERROR"
    error_r[msg]="[${1}] required in parent, missing in child"
 }
 
 #───────────────────────────────( misc. errors)───────────────────────────────
-function _argument_error {
+function raise_argument_error {
    local msg='invalid arguments: '
    for a in "$@" ; do
       msg+="[${a}]"
@@ -388,7 +394,7 @@ function _argument_error {
    error_r[msg]="$msg"
 }
 
-function _idiot_programmer {
+function raise_idiot_programmer {
    local -n error_r="$ERROR"
    error_r[msg]="$1"
 }
