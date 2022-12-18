@@ -189,8 +189,13 @@ function _ast_new_type {
 
    local -n node_r="$node"
    node_r['kind']=''
-   node_r['params']=''
-   node_r['next']=''
+
+   # Array to hold subtypes. Example:
+   #> rec[str, int]
+   (( ++_NODE_NUM ))
+   local subtype="NODE_${_NODE_NUM}"
+   declare -ga "$subtype"
+   node_r['subtype']="$subtype"
 
    location:new
    node_r['location']="$LOCATION"
@@ -842,8 +847,7 @@ function parser:type {
 
    if parser:match 'L_BRACKET' ; then
       declare -g ANCHOR="$open"
-      parser:typelist
-      node_r['params']="$NODE"
+      parser:typelist "$node"
       parser:munch 'R_BRACKET' "type params must close with \`]'."
    fi
 
@@ -857,7 +861,7 @@ function parser:type {
 
 # parser:typelist()
 # @description
-#  typelist ->  type ("," type)+
+#  typelist ->  type ("," type)*
 #
 # @see   parser:type
 #
@@ -865,14 +869,16 @@ function parser:type {
 # @set   ANCHOR
 # @noargs
 function parser:typelist {
-   parser:type
-   local node="$NODE"
+   local node="$1"
    local -n node_r="$node"
+   local -n items_r="${node_r[subtype]}"
+
+   parser:type
+   items_r+=( "$NODE" )
 
    while parser:match 'COMMA' ; do
       parser:type
-      node_r['next']="$NODE"
-      local -n node_r="$NODE"
+      items_r+=( "$NODE" )
    done
 
    declare -g NODE="$node"

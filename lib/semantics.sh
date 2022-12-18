@@ -188,35 +188,6 @@ function dependency_sort {
 
 
 #─────────────────────────────( semantic analysis )─────────────────────────────
-function type_equality {
-   local -n t1_r="$1"
-
-   if [[ ${t1_r[kind]} == 'ANY' ]] ; then
-      return 0
-   fi
-
-   # In the case of...
-   #  t1(type: list, subtype: any)
-   #  t2(type: list, subtype: None)
-   # ...the first type_equality() on their .type will match, but the second must
-   # not throw an exception. It is valid to have a missing (or different) type,
-   # if the principal type is ANY.
-   [[ "$2" ]] || return 1
-   local -n t2_r="$2"
-
-   if [[ ${t1_r[kind]} != "${t2_r[kind]}" ]] ; then
-      return 1
-   fi
-
-   if [[ ${t1_r[subtype]} ]] ; then
-      type_equality "${t1_r[subtype]}" "${t2_r[subtype]}"
-      return $?
-   fi
-
-   return 0
-}
-
-
 function walk:semantics {
    declare -g NODE="$1"
    semantics_${TYPEOF[$NODE]}

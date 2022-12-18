@@ -139,6 +139,10 @@ function argparse {
 # @set   IMPORTS[]
 function main {
    globals:init
+
+   symtab init_globals
+   local globals="$SYMTAB"
+
    file:new ; file:resolve "$INPUT"  "$PWD"
 
    for (( idx = 0 ; idx < ${#IMPORTS[@]} ; ++idx )) ; do
@@ -173,7 +177,7 @@ function main {
    done
 
    # Reduces all the IMPORTS[] to a single {Symtab,AST}.
-   fold
+   fold ; SYMTAB_PARENT["$SYMTAB"]="$globals"
 
    #walk:flatten "$NODE"
    #dependency_to_map

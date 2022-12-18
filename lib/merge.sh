@@ -151,19 +151,6 @@ function merge:section {
 }
 
 
-# TODO(CURRENT):
-#  Definitely now think that built-in types need to live in their own symbol
-#  table, at a level above the regular user table. Or maybe they're not
-#  introduced until after the merging phase? Either way, it adds unnecessary
-#  complexity to need to merge them across every time as well. Shouldn't need
-#  to consider merging copies of the same BITs for every file, it's a waste.
-#
-#  Options are:
-#     - Create a separate "BITs" table that's set as the parent of the merged
-#       result
-#     - Nvm I like that solution
-
-
 # merge:typedef()
 # @description
 #  This is a validation step. Cannot re-define typedefs.
@@ -179,53 +166,64 @@ function merge:typedef {
    #-- LHS dogshit.
    local -n lhs_sym_r="$lhs_sym"
    local -n lhs_type_r="${lhs_sym_r[type]}"
+   local -n lhs_node_r="${lhs_sym_r[node]}"
 
    #-- RHS bullshit.
    local -n rhs_sym_r="$rhs_sym"
    local -n rhs_type_r="${rhs_sym_r[type]}"
+   local -n rhs_node_r="${rhs_sym_r[node]}"
    
-   # validation.
-   if [[ ! ${rhs_type_r[kind]} == TYPE ]] ; then
-      # Any non-type rhs must have a ['node']. Safe to index.
-      local -n rhs_node_r="${rhs_sym_r[node]}"
-      local -n rhs_name_r="${rhs_node_r[name]}"
-
-      if [[ ! "${lhs_sym_r[node]}" ]] ; then
-         # Only built-in types do not have associated ['node']s.
-         e=( --anchor "${rhs_node_r[location]}"
-             --caught "${rhs_name_r[location]}"
-             "[${rhs_sym_r[name]}] conflicts with built-in type"
-         ); raise type_error "${e[@]}"
-      else
-         local -n lhs_node_r="${lhs_sym_r[node]}" 
-         e=( --anchor "${lhs_node_r[location]}"
-             --caught "${rhs_name_r[location]}"
-         ); raise symbol_mismatch "${e[@]}"
-      fi
-   fi
+   # TODO: it's acceptable to have a typedef that exactly matches. Should have
+   #       a flag to pass to merge:type, setting a 'strict' mode, in which it
+   #       may not have greater specificity.
+   #
+   #       I could see situations in which the user may want to be a bit more
+   #       verbose, and have the typedef additionally declared in their file.
+   #       Code as documentation, or whatever.
+   #
+   e=( --anchor "${lhs_node_r[location]}"
+       --caught "${rhs_name_r[location]}"
+       "may not overwrite a typedef"
+   ); raise type_error "${e[@]}"
 }
 
 
-# merge:variable()
+# merge:typedef()
 # @description
-function merge:variable {
-   local lhs_sym="$1"
-   local rhs_sym="$2"
-   local symtab="$3"
+#  This it's not a semantic typecheck. It only requires a duplicate typedef in
+#  an imported file *exactly* matches. You can declare a variable is more
+#  specific, but cannot change the underlying typedef itself.
+#
+# @arg   $1    :TYPE       LHS symbol
+# @arg   $2    :TYPE       RHS symbol
+function merge:typedef {
+   # Both types must be present.
+   [[ $1 && $2 ]] || return 1
 
-   #-- LHS dogshit.
-   local -n lhs_sym_r="$lhs_sym"
-   local -n lhs_type_r="${lhs_sym_r[type]}"
+   local -n t1_r="$1"
+   local -n t2_r="$2"
 
-   local lhs_node="${lhs_sym_r[node]}"
-   local -n lhs_node_r="$lhs_node"
+   # First match base types.
+   [[ ! ${t1_r['kind']} == "${t2_r[kind]}" ]] && return 1
 
-   #-- RHS bullshit.
-   local -n rhs_sym_r="$rhs_sym"
-   local -n rhs_type_r="${rhs_sym_r[type]}"
+   # If lhs has a subtype, so to must the rhs.
+   [[ ${t1_r['subtype']} && ! "${t2_r[subtype]}" ]] && return 1
 
-   local rhs_node="${rhs_sym_r[node]}"
-   local -n rhs_node_r="$rhs_node"
+   local -n t1_items_r="${t1_r['subtype']}"
+   local -n t2_items_r="${t2_r['subtype']}"
+
+   # Number of subtypes must match in number. Allows for easy iterating with a
+   # single index.
+   (( ${#t1_items_r[@]} == ${#t2_items_r[@]} )) && return 1
+
+   local -i idx
+   for idx in "${!t1_items_r[@]}" ; do
+      if ! merge_type "${t1_items_r[$idx]}" "${t2_items_r[$idx]}" ; then
+         return 1
+      fi
+   done
+
+   return 0
 }
 
 
@@ -243,22 +241,16 @@ function merge:type {
    local -n lhs_type_r="${lhs_sym_r[type]}"
    local -n rhs_type_r="${rhs_sym_r[type]}"
 
-   merge:type  "$lhs_sym"  "$rhs_sym"
-
    # RHS has not declared a type -- change nothing.
    #[[ "${rhs_type_r[kind]}" == ANY ]] && return 0
-
-   
-
 
    # TODO: maybe we want to first establish all the cases in which we DON'T
    #       copy tye type across and return. If nothing needs to be done, can
    #       return 0. Else return 1 for the `throw error` options below.
 
-   # TODO: hmm, this isn't quite what we need.
-   #       The cases for the calling function are:
-   #       1. [x] f0 has no type, fN has no type          (change nothing)
-   #       2. [x] f0 declares a type, fN does not         (change nothing)
+   # TODO: The cases for the calling function are:
+   #       1. [ ] f0 has no type, fN has no type          (change nothing)
+   #       2. [ ] f0 declares a type, fN does not         (change nothing)
    #       3. [ ] f0 declares a type, fN same type        (change nothing)
    #
    #       4. [ ] f0 declares a type, fN more specific    (use fN type)
@@ -268,26 +260,116 @@ function merge:type {
    #       7. [ ] f0 declares a type, fN different type   (throw error)
    #
    #       Recall that declaring no type gives an implicit ANY.
-   #
-   #       Probably need to have this function call some sub functions.
-   
-   # TODO: I think if I reverse their order, it makes more sense. Pretty much
-   #       the same as it was before, except reverse lhs/rhs order.
 
    lhs_sym_r[type]="${rhs_sym_r[type]}"
 }
 
 
-function walk:merge {
-   :;
+# TODO(CURRENT):
+# It seems built-ins are being created as a type(type(str)), raerpb type(str).
+# Need to investigate where/why. I'm also starting to be a little less fond of
+# using an array, instead of a linked list. Linked lists actually made some
+# parts of this easier.
+
+
+# merge:variable()
+# @description
+function merge:variable {
+   local lhs_sym="$1"
+   local rhs_sym="$2"
+   local symtab="$3"
+
+   #-- LHS dogshit.
+   local -n lhs_sym_r="$lhs_sym"
+   local lhs_type="${lhs_sym_r[type]}"
+   local lhs_node="${lhs_sym_r[node]}"
+   local -n lhs_node_r="$lhs_node"
+
+   #-- RHS bullshit.
+   local -n rhs_sym_r="$rhs_sym"
+   local rhs_type="${rhs_sym_r[type]}"
+   local rhs_node="${rhs_sym_r[node]}"
+   local -n rhs_node_r="$rhs_node"
+
+   if ! walk:type "$lhs_type"  "$rhs_type" ; then
+      e=( --anchor "${lhs_node_r[location]}"
+          --caught "${rhs_name_r[location]}"
+      ); raise symbol_mismatch "${e[@]}"
+   fi
+
+   # Gotta walk the rhs expression to find any identifiers. Update their symtab
+   # pointer to the appropriate lhs symtab.
+   walk:merge "$rhs_node"
 }
 
 
+function walk:merge {
+   declare -g NODE="$1"
+   merge_"${TYPEOF[$NODE]}"
+}
+
+
+function merge_decl_variable {
+   local -n node_r="$NODE"
+   if [[ -n ${node_r[expr]} ]] ; then
+      walk:merge "${node_r[expr]}"
+   fi
+}
+
+
+function merge_typecast {
+   local -n node_r="$NODE"
+   walk:merge "${node_r[expr]}"
+}
+
+
+function merge_member {
+   local -n node_r="$NODE"
+   walk:merge "${node_r[left]}"
+   walk:merge "${node_r[right]}"
+}
+
+
+function merge_index {
+   local -n node_r="$NODE"
+   walk:merge "${node_r[left]}"
+   walk:merge "${node_r[right]}"
+}
+
+
+function merge_unary {
+   local -n node_r="$NODE"
+   walk:merge "${node_r[right]}"
+}
+
+
+function merge_list {
+   local -n node_r="$NODE"
+   local -n items_r="${node_r[items]}"
+   for ast_node in "${items_r[@]}"; do
+      walk:merge "$ast_node"
+   done
+}
+
+
+function merge_identifier {
+   local -n node_r="$NODE"
+   node_r['symtab']="$SYMTAB"
+}
+
+
+function merge_boolean { :; }
+function merge_integer { :; }
+function merge_string  { :; }
+function merge_path    { :; }
+function merge_env_var { :; }
 
 
 
 
 
+
+#-------------------------------------------------------------------------------
 
 
 

@@ -1,73 +1,4 @@
 #!/bin/bash
-
-function mk_metatype() {
-   local name="$1"
-   local kind="$2"
-   local complex="$3"
-
-   mk_type
-   local type="$TYPE"
-   local -n type_r="$TYPE"
-   type_r['kind']="$kind"
-
-   # The presence of a set `.subtype` property defines a "complex" type.
-   if [[ "$complex" ]] ; then
-      type_r['subtype']=''
-   fi
-
-   # Example: _BOOLEAN=_TYPE_12. Useful in the `semantics_*` functions as a
-   # copy_type() target, e.g.,  `copy_type $_BOOLEAN`.
-   declare -g "_${kind}"="$TYPE"
-
-   # Create Type representing Types.
-   mk_type
-   local metatype="$TYPE"
-   local -n metatype_r="$TYPE"
-   metatype_r['kind']='TYPE'
-   metatype_r['subtype']="$type"
-
-   mk_symbol
-   local -n symbol_r="$SYMBOL"
-   symbol_r['type']="$metatype"
-   symbol_r['name']="$name"
-
-   declare -g TYPE="$metatype"
-}
-
-
-function populate_globals {
-   local -A primitive=(
-      [any]='ANY'
-      [int]='INTEGER'
-      [str]='STRING'
-      [bool]='BOOLEAN'
-      [path]='PATH'
-      [%section]='SECTION'
-      #--^ User isn't allowed to declare a section. They're a logical grouping,
-      # not an expression.
-   )
-
-   local -A complex=(
-      [type]='TYPE'
-      [list]='LIST'
-      [rec]='RECORD'
-   )
-
-   # Create symbols for primitive types.
-   for name in "${!primitive[@]}" ; do
-      mk_metatype "$name"  "${primitive[$name]}"
-      symtab set "$SYMBOL"
-   done
-
-   # Create symbols for complex types.
-   for name in "${!complex[@]}" ; do
-      mk_metatype "$name"  "${complex[$name]}"  'complex'
-      symtab set "$SYMBOL"
-   done
-}
-
-
-
 #===============================================================================
 # @section                        Symbol table trees
 # @description
@@ -112,6 +43,52 @@ function _symtab_new {
 
    # Without a value, this isn't glob matched by ${!_SYMTAB_*} expansion
    local -n s="$symtab" ; s=()
+}
+
+
+# @set   SYMBOL
+# @set   SYMTAB
+# @set   SYMTAB_PARENT{}
+# @set   TYPE
+# @noargs
+function _symtab_init_globals {
+   (( ++_SYMTAB_NUM ))
+   local symtab="SYMTAB_${_SYMTAB_NUM}"
+   declare -gA "$symtab"
+   declare -g SYMTAB="$symtab"
+
+   local -A primitive=(
+      [any]='ANY'
+      [int]='INTEGER'
+      [str]='STRING'
+      [bool]='BOOLEAN'
+      [path]='PATH'
+      [%section]='SECTION'
+      # User isn't allowed to declare a section. They're a logical grouping,
+      # not an expression.
+   )
+
+   local -A complex=(
+      [type]='TYPE'
+      [list]='LIST'
+      [rec]='RECORD'
+   )
+
+   # Create symbols for primitive types.
+   for short in "${!primitive[@]}" ; do
+      local long="${primitive[$short]}"
+      mk_metatype "$short"  "$long"
+      symtab set "$SYMBOL"
+      declare -g "_${long}"="$TYPE"
+   done
+
+   # Create symbols for complex types.
+   for short in "${!complex[@]}" ; do
+      local long="${complex[$short]}"
+      mk_metatype "$short"  "$long"  'complex'
+      symtab set "$SYMBOL"
+      declare -g "_${long}"="$TYPE"
+   done
 }
 
 
@@ -167,33 +144,74 @@ function _symtab_from {
 
 function mk_symbol {
    (( ++_SYMBOL_NUM ))
-   local   --  sname="SYMBOL_${_SYMBOL_NUM}"
-   declare -gA $sname
-   declare -g  SYMBOL=$sname
-   local   -n  symbol=$sname
+   local symbol="SYMBOL_${_SYMBOL_NUM}"
+   declare -gA "$symbol"
+   declare -g SYMBOL="$symbol"
 
-   symbol['type']=    #> TYPE
-   symbol['node']=    #> NODE
-   symbol['name']=    #> str
+   local -n symbol_r="$symbol"
+   symbol_r['type']=    #> TYPE
+   symbol_r['node']=    #> NODE
+   symbol_r['name']=    #> str
    # While it isn't really required, it's substantially easier if we have a
    # string name, rather than needing to pull it from the symbol.node.name.value
 }
 
 
+#===============================================================================
+# @section                       Type functions
+#-------------------------------------------------------------------------------
+
+# TODO: rename -> type:new
 function mk_type {
    (( ++_TYPE_NUM ))
    local type="TYPE_${_TYPE_NUM}"
-   declare -gA $type
+   declare -gA "$type"
    declare -g  TYPE="$type"
 
-   local -n t="$type"
-   t['kind']=         #-> str
-   #type['subtype']=  #-> Type
-   # .subtype is only present in complex types. It is unset in primitive types,
-   # which allows for throwing errors in semantic analysis for invalid subtypes.
+   # Subtype array.
+   (( ++_TYPE_NUM ))
+   local items="TYPE_${_TYPE_NUM}"
+   declare -ga "$items"
+
+   local -n t_r="$type"
+   t_r['kind']=''
+   t_r['subtype']="$items"
 }
 
 
+# TODO: rename -> type:new_meta
+function mk_metatype() {
+   local name="$1"
+   local kind="$2"
+   local complex="$3"
+
+   mk_type
+   local type="$TYPE"
+   local -n type_r="$TYPE"
+   type_r['kind']="$kind"
+
+   if [[ "$complex" ]] ; then
+      type_r['complex']='yes'
+   fi
+
+   # Create Type representing Types.
+   mk_type
+   local metatype="$TYPE"
+   local -n metatype_r="$TYPE"
+   metatype_r['kind']='TYPE'
+   local -n metatype_items_r="${metatype_r[subtype]}"
+   metatype_items_r+=( "$type" )
+
+   mk_symbol
+   local -n symbol_r="$SYMBOL"
+   symbol_r['type']="$metatype"
+   symbol_r['name']="$name"
+
+   declare -g TYPE="$metatype"
+}
+
+
+# TODO: rename -> type:copy
 function copy_type {
    local -n t0_r="$1"
 
@@ -202,16 +220,56 @@ function copy_type {
    local -n t1_r="$TYPE"
    t1_r['kind']="${t0_r[kind]}"
 
-   if [[ "${t0_r['subtype']}" ]] ; then
-      copy_type "${t0_r['subtype']}"
-      t1_r['subtype']="$TYPE"
-   elif [[ "${t0_r['subtype']+_}" ]] ; then
-      # For complex types with a not-yet-set subtype.
-      t1_r['subtype']=''
-   fi
+   local -n t0_items_r="${t0_r[subtype]}"
+   local -n t1_items_r="${t1_r[subtype]}"
+
+   for t in "${t0_items_r[@]}" ; do
+      copy_type "$t"
+      t1_items_r+=( "$TYPE" )
+   done
 
    declare -g TYPE="$t1"
 }
+
+
+# TODO: rename -> type:equality
+function type_equality {
+   local -n t1_r="$1"
+
+   if [[ ${t1_r[kind]} == 'ANY' ]] ; then
+      return 0
+   fi
+
+   # In the case of...
+   #  t1(type: list, subtype: any)
+   #  t2(type: list, subtype: None)
+   # ...the first type_equality() on their .type will match, but the second must
+   # not throw an exception. It is valid to have a missing (or different) type,
+   # if the principal type is ANY.
+   [[ "$2" ]] || return 1
+   local -n t2_r="$2"
+
+   if [[ ${t1_r[kind]} != "${t2_r[kind]}" ]] ; then
+      return 1
+   fi
+
+   local -n t1_items_r="${t1_r['subtype']}"
+   local -n t2_items_r="${t2_r['subtype']}"
+
+   # Number of subtypes must match in number. Allows for easy iterating with a
+   # single index.
+   (( ${#t1_items_r[@]} == ${#t2_items_r[@]} )) || return 1
+
+   local -i idx
+   for idx in "${!t1_items_r[@]}" ; do
+      if ! merge_type "${t1_items_r[$idx]}" "${t2_items_r[$idx]}" ; then
+         return 1
+      fi
+   done
+
+   return 0
+}
+
 
 #===============================================================================
 # @section                       Create scopes
@@ -240,7 +298,6 @@ function walk:symtab {
 
 function symtab_program {
    symtab new
-   populate_globals
    local symtab="$SYMTAB"
 
    local node="$NODE"
@@ -415,9 +472,7 @@ function symtab_type {
    local -n type_r="$type"
 
    if [[ "${node_r[subtype]}" ]] ; then
-      # See ./doc/truth.sh for an explanation on the test below. Checks if the
-      # type has an unset .subtype field (indicating non-complex type).
-      if [[ ! "${type_r[subtype]+_}" ]] ; then
+      if [[ ! "${type_r[complex]}" ]] ; then
          local -n subtype_r="${node_r[subtype]}"
          e=( --anchor "${name_r[location]}"
              --caught "${subtype_r[location]}"
