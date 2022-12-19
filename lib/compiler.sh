@@ -113,7 +113,7 @@ function skelly_decl_section {
    IS_SECTION[$dict_skelly]='yes'
 
    local symtab="$SYMTAB"
-   symtab from "$node"
+   symtab:from "$node"
 
    local -n items_r="${node_r[items]}"
    for var_decl in "${items_r[@]}"; do
@@ -308,8 +308,8 @@ function evaluate_identifier {
    #
    # This function would be called on line 2 for the reference to `a`.
    #
-   symtab from "$NODE"
-   symtab get "$name"
+   symtab:from "$NODE"
+   symtab:get "$name"
    local -n symbol_r="$SYMBOL"
    local ast_node="${symbol_r[node]}"
 

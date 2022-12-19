@@ -17,7 +17,7 @@
    introspect-able, as some _TYPE_NUM's are not being used for the arrays, etc.
    
    Need this change to be reflected in the...
-   - [ ] parser
+   - [x] parser
    - [ ] symtab   phase
    - [ ] merge    phase
    - [ ] semantic phase

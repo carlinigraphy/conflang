@@ -7,32 +7,7 @@
 #  nonsense.
 #-------------------------------------------------------------------------------
 
-# symtab()
-# @description
-#  Symbol table API. Directly calls sub-commands:
-#  - `new()`       :: create new symtab, assigns previous one as its parent
-#  - `get(key)`    :: recursively search upward for Symbol identified by `$key`
-#  - `strict(key)` :: search only current symtab for Symbol identified by `$key`
-#  - `set(symbol)` :: set `${symbol[name]}` -> `$symbol` in current symtab
-#  - `from(node)`  :: set global `$SYMTAB` pointer to that referenced in $node
-#
-#  The first argument is the sub-command to call. Additional arguments are
-#  passed to that command.
-#
-#  Example:
-#  ```bash
-#  symtab get "key"
-#  #--^ calls `_symtab_get key`
-#  ```
-#
-# @arg   $1    :str     Sub-command to call
-function symtab {
-   local cmd="$1" ; shift
-   _symtab_"$cmd" "$@"
-}
-
-# new()  :: creates new symtab
-function _symtab_new {
+function symtab:new {
    (( ++_SYMTAB_NUM ))
    local symtab="SYMTAB_${_SYMTAB_NUM}"
    declare -gA "$symtab"
@@ -52,7 +27,7 @@ function _symtab_new {
 # @set   SYMTAB_PARENT{}
 # @set   TYPE
 # @noargs
-function _symtab_init_globals {
+function symtab:init_globals {
    (( ++_SYMTAB_NUM ))
    local symtab="SYMTAB_${_SYMTAB_NUM}"
    declare -gA "$symtab"
@@ -79,7 +54,7 @@ function _symtab_init_globals {
    for short in "${!primitive[@]}" ; do
       local long="${primitive[$short]}"
       type:new_meta "$short"  "$long"
-      symtab set "$SYMBOL"
+      symtab:set "$SYMBOL"
       declare -g "_${long}"="$TYPE"
    done
 
@@ -87,14 +62,15 @@ function _symtab_init_globals {
    for short in "${!complex[@]}" ; do
       local long="${complex[$short]}"
       type:new_meta "$short"  "$long"  'complex'
-      symtab set "$SYMBOL"
+      symtab:set "$SYMBOL"
       declare -g "_${long}"="$TYPE"
    done
 }
 
 
-# get(key)  :: recursively searches upward for Symbol identified by $key.
-function _symtab_get {
+# @description
+#  Recursively searches upward for Symbol identified by $1.
+function symtab:get {
    local name="$1"
 
    local symtab="$SYMTAB" ; local -n symtab_r="$symtab"
@@ -114,8 +90,9 @@ function _symtab_get {
 }
 
 
-# strict(key)  :: searches only current symtab for Symbol identified by $key.
-function _symtab_strict {
+# @description
+#  Searches only current symtab for Symbol identified by $1.
+function symtab:strict {
    local name="$1"
    local symtab="$SYMTAB"
    local -n symtab_r="$symtab"
@@ -125,8 +102,9 @@ function _symtab_strict {
 }
 
 
-# set(symbol)  :: sets ${symbol[name]} -> $symbol in current symtab
-function _symtab_set {
+# @description
+#  Sets ${symbol[name]} -> $symbol in current symtab
+function symtab:set {
    local symbol="$1"
    local -n symbol_r="$symbol"
    local name="${symbol_r[name]}"
@@ -136,14 +114,15 @@ function _symtab_set {
 }
 
 
-# from(node)  :: sets global $SYMTAB pointer to that referenced in $node
-function _symtab_from {
+# @description
+#  Sets global $SYMTAB pointer to that referenced in $node
+function symtab:from {
    local -n node_r="$1"
    declare -g SYMTAB="${node_r[symtab]}"
 }
 
 
-function mk_symbol {
+function symbol:new {
    (( ++_SYMBOL_NUM ))
    local symbol="SYMBOL_${_SYMBOL_NUM}"
    declare -gA "$symbol"
@@ -198,7 +177,7 @@ function type:new_meta {
    metatype_r['kind']='TYPE'
    metatype_r['params']="$type"
 
-   mk_symbol
+   symbol:new
    local -n symbol_r="$SYMBOL"
    symbol_r['type']="$metatype"
    symbol_r['name']="$name"
@@ -214,14 +193,20 @@ function type:copy {
    local t1="$TYPE"
    local -n t1_r="$TYPE"
    t1_r['kind']="${t0_r[kind]}"
+   t1_r['complex']="${t0_r[complex]}"
 
-   local -n t0_items_r="${t0_r[subtype]}"
-   local -n t1_items_r="${t1_r[subtype]}"
+   local t0_next="${t0_r[next]}"
+   local t0_params="${t0_r[params]}"
 
-   for t in "${t0_items_r[@]}" ; do
-      type:copy "$t"
-      t1_items_r+=( "$TYPE" )
-   done
+   if [[ "$t0_next" ]] ; then
+      type:copy "$t0_next" 
+      t1_r['next']="$TYPE"
+   fi
+
+   if [[ "$t0_params" ]] ; then
+      type:copy "$t0_params" 
+      t1_r['params']="$TYPE"
+   fi
 
    declare -g TYPE="$t1"
 }
@@ -291,7 +276,7 @@ function walk:symtab {
 
 
 function symtab_program {
-   symtab new --parent "$SYMTAB"
+   symtab:new --parent "$SYMTAB"
    local symtab="$SYMTAB"
 
    local node="$NODE"
@@ -315,7 +300,7 @@ function symtab_header {
 
 
 function symtab_typedef {
-   mk_symbol
+   symbol:new
    local symbol="$SYMBOL"
    local -n symbol_r="$symbol"
 
@@ -349,14 +334,14 @@ function symtab_typedef {
    metatype_r['subtype']="$type"
 
    symbol_r['type']="$metatype"
-   symtab set "$symbol"
+   symtab:set "$symbol"
 }
 
 
 function symtab_decl_section {
    local -n node_r="$NODE"
 
-   mk_symbol
+   symbol:new
    local symbol="$SYMBOL"
    local -n symbol_r="$SYMBOL"
 
@@ -368,13 +353,13 @@ function symtab_decl_section {
    local name="${ident_r[value]}"
    symbol_r['name']="${ident_r[value]}"
 
-   if symtab strict "$name" ; then
+   if symtab:strict "$name" ; then
       e=( --anchor "${node_r[location]}"
           --caught "${node_r[location]}"
           "$name"
       ); raise name_collision "${e[@]}"
    else
-      symtab set "$symbol"
+      symtab:set "$symbol"
    fi
 
    #  ┌── doesn't know about dynamically created $_SECTION var.
@@ -383,7 +368,7 @@ function symtab_decl_section {
    symbol_r['type']="$TYPE"
 
    local symtab="$SYMTAB"
-   symtab new --parent "$SYMTAB"
+   symtab:new --parent "$SYMTAB"
 
    # Save reference to the symbol table at the current scope. Needed in the
    # linear evaluation phase.
@@ -405,7 +390,7 @@ function symtab_decl_variable {
    # linear compilation phase(s).
    node_r['symtab']="$SYMTAB"
 
-   mk_symbol
+   symbol:new
    local symbol="$SYMBOL"
    local -n symbol_r="$symbol"
 
@@ -418,13 +403,13 @@ function symtab_decl_variable {
    local name="${identifier_r[value]}"
    symbol_r['name']="$name"
 
-   if symtab strict "$name" ; then
+   if symtab:strict "$name" ; then
       e=( --anchor "${node_r[location]}"
           --caught "${node_r[location]}"
           "$name"
       ); raise name_collision "${e[@]}"
    else
-      symtab set "$symbol"
+      symtab:set "$symbol"
    fi
 
    # Set the symbol's type to the declared type (if exists), else implicitly
@@ -450,7 +435,7 @@ function symtab_type {
    local -n name_r="${node_r[kind]}"
    local name="${name_r[value]}"
 
-   if ! symtab get "$name" ; then
+   if ! symtab:get "$name" ; then
       e=( --anchor "${name_r[location]}"
           --caught "${name_r[location]}"
           "$name"

@@ -200,14 +200,9 @@ function _ast_new_type {
    declare -g NODE="$node"
 
    local -n node_r="$node"
-   node_r['kind']=''
-
-   # Array to hold subtypes. Example:
-   #> rec[str, int]
-   (( ++_NODE_NUM ))
-   local subtype="NODE_${_NODE_NUM}"
-   declare -ga "$subtype"
-   node_r['subtype']="$subtype"
+   node_r['kind']=''          #< :str
+   node_r['params']=''        #< :TYPE, initial node of a paramlist
+   node_r['next']=''          #< :TYPE, subsequent node of a paramlist
 
    location:new
    node_r['location']="$LOCATION"
@@ -826,16 +821,16 @@ function parser:decl_variable {
 #  Example:
 #  ```python
 #  class Type():
-#     def __init__(self, kind: str, param: Type, next: Type):
-#        self.kind  = kind
-#        self.param = param
-#        self.next  = next
+#     def __init__(self, kind: str, params: Type, next: Type):
+#        self.kind   = kind
+#        self.params = params
+#        self.next   = next
 #  
 #  # rec[list[str], int]
 #  int  = Type('INT')
 #  str  = Type('STR')
-#  list = Type('LIST', param: str, next: int)
-#  rec  = Type('RECORD', param: list)
+#  list = Type('LIST', params: str, next: int)
+#  rec  = Type('RECORD', params: list)
 #  ```
 #
 # @see   parser:typelist
@@ -859,7 +854,8 @@ function parser:type {
 
    if parser:match 'L_BRACKET' ; then
       declare -g ANCHOR="$open"
-      parser:typelist "$node"
+      parser:typelist
+      node_r['params']="$NODE"
       parser:munch 'R_BRACKET' "type params must close with \`]'."
    fi
 
@@ -881,16 +877,14 @@ function parser:type {
 # @set   ANCHOR
 # @noargs
 function parser:typelist {
-   local node="$1"
-   local -n node_r="$node"
-   local -n items_r="${node_r[subtype]}"
-
    parser:type
-   items_r+=( "$NODE" )
+   local node="$NODE"
+   local -n node_r="$node"
 
    while parser:match 'COMMA' ; do
       parser:type
-      items_r+=( "$NODE" )
+      node_r['next']="$NODE"
+      local -n node_r="$NODE"
    done
 
    declare -g NODE="$node"

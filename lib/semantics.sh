@@ -45,7 +45,7 @@ function flatten_decl_section {
    local -n node_r="$node"
 
    local symtab="$SYMTAB"
-   symtab from "$node"
+   symtab:from "$node"
 
    local -n items_r="${node_r[items]}"
    for var_decl in "${items_r[@]}"; do
@@ -107,7 +107,7 @@ function flatten_identifier {
    local -n node_r="$NODE"
    local name="${node_r[value]}"
 
-   if ! symtab get "$name" ; then
+   if ! symtab:get "$name" ; then
       e=( missing_var
          --anchor "${node_r[location]}"
          --caught "${node_r[location]}"
@@ -121,7 +121,7 @@ function flatten_identifier {
    local -n dep="$DEPENDENCY"
    dep+=( "$target" )
 
-   symtab from "$target"
+   symtab:from "$target"
 }
 
 
@@ -200,7 +200,7 @@ function semantics_decl_section {
    local -n node_r="$NODE"
    local -n name_r="${node_r[name]}"
 
-   symtab get "${name_r[value]}"
+   symtab:get "${name_r[value]}"
 
    # Need to "return" the resulting
    local -n symbol_r="$SYMBOL"
@@ -221,8 +221,8 @@ function semantics_decl_variable {
    local -n name_r="${node_r[name]}"
    local name="${name_r[value]}"
 
-   symtab from "$NODE"
-   symtab get "$name"
+   symtab:from "$NODE"
+   symtab:get "$name"
 
    # Initially set Type(ANY). Potentially overwritten by the expr.
    declare -g TYPE="$_ANY"
@@ -258,7 +258,7 @@ function semantics_type {
    local -n name_r="${node_r[kind]}"
    local name="${name_r[value]}"
 
-   symtab get "$name"
+   symtab:get "$name"
    local -n symbol_r="$SYMBOL"
    local outer_type="${symbol_r[type]}"
    # Types themselves are defined as such:
@@ -312,10 +312,10 @@ function semantics_member {
 
    # Descend to section's scope (from above `walk:semantics`).
    local -n symbol_r="$SYMBOL"
-   symtab from "${symbol_r[node]}"
+   symtab:from "${symbol_r[node]}"
 
    local index="${right_r[value]}"
-   if ! symtab strict "$index" ; then
+   if ! symtab:strict "$index" ; then
       raise
       e=( missing_var
          --anchor "${node_r[location]}"
@@ -438,8 +438,8 @@ function semantics_identifier {
    local -n node_r="$NODE"
    local name="${node_r[value]}"
 
-   symtab from "$NODE"
-   symtab get "$name"
+   symtab:from "$NODE"
+   symtab:get "$name"
    local -n symbol_r="$SYMBOL"
 
    # Need to set the $NODE to "return" the expression referenced by this

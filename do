@@ -35,7 +35,7 @@ case "$1" in
 
    'edit')  order=(
                "${PROGDIR}"/bin/confc
-               "${PROGDIR}"/lib/{lexer,parser,merge}.sh
+               "${PROGDIR}"/lib/{lexer,parser,symbols,merge,files}.sh
                "${PROGDIR}"/lib/{semantics,compiler,errors}.sh
             )
             exec nvim -O3 "${order[@]}"
@@ -98,9 +98,8 @@ case "$1" in
 
    'doc')   order=(
                "${PROGDIR}"/bin/confc
-               "${PROGDIR}"/lib/{lexer,parser,symbols,merge}.sh
-               "${PROGDIR}"/lib/{semantics,compiler}.sh
-               "${PROGDIR}"/lib/{errors,debug,ffi}.sh
+               "${PROGDIR}"/lib/{lexer,parser,symbols,merge,files}.sh
+               "${PROGDIR}"/lib/{semantics,compiler,errors}.sh
             )
             AWKDOC_LOG_LEVEL=1 awkdoc "${order[@]}"
             ;;
