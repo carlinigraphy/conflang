@@ -81,7 +81,7 @@ function symtab:get {
 
    if [[ ! "$SYMBOL" && "$parent" ]] ; then
       declare -g SYMTAB="$parent"
-      _symtab_get "$name"
+      symtab:get "$name"
    fi
 
    # Return to the original symbol table.
@@ -151,7 +151,7 @@ function type:new {
 
    local -n t_r="$type"
    t_r['kind']=''          #< :str
-   t_r['params']=''        #< :TYPE, initial node of a paramlist
+   t_r['subtype']=''       #< :TYPE, initial node of a paramlist
    t_r['next']=''          #< :TYPE, subsequent node of a paramlist
 
    if [[ "$complex" ]] ; then
@@ -175,7 +175,7 @@ function type:new_meta {
    local metatype="$TYPE"
    local -n metatype_r="$TYPE"
    metatype_r['kind']='TYPE'
-   metatype_r['params']="$type"
+   metatype_r['subtype']="$type"
 
    symbol:new
    local -n symbol_r="$SYMBOL"
@@ -196,16 +196,16 @@ function type:copy {
    t1_r['complex']="${t0_r[complex]}"
 
    local t0_next="${t0_r[next]}"
-   local t0_params="${t0_r[params]}"
+   local t0_subtype="${t0_r[subtype]}"
 
    if [[ "$t0_next" ]] ; then
       type:copy "$t0_next" 
       t1_r['next']="$TYPE"
    fi
 
-   if [[ "$t0_params" ]] ; then
-      type:copy "$t0_params" 
-      t1_r['params']="$TYPE"
+   if [[ "$t0_subtype" ]] ; then
+      type:copy "$t0_subtype" 
+      t1_r['subtype']="$TYPE"
    fi
 
    declare -g TYPE="$t1"
@@ -314,24 +314,12 @@ function symtab_typedef {
    walk:symtab "${node_r[type]}"
    local type="$TYPE"
 
-   ## TODO: uncomment when typedefs are list-based
-   #
-   #local -n items_r"${metatype_r[subtype]}"
-   #if (( ! ${#items_r[@]} == 1 )) ; then
-   #   e=( --anchor "${name_r[location]}"
-   #       --caught "${subtype_r[location]}"
-   #       "${metatype_r[kind]}"
-   #   ); raise too_many_subtypes "${e[@]}"
-   #fi
-
    # Create Type representing Types.
    type:new
    local metatype="$TYPE"
    local -n metatype_r="$TYPE"
    metatype_r['kind']='TYPE'
-   
-   local -n items_r="${metatype_r[subtype]}"
-   metatype_r['subtype']="$type"
+   metatype_r['param']="$type"
 
    symbol_r['type']="$metatype"
    symtab:set "$symbol"
@@ -446,8 +434,6 @@ function symtab_type {
    local metatype="${symbol_r[type]}"
    local -n metatype_r="$metatype"
 
-   #  ┌── doesn't know about dynamically created $_TYPE (confused with $TYPE).
-   # shellcheck disable=SC2153,SC2154
    if [[ ! "${metatype_r[kind]}" == TYPE ]] ; then
       e=( --anchor "${name_r[location]}"
           --caught "${name_r[location]}"
@@ -455,30 +441,11 @@ function symtab_type {
       ); raise not_a_type "${e[@]}"
    fi
 
-   #local -n items_r"${metatype_r[subtype]}"
-   #if (( ! ${#items_r[@]} == 1 )) ; then
-   #   e=( --anchor "${name_r[location]}"
-   #       --caught "${subtype_r[location]}"
-   #       "${metatype_r[kind]}"
-   #   ); raise too_many_subtypes "${e[@]}"
-   #fi
+   type:copy "${metatype_r[subtype]}"
+   local type="$TYPE"
+   local -n type_r="$type"
 
-   #type:copy
-   #local type="$TYPE"
-   #local -n type_r="$type"
-
-   #if [[ "${node_r[subtype]}" ]] ; then
-   #   if [[ ! "${type_r[complex]}" ]] ; then
-   #      local -n subtype_r="${node_r[subtype]}"
-   #      e=( --anchor "${name_r[location]}"
-   #          --caught "${subtype_r[location]}"
-   #          "primitive types are not subscriptable"
-   #      ); raise type_error "${e[@]}"
-   #   fi
-
-   #   walk:symtab "${node_r[subtype]}"
-   #   type_r['subtype']="$TYPE"
-   #fi
+   # TODO(CURRENT):
 
    declare -g TYPE="$type"
 }

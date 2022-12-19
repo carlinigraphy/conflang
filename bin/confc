@@ -140,7 +140,9 @@ function argparse {
 function main {
    globals:init
 
-   symtab init_globals
+   # TODO: may need to pass this to "file:parse" or something. Add it as the
+   # initial parent of the first created symbol table. Hmm.
+   symtab:init_globals
    local globals="$SYMTAB"
 
    file:new ; file:resolve "$INPUT"  "$PWD"

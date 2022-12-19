@@ -201,7 +201,7 @@ function _ast_new_type {
 
    local -n node_r="$node"
    node_r['kind']=''          #< :str
-   node_r['params']=''        #< :TYPE, initial node of a paramlist
+   node_r['subtype']=''       #< :TYPE, initial node of a paramlist
    node_r['next']=''          #< :TYPE, subsequent node of a paramlist
 
    location:new
@@ -816,21 +816,21 @@ function parser:decl_variable {
 #
 #  Within the parameters of a type, [...], Type() nodes are assigned as a linked
 #  list to the .next slot. The pointer to the parameters themselves is in the
-#  .params slot.
+#  .subtype slot.
 #
 #  Example:
 #  ```python
 #  class Type():
-#     def __init__(self, kind: str, params: Type, next: Type):
-#        self.kind   = kind
-#        self.params = params
-#        self.next   = next
+#     def __init__(self, kind: str, subtype: Type, next: Type):
+#        self.kind    = kind
+#        self.subtype = subtype
+#        self.next    = next
 #  
 #  # rec[list[str], int]
 #  int  = Type('INT')
 #  str  = Type('STR')
-#  list = Type('LIST', params: str, next: int)
-#  rec  = Type('RECORD', params: list)
+#  list = Type('LIST', subtype: str, next: int)
+#  rec  = Type('RECORD', subtype: list)
 #  ```
 #
 # @see   parser:typelist
@@ -855,7 +855,7 @@ function parser:type {
    if parser:match 'L_BRACKET' ; then
       declare -g ANCHOR="$open"
       parser:typelist
-      node_r['params']="$NODE"
+      node_r['subtype']="$NODE"
       parser:munch 'R_BRACKET' "type params must close with \`]'."
    fi
 
