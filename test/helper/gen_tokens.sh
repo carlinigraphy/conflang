@@ -6,12 +6,12 @@
 declare -g  PROGDIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" ; pwd )
 declare -g  LIBDIR="${PROGDIR}"/../../lib
 
-declare -a  INCLUDE_ROOT=()
-declare -ga FILES=( "${1?}" )
-
-source "${LIBDIR}"/utils.sh
+source "${LIBDIR}"/../bin/confc
+source "${LIBDIR}"/files.sh
 source "${LIBDIR}"/errors.sh
 source "${LIBDIR}"/lexer.sh
+
+globals:init
 lexer:init
 lexer:scan
 
