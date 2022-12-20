@@ -6,23 +6,42 @@
 declare -gi INDENT_FACTOR=2
 declare -gi INDENTATION=0
 
+function debug_type {
+   local -n type_r="$1"
+   printf '%s\n'  "${type_r[kind]}"
+
+   if [[ "${type_r[next]}" ]] ; then
+      printf -- '->'
+      debug_type "${type_r[next]}" 
+   fi
+
+   if [[ "${type_r[subtype]}" ]] ; then
+      printf -- '- '
+      debug_type "${type_r[subtype]}" 
+   fi
+}
+
+
+
+
+
+
+
+
+# TODO: need to rework everything below, the last time it was touched was
+# straight up months ago. Doesn't have any of the current AST nodes or props.
+
 #───────────────────────────( pretty print symtab )─────────────────────────────
 function pprint_symtab {
    local -n symtab="$1"
 
-   (( INDENTATION++ ))
+   (( ++INDENTATION )) ||:
 
    for key in "${!symtab[@]}" ; do
       local -n symbol="${symtab[$key]}"
       local -n type="${symbol[type]}"
 
-      if [[ "$key" == '%container' ]] ; then
-         local -n node="${symbol[node]}"
-         local -n name="${node[name]}"
-         printf '%s' "${FILES[${name[file]}]##*/}"
-      else
-         printf "%$(( INDENTATION * INDENT_FACTOR ))s%s" '' "$key"
-      fi
+      printf "%$(( INDENTATION * INDENT_FACTOR ))s%s" '' "$key"
 
       if [[ "${type[kind]}" == 'SECTION' ]] ; then
          printf '\n'
@@ -32,7 +51,7 @@ function pprint_symtab {
       fi
    done
 
-   (( INDENTATION-- ))
+   (( --INDENTATION ))
 }
 
 #───────────────────────────( pretty print NODE_* )─────────────────────────────
