@@ -18,7 +18,7 @@
    
    Need this change to be reflected in the...
    - [x] parser
-   - [ ] symtab   phase
+   - [x] symtab   phase
    - [ ] merge    phase
    - [ ] semantic phase
    - [ ] compiler phase

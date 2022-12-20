@@ -163,7 +163,7 @@ function type:new {
 function type:new_meta {
    local name="$1"
    local kind="$2"
-   local complex="$1"
+   local complex="$3"
 
    type:new "$complex"
    local type="$TYPE"
@@ -319,7 +319,7 @@ function symtab_typedef {
    local metatype="$TYPE"
    local -n metatype_r="$TYPE"
    metatype_r['kind']='TYPE'
-   metatype_r['param']="$type"
+   metatype_r['subtype']="$type"
 
    symbol_r['type']="$metatype"
    symtab:set "$symbol"
@@ -404,6 +404,7 @@ function symtab_decl_variable {
    # takes a Type('ANY').
    if [[ "${node_r[type]}" ]] ; then
       walk:symtab "${node_r[type]}"
+      source lib/debug.sh ; debug_type "$TYPE"
    else
       # shellcheck disable=SC2154
       type:copy "$_ANY"
@@ -445,7 +446,23 @@ function symtab_type {
    local type="$TYPE"
    local -n type_r="$type"
 
-   # TODO(CURRENT):
+   if [[ "${node_r[subtype]}" ]] ; then
+      if [[ ! "${type_r[complex]}" ]] ; then
+         local -n subtype_r="${node_r[subtype]}"
+         e=( --anchor "${name_r[location]}"
+             --caught "${subtype_r[location]}"
+            "primitive types are not subscriptable"
+         ); raise type_error "${e[@]}"
+      else
+
+      walk:symtab "${node_r[subtype]}"
+      type_r['subtype']="$TYPE"
+   fi
+
+   if [[ "${node_r[next]}" ]] ; then
+      walk:symtab "${node_r[next]}"
+      type_r['next']="$TYPE"
+   fi
 
    declare -g TYPE="$type"
 }
