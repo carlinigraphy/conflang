@@ -9,19 +9,18 @@
 
 Configuration language, featuring strong typing and a small but robust feature set.
 
-NOTE:
-Time for a break.
-Been working on this project for almost five months now.
-Putting it down for a bit, to pick up and finish incrementally at a later date.
-
 
 == What works
-* [ ] Parsing, evaluation
+Almost nothing.
+Been doing a lot of work to clean up symbol tables, the type system, and `import` statements.
+That broke everything.
+Oops.
+
+* [ ] Accessing values from input data
+* [ ] Including sub-files
+* [ ] Enforcing constraints upon child-files
 * [ ] Typechecking
 * [ ] VM & post-compilation validation
-* [x] Accessing values from input data
-* [x] Including sub-files
-* [x] Enforcing constraints upon child-files
 
 Around a503e1b917aa or so I broke a good amount of core functionality while fixing symbol tables.
 Gonna be worse before it gets better.
@@ -29,7 +28,7 @@ Gonna be worse before it gets better.
 == Why it do
 Learning.
 
-Several years ago I began learning to write a "real" programming language.
+Around 2020 I began learning to write a "real" programming language.
 Turns out it's hard.
 I found myself consistently hitting conceptual sticking points.
 Approaching these in the context of something I already understand very well (bash) is easier.
@@ -49,12 +48,12 @@ age  : 30;
 
 
 # Basic types.
-name (str): "Marcus";
-age  (int): 30;
+name @str: "Marcus";
+age  @int: 30;
 
 
 # Complex types.
-full_name (array:str): [
+full_name @list[str]: [
    "Marcus",
    "Aurelius",
 ];
@@ -63,11 +62,12 @@ full_name (array:str): [
 
 .Types
 ----
-# (str)    Surrounded with double-quotes:  "this is a string"
-# (path)   Surrounded with single-quotes:  './relative', '~/relative', '/absolute'
-# (int)    Negative & positive integers:   -1, 0, 1, ...
-# (bool)   Boolean values:                 true, false
-# (array)  Arrays, allows mixed types:     [0, 1, 2],  ["one", 2, '~/three.txt']
+# @str     Surrounded with double-quotes:  "this is a string"
+# @path    Surrounded with single-quotes:  './relative', '~/relative', '/absolute'
+# @int     Negative & positive integers:   -1, 0, 1, ...
+# @bool    Boolean values:                 true, false
+# @list    Lists, any length, same type:   [1, 2, 3], ["one", "two", "three"]
+# @tup     Tuples, set length, any type:   {"Marcus", "Aurelius", 30}
 ----
 
 .Environment variables
@@ -107,8 +107,8 @@ section {
 .Others
 ----
 # String interpolation.
-project_dir (path): '{$HOME}/projects/';
-sub_dir     (path): '{project_dir}/sub/';
+project_dir @path: '{$HOME}/projects/';
+sub_dir     @path: '{project_dir}/sub/';
 
 # Type casting.
 shell_level: $SHLVL -> int;
@@ -117,7 +117,7 @@ shell_level: $SHLVL -> int;
 .Example '`real`' file
 ----
 common {
-   colors (array:str) [
+   colors @list[str] [
       "#000000",
       "#111111",
       "#222222",
@@ -126,8 +126,8 @@ common {
 
 window {
    geometry {
-      height (int): 100;
-      width  (int): 80;
+      height @int: 100;
+      width  @int: 80;
    }
 
    theme {
@@ -135,156 +135,4 @@ window {
       foreground: common.colors.1;
    }
 }
-
-%include './bindings.conf';
-----
-
-
-== What it solves
-Configuration files are the backbone of unix systems.
-Most every application/tool uses one.
-
-They have many common problems.
-
-=== Weak typing
-By their nature, configuration files are untyped.
-Even more modern file formats (json, yaml, toml) don't even have type hinting, let alone strong type requirements.
-For configuring utilities as critical a backup application, or system monitoring services, typing is necessary.
-
-No script should fail due to semantic oversights in the configuration.
-
-=== Poor documentation
-Is a boolean looking for `true` or `True`, or maybe just anything _truthy_?
-Can I include environment variables?
-What about references to other config variables, to keep my code _DRY_.
-
-What is allowed, what is expected, what is required.
-Who knows.
-
-=== Inconsistent validation
-Validating a configuration file is left entirely to the program author.
-The extent to which they attempt to catch & appropriately handle edge cases can vary wildly.
-Error reporting is often unhelpful ("`an error has occurred`"), or non-existent ("`exit 1`").
-
-Programmers don't want to spend their time validating user input.
-Shifting that responsibility to the config file itself allows them to write code.
-
-=== Limited features and limited portability
-Bash config files must sacrifice features for portability.
-You don't want to download the entirety of Python3 just to parse a more complex config file for your project.
-Thus limiting you to easily bash-parsable formats.
-Largely just a series of `KEY=VALUE` lines.
-
-This project aims to provide a decent feature set, writing entirely in the Lord's most venerable language: Bash.
-
-With no external dependencies, this should run anywhere Bash 4.2+ is present.
-
-
-== How you use
-The core premise is: two configuration files are present.
-One written by the programmer, the other by the end user.
-
-The parent (programmer's) file enforces variables and types upon the child (end user's) file.
-The child must declare values for the sections & variables required by the parent.
-
-This increased transparency makes it easier on both parties.
-
-=== Variables
-A variable is "`required`" in the child file if there's no expression present in the parent's.
-If the parent's variable does have an expression, it serves as a default if omitted in the child.
-
-[cols='1,1,3']
-|===
-| _./parent.conf_ | _./child.conf_ | result
-
-| `age;`
-| <not present>
-| `Key Error: age must be set in ./child.conf`
-
-| `age: 30;`
-| <not present>
-| `age: 30;`
-
-| `age: 30;`
-| `age: true;`
-| `age: true;`
-
-| `age (int);`
-| `age: true;`
-| `Type Error: age must be (int)`
-
-| `age (int);`
-| `age (bool): true`
-| `Type Error: type of age may not be overwritten`
-
-|===
-
-
-=== Sections
-Sections declared in the parent file are only required if at least one of the variables is required.
-
-.Required
-----
-# Section is required, as one of the variables (age_1) is required.
-required {
-   # Required variable declaration.
-   age_1;
-
-   # Not required.
-   age_2 (int): 30;
-}
-
-# Section & sub-section are both required, as variable (age) is required.
-required {
-   required {
-      age;
-   }
-}
-----
-
-.Not required
-----
-# Section is not required, as none of the variables are required.
-not_required {
-   name (str) : "Marcus";
-   age  (int) : 30;
-}
-
-# Top-level section is required, as is sub-level `sub_required`. Sub-level
-# `not_required` is not.
-required {
-   not_required {
-      age (int) 30;
-   }
-
-   sub_required {
-      name;
-   }
-}
-----
-
-
-== How it do
-At its core, conflang does this:
-
-[source]
-----
-#[pseudocode]
-fn main(src):
-   ast = parse(src)
-   while includes > 0:
-      ast += parse(includes.pop())
-
-   child = None
-   if constrain:
-      child = parse(constrain)
-      while includes > 0:
-         child += parse(includes.pop())
-
-   parent_symtab = mk_symtab(ast)
-   child_symtab  = mk_symtab(child)
-
-   ast, symtab = merge(parent_symtab, child_symtab)
-   semantics(ast, symtab)
-   evaluate(ast, symtab)
 ----
