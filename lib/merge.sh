@@ -44,7 +44,7 @@ function fold {
 #  - Expressions maybe overwritten
 #  - Types may be overwritten with equal or greater specificity
 #    - [GOOD]: `arr @list;`  ->  `arr @list[str];`
-#    - [BAD]: `arr @list[str]`  ->  `arr @list[int];`
+#    - [BAD]: `arr @list[str];`  ->  `arr @list[int];`
 #    - [BAD]: `arr @list[str];`  ->  `arr @str;`
 #
 # @see   merge:section
@@ -91,7 +91,7 @@ function merge {
    done
 
    # Set rhs's symtab parent to lhs's parent. Necessary for overflow statements.
-   SYMTAB_PARENT["$rhs_symtab"]="${SYMTAB_PARENT["$lhs_symtab"]}"
+   SYMTAB_PARENT["$rhs_symtab"]="${SYMTAB_PARENT[$lhs_symtab]}"
 
    # Merge overflow back in.
    local -n lhs_items_r="${lhs_ast_r[items]}"

@@ -22,3 +22,64 @@
    - [ ] merge    phase
    - [ ] semantic phase
    - [ ] compiler phase
+
+
+2022-12-21
+   Need record keeping for how many parameters a type has. Types are linked
+   lists with pointers to the first element of their parameters (.subtype), and
+   to the next element of a paramlist (.next).
+
+    e.g.,
+    rec[list[str], int]
+   
+    rec
+      \                     rec.subtype  = list
+       `-> list ->>- int    list.next    = int 
+              \             list.subtype = str
+               `-> str
+   
+    In the case of something such as
+    rec[list[str], rec[str, int], bool]
+   
+    rec
+      \
+       `-> list  ->>-  rec  ->>-  bool
+              \          \
+               `-> str    `-> str ->>- int
+   
+   
+    Types have a [slots] parameter. If [slots] == 0, and...
+     - There's a [subtype]
+        - Throw an error caught at the subtype
+     - There's a [next]
+        - Throw an error caught at this type...
+          ...originating at the parent type
+   
+    It's that second line of the bullet above that's a problem. How to drop an
+    anchor there, and walk that pointer forwards?
+   
+    In the case of...
+    rec[rec[list[str], rec[int, str], int], str]
+   
+    rec
+      \    (a)
+       `-> rec  ->>-  str
+             \    (a)         (a)
+              `-> list  ->>-  rec  ->>-  int
+                    \           \    (a)
+                     `-> str     `-> rec
+                                       \ 
+                                        `-> int  ->>-  str
+   
+    Drop anchors on (a).
+   
+    It looks like if you drop both an anchor (a) for error tracking, we'll
+    need another anchor for keeping track of the parent Type. TYPE_ANCHOR?
+    PARENT_TYPE? Iterating first by [subtype], then by [next]. Think gives the
+    right tree.
+   
+    Maybe instead do with both a [slots_used] and [slots_avail]. Can maintain
+    a count of how many it was expecting to get for better error reporting.
+   > if ! (( type_r[slots_avail] - type_r[slots_used] )) ; then
+   >    raise type_error
+   > fi
