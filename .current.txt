@@ -70,7 +70,7 @@
                      `-> str     `-> rec
                                        \ 
                                         `-> int  ->>-  str
-   
+
     Drop anchors on (a).
    
     It looks like if you drop both an anchor (a) for error tracking, we'll
@@ -80,6 +80,6 @@
    
     Maybe instead do with both a [slots_used] and [slots_avail]. Can maintain
     a count of how many it was expecting to get for better error reporting.
-   > if ! (( type_r[slots_avail] - type_r[slots_used] )) ; then
-   >    raise type_error
-   > fi
+    > if ! (( type_r[slots_avail] - type_r[slots_used] )) ; then
+    >    raise type_error
+    > fi
