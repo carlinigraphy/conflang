@@ -1,0 +1,44 @@
+= Architecture
+
+For the next time I pick this project back up.
+How does it work, what does each piece do, what's the overall flow.
+
+There's currently ongoing design decisions, ideas, changes, etc., that exist only in my head.
+That's a problem.
+
+
+== Overview
+=== The flow
+==== Parsing
+
+The first "block" takes in an absolute file path, and outputs a File object represented as a tuple of `{AST, Symtab}`.
+
+----
+     path
+      |
+  [ LEXER ] >> tokens
+                  |
+              [ PARSER ] >> AST
+                             |
+                         [ SYMTAB ] >> {AST, Symtab}
+----
+
+This is referred to as "parsing a file".
+
+The file objects are stored in an associative array: `FILES[absolute_path] = {AST, Symtab}`.
+
+==== Fold & merge
+
+
+== Parsing
+=== Lexer
+=== Parser
+=== Symbol table creation phase
+== Tree walk phases
+=== Fold/merge phase
+=== Flattening phase
+== Linear phases
+=== Typechecking phase
+=== Evaluation phase
+== Dismiss army of the dead phase
+== Pre-processor

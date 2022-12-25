@@ -1,7 +1,7 @@
 alpha.$n ->
    robustly retrieve keys from sections
    semantic analysis
-   BATS tests for lexer, parser, and data compiler
+   BATS unit tests
 
 beta.$n ->
    get ffi working
