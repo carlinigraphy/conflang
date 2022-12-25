@@ -26,19 +26,21 @@ exit "$1"
 }
 
 
+declare -a FILES=(
+   "${PROGDIR}"/src/main
+   "${PROGDIR}"/src/{lexer,parser,symbols,merge,files}.sh
+   "${PROGDIR}"/src/{semantics,compiler,errors}.sh
+)
+
+
 case "$1" in
-   'run')   shift ; "${PROGDIR}"/bin/confc "$@"
+   'run')   shift ; "${PROGDIR}"/src/main  "$@"
             ;;
 
-   'rundb') shift ; CONFC_TRACEBACK='sure' "${PROGDIR}"/bin/confc "$@"
+   'rundb') shift ; CONFC_TRACEBACK='sure'  "${PROGDIR}"/src/main  "$@"
             ;;
 
-   'edit')  order=(
-               "${PROGDIR}"/bin/confc
-               "${PROGDIR}"/lib/{lexer,parser,symbols,merge,files}.sh
-               "${PROGDIR}"/lib/{semantics,compiler,errors}.sh
-            )
-            exec nvim -O3 "${order[@]}"
+   'edit')  exec nvim -O3 "${FILES[@]}"
             ;;
 
    'test')  shift ; args=( "$@" )
@@ -71,8 +73,8 @@ case "$1" in
                   --shell=bash
                   --severity=warning
                   --external-sources 
-                  "${PROGDIR}"/bin/confc
-                  "${PROGDIR}"/lib/*.sh
+                  "${PROGDIR}"/src/main
+                  "${PROGDIR}"/src/*.sh
                )
             fi
             shellcheck "${args[@]}" | less -R
@@ -81,7 +83,7 @@ case "$1" in
 
    'wc')    files=(
                "${PROGDIR}"/bin/*
-               "${PROGDIR}"/lib/*
+               "${PROGDIR}"/src/*
             )
             wc -l "${files[@]}"
             ;;
@@ -91,27 +93,15 @@ case "$1" in
             params=(
                "${PROGDIR}"/test/
                -type  f
-               -regex '.*.\(bats\|conf\)'
+               -regex '.*.\(bats\|conf\)$'
             )
             wc -l $(find "${params[@]}")
             ;;
 
-   'doc')   order=(
-               "${PROGDIR}"/bin/confc
-               "${PROGDIR}"/lib/{lexer,parser,symbols,merge,files}.sh
-               "${PROGDIR}"/lib/{semantics,compiler,errors}.sh
-            )
-            AWKDOC_LOG_LEVEL=1 awkdoc "${order[@]}"
+   'doc')   AWKDOC_LOG_LEVEL=1 awkdoc "${FILES[@]}"
             ;;
 
-   'html')  order=(
-               "${PROGDIR}"/bin/confc
-               "${PROGDIR}"/lib/{lexer,parser,symbols,merge}.sh
-               "${PROGDIR}"/lib/{semantics,compiler}.sh
-               "${PROGDIR}"/lib/{errors,debug,ffi}.sh
-            )
-            AWKDOC_LOG_LEVEL=1 awkdoc "${order[@]}" > "${PROGDIR}/doc/out.md"
-
+   'html')  AWKDOC_LOG_LEVEL=1 awkdoc "${FILES[@]}" > "${PROGDIR}/doc/out.md"
             args=(
                --standalone
                --highlight-style monochrome

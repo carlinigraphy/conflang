@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 PROGDIR=$( cd $(dirname "${BASH_SOURCE[0]}") ; pwd )
-LIBDIR="${PROGDIR}"/../lib/
+SRCDIR="${PROGDIR}"/../src/
 
 
 function usage {
@@ -9,29 +9,38 @@ cat <<EOF
 usage ./$(basename "${BASH_SOURCE[0]}") <option>
 
 options.
-   -W | --strip-whitespace    Removes empty lines
-   -C | --strip-comments      Removes comments
+   -w | --strip-newlines    Removes empty lines
+   -c | --strip-comments    Removes comments
+   -t | --topic <TOPIC>     Subscribes to TOPIC
 EOF
 
 exit $1
 }
 
-
+topics=''
 invalid_opts=()
 awk_opts=()
 
 while (( $# )) ; do
    case "$1" in
-      -W | --strip-whitespace)
+      -h | --help)
+         usage 0
+         ;;
+
+      -w | --strip-whitespace)
          shift
          awk_opts+=( -v STRIP_WHITESPACE=yes )
          ;;
 
-      -C | --strip-comments)
+      -c | --strip-comments)
          shift
          awk_opts+=( -v STRIP_COMMENTS=yes )
          ;;
 
+      -t | --topic)
+         shift
+         topics+="${topics:=,}${1}"
+         ;;
 
       -[^-]*)
          opt="${1/-/}"; newopts=()
@@ -58,6 +67,9 @@ while (( $# )) ; do
    esac
 done
 
+awk_opts+=(
+   -v SUBSCRIBE="$topics"
+)
 
 if (( ${#invalid_opts[@]} )) ; then
    printf 'invalid opts:'
@@ -66,5 +78,4 @@ if (( ${#invalid_opts[@]} )) ; then
    usage 1
 fi
 
-
-awk "${awk_opts[@]}" -f "${PROGDIR}"/fmt.awk "${LIBDIR}"/*.sh
+awk "${awk_opts[@]}"  -f "${PROGDIR}"/preproc.awk  "${SRCDIR}"/*.sh  "${SRCDIR}"/main

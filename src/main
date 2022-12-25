@@ -138,6 +138,7 @@ function argparse {
 # @set   FILE
 # @set   IMPORTS[]
 function main {
+   argparse "$@"
    globals:init
 
    # TODO: may need to pass this to "file:parse" or something. Add it as the
@@ -191,9 +192,14 @@ function main {
    #done
 
    #walk:compiler "$NODE"
+
+   #declare -f conf > "$OUTPUT"
+   [[ ${!_SKELLY_*} ]] && declare -p ${!_SKELLY_*} > "$OUTPUT"  ||:
+   [[ ${!_DATA_*}   ]] && declare -p ${!_DATA_*}   > "$OUTPUT"  ||:
 }
 
 
+#>>TOPIC SOURCE
 # If sourced, exit. Equiv. to Python's >if __name__ == '__main__'
 # Nothing below this line will run if sourced, only if invoked directly.
 if [[ ! "${BASH_SOURCE[0]}" == "$0" ]] ; then
@@ -203,38 +209,33 @@ fi
 
 # shellcheck disable=SC2155,SC2164
 declare -g PROGDIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" ; pwd )
-declare -g LIBDIR="${PROGDIR}/../lib"
 
-# shellcheck source=./lib/errors.sh
-source "${LIBDIR}"/errors.sh
+# shellcheck source=./src/errors.sh
+source "${PROGDIR}"/errors.sh
 
-# shellcheck source=./lib/lexer.sh
-source "${LIBDIR}"/lexer.sh
+# shellcheck source=./src/files.sh
+source "${PROGDIR}"/files.sh
 
-# shellcheck source=./lib/parser.sh
-source "${LIBDIR}"/parser.sh
+# shellcheck source=./src/lexer.sh
+source "${PROGDIR}"/lexer.sh
 
-# shellcheck source=./lib/files.sh
-source "${LIBDIR}"/files.sh
+# shellcheck source=./src/parser.sh
+source "${PROGDIR}"/parser.sh
 
-# shellcheck source=./lib/merge.sh
-source "${LIBDIR}"/merge.sh
+# shellcheck source=./src/symbols.sh
+source "${PROGDIR}"/symbols.sh
 
-# shellcheck source=./lib/symbols.sh
-source "${LIBDIR}"/symbols.sh
+# shellcheck source=./src/merge.sh
+source "${PROGDIR}"/merge.sh
 
-# shellcheck source=./lib/semantics.sh
-source "${LIBDIR}"/semantics.sh
+# shellcheck source=./src/semantics.sh
+source "${PROGDIR}"/semantics.sh
 
-# shellcheck source=./lib/compiler.sh
-source "${LIBDIR}"/compiler.sh
+# shellcheck source=./src/compiler.sh
+source "${PROGDIR}"/compiler.sh
 
-# shellcheck source=./lib/api.sh
-source "${LIBDIR}"/api.sh
+# shellcheck source=./src/api.sh
+source "${PROGDIR}"/api.sh
+#<<END TOPIC SOURCE
 
-argparse "$@"
-main
-
-#declare -f conf > "$OUTPUT"
-[[ ${!_SKELLY_*} ]] && declare -p ${!_SKELLY_*} > "$OUTPUT"  ||:
-[[ ${!_DATA_*}   ]] && declare -p ${!_DATA_*}   > "$OUTPUT"  ||:
+main "$@"
