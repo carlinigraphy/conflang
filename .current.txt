@@ -57,10 +57,7 @@
    
     It's that second line of the bullet above that's a problem. How to drop an
     anchor there, and walk that pointer forwards?
-   
-    In the case of...
-    rec[rec[list[str], rec[int, str], int], str]
-   
+   In the case of...  rec[rec[list[str], rec[int, str], int], str]
     rec
       \    (a)
        `-> rec  ->>-  str
@@ -83,3 +80,23 @@
     > if ! (( type_r[slots_avail] - type_r[slots_used] )) ; then
     >    raise type_error
     > fi
+
+
+2022-12-30
+   Hmm. What if user does something like:
+   > typedef record[str, str, int] as Person;
+   > marcus @Person[int];
+
+   Maybe this is something that falls through to the typechecking phase? What
+   does the above actually mean. Something like this...
+   > typedef list as List;
+   > things @List[str];
+   ...sorta makes sense? But I don't really understand what a subtype to the
+   whole record declared above would be.
+
+   Do we just change the slots available of any user-declared type to 0? So
+   it's disallowed by default? Makes sense.
+
+   This is a part of the bigger theory of designing the very basics of a type
+   system that I don't know/understand. Eventually I'd love to know real type
+   theory.

@@ -45,9 +45,9 @@ function symtab:init_globals {
    )
 
    local -A complex=(
-      [type]='TYPE'
-      [list]='LIST'
-      [rec]='RECORD'
+      [type]='TYPE,1'
+      [list]='LIST,1'
+      [rec]='RECORD,-1'
    )
 
    # Create symbols for primitive types.
@@ -60,8 +60,9 @@ function symtab:init_globals {
 
    # Create symbols for complex types.
    for short in "${!complex[@]}" ; do
-      local long="${complex[$short]}"
-      type:new_meta "$short"  "$long"  'complex'
+      local long="${complex[$short]%,*}"
+      local slots="${complex[$short]#*,}"
+      type:new_meta "$short"  "$long"  "$slots"
       symtab:set "$SYMBOL"
       declare -g "_${long}"="$TYPE"
    done
@@ -142,7 +143,7 @@ function symbol:new {
 #-------------------------------------------------------------------------------
 
 function type:new {
-   local complex="$1"
+   local -i slots="${1:-0}"
 
    (( ++_TYPE_NUM ))
    local type="TYPE_${_TYPE_NUM}"
@@ -151,27 +152,24 @@ function type:new {
 
    local -n t_r="$type"
    t_r['kind']=''          #< :str
+   t_r['slots']="$slots"   #< :int,  available slots in paramlist
    t_r['subtype']=''       #< :TYPE, initial node of a paramlist
    t_r['next']=''          #< :TYPE, subsequent node of a paramlist
-
-   if [[ "$complex" ]] ; then
-      t_r['complex']='yes'
-   fi
 }
 
 
 function type:new_meta {
    local name="$1"
    local kind="$2"
-   local complex="$3"
+   local -i slots="${3:-0}"
 
-   type:new "$complex"
+   type:new "$slots"
    local type="$TYPE"
    local -n type_r="$TYPE"
    type_r['kind']="$kind"
 
    # Create Type representing Types.
-   type:new 'complex'
+   type:new 1
    local metatype="$TYPE"
    local -n metatype_r="$TYPE"
    metatype_r['kind']='TYPE'
@@ -193,7 +191,7 @@ function type:copy {
    local t1="$TYPE"
    local -n t1_r="$TYPE"
    t1_r['kind']="${t0_r[kind]}"
-   t1_r['complex']="${t0_r[complex]}"
+   t1_r['slots']="${t0_r[slots]}"
 
    local t0_next="${t0_r[next]}"
    local t0_subtype="${t0_r[subtype]}"
@@ -262,6 +260,8 @@ function type:equality {
 #     * Type isn't found in symbol table
 #     * Type isn't a valid type
 #-------------------------------------------------------------------------------
+declare -g  TYPE_ANCHOR=''
+declare -gi SLOTS=0
 
 # walk:symtab()
 # @description
@@ -313,6 +313,11 @@ function symtab_typedef {
 
    walk:symtab "${node_r[type]}"
    local type="$TYPE"
+   local -n type_r="$type"
+   type_r['slots']=0
+   # Disallow subtypes on user-defined types.
+   #> typdef rec[str, int] as Person;
+   #> marcus Person[int];
 
    # Create Type representing Types.
    type:new
@@ -386,9 +391,8 @@ function symtab_decl_variable {
    symbol_r['node']="$NODE"
 
    # Save variable name in symbol.
-   local identifier="${node_r[name]}"
-   local -n identifier_r="$identifier"
-   local name="${identifier_r[value]}"
+   local -n ident_r="${node_r[name]}"
+   local name="${ident_r[value]}"
    symbol_r['name']="$name"
 
    if symtab:strict "$name" ; then
@@ -404,7 +408,6 @@ function symtab_decl_variable {
    # takes a Type('ANY').
    if [[ "${node_r[type]}" ]] ; then
       walk:symtab "${node_r[type]}"
-      source lib/debug.sh ; debug_type "$TYPE"
    else
       # shellcheck disable=SC2154
       type:copy "$_ANY"
@@ -419,6 +422,40 @@ function symtab_decl_variable {
 }
 
 
+# symtab_type()
+# @description
+#  Walks the current AST(type) node, and any possible .subtype or .next nodes.
+#  Need to make sure types do not exceed their available subtype param "slots"
+#  here, rather than in the semantic analysis phase.
+#
+#  As merging is done prior to semantics, don't want to worry about merging
+#  invalid types. E.g., how does one merge int[str] <- int[int]?
+#
+#  ```
+#  In the case of...
+#  rec[rec[list[str], rec[int, str], int], str]
+# 
+#  rec
+#    \    (a)
+#     `-> rec  ->>-  str
+#           \    (a)         (a)
+#            `-> list  ->>-  rec  ->>-  int
+#                  \           \    (a)
+#                   `-> str     `-> rec
+#                                     \ 
+#                                      `-> int  ->>-  str
+#  ```
+#
+#  May throw either:
+#  1. `not_a_type`, when the user supplies an identifier that isn't a type, or
+#  2. `slot_error`, if the slots do not match the expected value
+#
+# @set   TYPE_ANCHOR
+# @use   TYPE_ANCHOR
+# @set   TYPE
+# @use   TYPE
+# @use   NODE
+# @noargs
 function symtab_type {
    local -n node_r="$NODE"
    local -n name_r="${node_r[kind]}"
@@ -428,13 +465,14 @@ function symtab_type {
       e=( --anchor "${name_r[location]}"
           --caught "${name_r[location]}"
           "$name"
-      ); raise undefined_type "${e[@]}"
+      ); raise missing_var "${e[@]}"
    fi
 
    local -n symbol_r="$SYMBOL"
    local metatype="${symbol_r[type]}"
    local -n metatype_r="$metatype"
 
+   #1. not_a_type :: identifier does not refer to a Type.
    if [[ ! "${metatype_r[kind]}" == TYPE ]] ; then
       e=( --anchor "${name_r[location]}"
           --caught "${name_r[location]}"
@@ -442,21 +480,28 @@ function symtab_type {
       ); raise not_a_type "${e[@]}"
    fi
 
+   #2. slot_error :: exceeded available slots (e.g., list[str, int], int[str]).
+   if [[ "$TYPE_ANCHOR" ]] ; then
+      local -n ta_r="$TYPE_ANCHOR"
+      if ! (( ta_r[slots] - SLOTS )) ; then
+         e=( --anchor "${name_r[location]}"
+            --caught "${name_r[location]}"
+         ); raise slot_error "${e[@]}"
+      fi
+   fi
+
    type:copy "${metatype_r[subtype]}"
    local type="$TYPE"
    local -n type_r="$type"
 
    if [[ "${node_r[subtype]}" ]] ; then
-      if [[ ! "${type_r[complex]}" ]] ; then
-         local -n subtype_r="${node_r[subtype]}"
-         e=( --anchor "${name_r[location]}"
-             --caught "${subtype_r[location]}"
-            "primitive types are not subscriptable"
-         ); raise type_error "${e[@]}"
-      else
+      local type_anchor="$TYPE_ANCHOR"
+      declare -g TYPE_ANCHOR="$type"
 
       walk:symtab "${node_r[subtype]}"
       type_r['subtype']="$TYPE"
+
+      declare -g TYPE_ANCHOR="$type_anchor"
    fi
 
    if [[ "${node_r[next]}" ]] ; then

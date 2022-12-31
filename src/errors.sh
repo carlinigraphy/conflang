@@ -26,31 +26,27 @@ declare -gA ERROR_CODE=(
    [argument_error]='10,Argument Error'
    [no_input]='11,File Error'
    [missing_file]='12,File Error'
-   [missing_constraint]='13,File Error'
-   [circular_import]='14,File Error'
+   [circular_import]='13,File Error'
 
    # Syntax errors
-   [syntax_error]='15,Syntax Error'
-   [invalid_interpolation_char]='16,Syntax Error'
-   [unescaped_interpolation_brace]='17,Syntax Error'
+   [syntax_error]='14,Syntax Error'
+   [invalid_interpolation_char]='15,Syntax Error'
+   [unescaped_interpolation_brace]='16,Syntax Error'
 
    # Parse errors
-   [parse_error]='18,Parse Error'
-   [munch_error]='19,Parse Error'
+   [parse_error]='17,Parse Error'
+   [munch_error]='18,Parse Error'
 
    # Type errors
-   [type_error]='20,Type Error'
-   [undefined_type]='21,Type Error'
-   [not_a_type]='22,Type Error'
-   [symbol_mismatch]='23,Type Error'
-   [too_many_subtypes]='24,Type Error'
+   [type_error]='19,Type Error'
+   [not_a_type]='20,Type Error'
+   [symbol_mismatch]='21,Type Error'
+   [too_many_subtypes]='22,Type Error'
 
    # Key errors
-   [index_error]='25,Name Error'
-   [name_collision]='26,Name Error'
-   [missing_env_var]='27,Name Error'
-   [missing_var]='28,Name Error'
-   [missing_required]='29,Name Error'
+   [index_error]='23,Name Error'
+   [name_collision]='24,Name Error'
+   [missing_var]='25,Name Error'
 
    # Misc. errors
    [idiot_programmer]='255,Idiot Programmer Error'
@@ -290,12 +286,6 @@ function raise_missing_file {
 }
 
 
-function raise_missing_constraint {
-   local -n error_r="$ERROR"
-   error_r[msg]="no %constrain file exists"
-}
-
-
 function raise_circular_import {
    local -n error_r="$ERROR"
    error_r[msg]="cannot source [${1##*/}], circular import"
@@ -336,11 +326,6 @@ function raise_type_error {
    error_r[msg]="$1"
 }
 
-function raise_undefined_type {
-   local -n error_r="$ERROR"
-   error_r[msg]="[${1}] not a defined type"
-}
-
 function raise_not_a_type {
    local -n error_r="$ERROR"
    error_r[msg]="[${1}] is not a type"
@@ -368,19 +353,9 @@ function raise_name_collision {
    error_r[msg]="[${1}] already defined in this scope"  
 }
 
-function raise_missing_env_var {
-   local -n error_r="$ERROR"
-   error_r[msg]="[${1}] undefined"  
-}
-
 function raise_missing_var {
    local -n error_r="$ERROR"
    error_r[msg]="[${1}] undefined"
-}
-
-function raise_missing_required {
-   local -n error_r="$ERROR"
-   error_r[msg]="[${1}] required in parent, missing in child"
 }
 
 #───────────────────────────────( misc. errors)───────────────────────────────

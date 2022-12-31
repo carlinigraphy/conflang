@@ -200,10 +200,8 @@ function main {
 
 
 #>>TOPIC SOURCE
-# If sourced, exit. Equiv. to Python's >if __name__ == '__main__'
-# Nothing below this line will run if sourced, only if invoked directly.
+# Equiv. to Python's >if __name__ == '__main__'
 if [[ ! "${BASH_SOURCE[0]}" == "$0" ]] ; then
-   # Return is valid at the top level if sourced.
    return 0
 fi
 
