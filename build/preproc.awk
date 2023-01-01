@@ -50,19 +50,18 @@ match($0, /\$\{[[:alpha:]_][[:alnum:]_]*(\.[[:alpha:]_][[:alnum:]_]*)+\}/) {
    }
 
    print indent "unset '__'"
-   print indent "declare -n __=\"${"  words[1]  "}"
+   print indent "declare -n __=\"${"  words[1]  "}\""
 
    len = 0
    for (w in words) len = len + 1
 
    for (idx=2; idx<len; ++idx) {
-      print indent "declare -n __=\"${__["  words[idx]  "]}"
+      print indent "declare -n __=\"${__['"  words[idx]  "']}\""
    }
 
-   repl = "${__["  words[len]  "]}"
+   repl = "${__['"  words[len]  "']}"
 
    sub(/\$\{[[:alpha:]_][[:alnum:]_]*(\.[[:alpha:]_][[:alnum:]_]*)+\}/, repl)
-   print $0
 }
 
 # Begin topic.
