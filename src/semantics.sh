@@ -1,32 +1,34 @@
 #!/bin/bash
-
-#─────────────────────────────( dependency tree )───────────────────────────────
-# Can't typecheck off the AST directly, as some dependent nodes may occur
-# earlier than their dependencies. Example:
+#===============================================================================
+# @section                      Dependency tree
+# @description
+#  Can't typecheck off the AST directly, as some dependent nodes may occur
+#  earlier than their dependencies. Example:
+#  ```
+#  item (str): arr[0];
+#  arr: [0, 1];
+#  ```
 #
-#> item (str): arr[0];
-#> arr: [0, 1];
+#  The array `arr` was declared with no type. Until we can walk its expression
+#  to determine the "evaluated" type, it's impossible to know if `item` is
+#  actually a valid assignment.
 #
-# The array `arr` was declared with no type. Until we can walk its expression to
-# determine the "evaluated" type, it's impossible to know if `item` is actually
-# a valid assignment.
-#
-# Building a tree of dependencies, and flatting the AST into an ordered list
-# ensures never walking a note before its dependants have been evaluated first.
+#  Building a tree of dependencies, and flatting the AST into an ordered list
+#  ensures never walking a node before its dependants have been evaluated.
+#-------------------------------------------------------------------------------
 
-declare -g DEPENDENCY=
-# Current DEP_$n node we're in.
-
-declare -gA DEPTH_MAP=()
-# Mapping of {NODE_$n -> $depth}. Intermediate phase in going from unordered to
-# ordered.
-
+# @type
+declare -g  DEPENDENCY=
 declare -ga UNORDERED_DEPS=()
 declare -ga ORDERED_DEPS=()
 # UNORDERED_DEPS[] -> DEPTH_MAP{} -> ORDERED_DEPS[]
 
+declare -gA DEPTH_MAP=()
+# Mapping of {NODE -> $depth}. Intermediate phase in going from unordered to
+# ordered.
 
-function mk_dependency {
+
+function dependency:new {
    local dep="DEP_${1}"
    declare -ga "$dep"
    declare -g  DEPENDENCY="$dep"
@@ -37,6 +39,16 @@ function mk_dependency {
 function walk:flatten {
    declare -g NODE="$1"
    flatten_"${TYPEOF[$NODE]}"
+}
+
+
+function flatten_program {
+   local -n node_r="$NODE"
+   local -n container_r="${node_r[container]}"
+   local -n items_r="${container_r[items]}"
+   for node in "${items_r[@]}" ; do
+      walk:flatten "$node"
+   done
 }
 
 
@@ -60,8 +72,8 @@ function flatten_decl_section {
 function flatten_decl_variable {
    local -n node_r="$NODE"
 
-   mk_dependency "$NODE"
-   if [[ -n ${node_r[expr]} ]] ; then
+   dependency:new "$NODE"
+   if [[ ${node_r[expr]} ]] ; then
       walk:flatten "${node_r[expr]}"
    fi
 }
@@ -107,6 +119,7 @@ function flatten_identifier {
    local -n node_r="$NODE"
    local name="${node_r[value]}"
 
+   symtab:from "$NODE"
    if ! symtab:get "$name" ; then
       e=( missing_var
          --anchor "${node_r[location]}"
@@ -120,8 +133,6 @@ function flatten_identifier {
    local target="${symbol_r[node]}"
    local -n dep="$DEPENDENCY"
    dep+=( "$target" )
-
-   symtab:from "$target"
 }
 
 
@@ -225,7 +236,7 @@ function semantics_decl_variable {
    symtab:get "$name"
 
    # Initially set Type(ANY). Potentially overwritten by the expr.
-   declare -g TYPE="$_ANY"
+   type:copy "$_ANY"
    if [[ "${node_r[expr]}" ]] ; then
       walk:semantics "${node_r[expr]}"
    fi
@@ -347,9 +358,9 @@ function semantics_index {
 
    #  ┌── doesn't know about dynamically created $_LIST var.
    # shellcheck disable=SC2154
-   if ! type:equality  "$_LIST"  "$TYPE" ; then
-      local msg='the left hand side must evaluate to an list.'
-      raise type_error "${node_r[left]}"  "$msg"
+   if ! type:shallow_eq  "$_LIST"  "$TYPE" ; then
+      local msg='the left hand side must evaluate to a list'
+      raise type_error "$msg"
    fi
 
    walk:semantics "${node_r[right]}"
@@ -364,7 +375,7 @@ function semantics_index {
    fi
 
    local index="${rhs_r[value]}"
-   local -n items_r="${node_r[items]}"
+   local -n items_r="${lhs_r[items]}"
    local rv="${items_r[$index]}"
 
    if [[ ! "$rv" ]] ; then

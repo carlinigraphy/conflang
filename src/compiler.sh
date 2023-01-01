@@ -173,7 +173,7 @@ function evaluate_decl_section {
 
 function evaluate_decl_variable {
    local -n node_r="$NODE"
-   if [[ -n ${node_r[expr]} ]] ; then
+   if [[ ${node_r[expr]} ]] ; then
       walk:evaluate "${node_r[expr]}"
    fi
 }

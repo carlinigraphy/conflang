@@ -311,7 +311,7 @@ function walk:merge {
 
 function merge_decl_variable {
    local -n node_r="$NODE"
-   if [[ -n ${node_r[expr]} ]] ; then
+   if [[ ${node_r[expr]} ]] ; then
       walk:merge "${node_r[expr]}"
    fi
 }
@@ -363,8 +363,6 @@ function merge_integer { :; }
 function merge_string  { :; }
 function merge_path    { :; }
 function merge_env_var { :; }
-
-
 
 
 
@@ -567,7 +565,7 @@ function merge_type {
    #  3. not exist (in the case of a parent subtype, and the child's is empty)
 
    # case 3.
-   # If there's a defined parent type, but no child.
+   # If there's a defined lhs type, but no rhs.
    [[ $1 && ! $2 ]] && return 0
 
    local -n t1_r="$1"
@@ -576,7 +574,7 @@ function merge_type {
    # case 2.
    # Doesn't matter what the parent's type was. The child is not declaring it,
    # thus respecting the imposed type.
-   [[ "${t2_r[kind]}" == 'ANY' ]] && return 0
+   [[ ${t2_r[kind]} == ANY ]] && return 0
 
    # case 1.
    # First match base types.

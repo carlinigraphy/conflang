@@ -41,7 +41,7 @@ declare -gA ERROR_CODE=(
    [type_error]='19,Type Error'
    [not_a_type]='20,Type Error'
    [symbol_mismatch]='21,Type Error'
-   [too_many_subtypes]='22,Type Error'
+   [slot_error]='22,Type Error'
 
    # Key errors
    [index_error]='23,Name Error'
@@ -336,9 +336,9 @@ function raise_symbol_mismatch {
    error_r[msg]="does not match parent's type"
 }
 
-function raise_too_many_subtypes {
+function raise_slot_error {
    local -n error_r="$ERROR"
-   error_r[msg]="[${1,,}] only takes one subtype"
+   error_r[msg]="expected ${1} parameter(s)"
 }
 
 #────────────────────────────────( key errors )─────────────────────────────────

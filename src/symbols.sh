@@ -55,7 +55,6 @@ function symtab:init_globals {
       local long="${primitive[$short]}"
       type:new_meta "$short"  "$long"
       symtab:set "$SYMBOL"
-      declare -g "_${long}"="$TYPE"
    done
 
    # Create symbols for complex types.
@@ -64,7 +63,6 @@ function symtab:init_globals {
       local slots="${complex[$short]#*,}"
       type:new_meta "$short"  "$long"  "$slots"
       symtab:set "$SYMBOL"
-      declare -g "_${long}"="$TYPE"
    done
 }
 
@@ -142,6 +140,8 @@ function symbol:new {
 # @section                       Type functions
 #-------------------------------------------------------------------------------
 
+# @set   TYPE
+# @noargs
 function type:new {
    local -i slots="${1:-0}"
 
@@ -158,6 +158,9 @@ function type:new {
 }
 
 
+# @set   TYPE
+# @arg   $1    :str     Short name of the Symbol ("str", "int", etc.)
+# @arg   $1    :str     Kind of type (STRING, INTEGER, RECORD)
 function type:new_meta {
    local name="$1"
    local kind="$2"
@@ -180,10 +183,12 @@ function type:new_meta {
    symbol_r['type']="$metatype"
    symbol_r['name']="$name"
 
+   declare -g "_${kind}"="$type"
    declare -g TYPE="$metatype"
 }
 
 
+# @arg   $1    TYPE
 function type:copy {
    local -n t0_r="$1"
 
@@ -211,40 +216,58 @@ function type:copy {
 
 
 function type:equality {
-   local -n t1_r="$1"
+   local t1="$1" t2="$2"
 
+   #0) Neither type exists. All good.
+   if [[ ! $t1 && ! $t2 ]] ; then
+      return 0
+   fi
+
+   #1) Either RHS or LHS did not exist. Not good.
+   if ! [[ $t1 && $t2 ]] ; then
+      echo "case 1 :: rhs or lhs not exists" ##DEBUG
+      return 1
+   fi
+
+   local -n t1_r="$t1"
+   local -n t2_r="$t2"
+
+   # TODO: need to reconsider this. Maybe add a `--strict` switch to toggle the
+   #       behavior. Would allow for easy merge, as if `type:equality()`
+   #       passes, default take the RHS' type declaration. Maybe don't allow
+   #       touching declared types though? Feel out ergonomics.
+   #
+   #2) 'ANY' type default allow.
    if [[ ${t1_r[kind]} == 'ANY' ]] ; then
       return 0
    fi
 
-   # In the case of...
-   #  t1(type: list, subtype: any)
-   #  t2(type: list, subtype: None)
-   # ...the first type:equality() on their .type will match, but the second must
-   # not throw an exception. It is valid to have a missing (or different) type,
-   # if the principal type is ANY.
-   [[ "$2" ]] || return 1
-   local -n t2_r="$2"
-
-   if [[ ${t1_r[kind]} != "${t2_r[kind]}" ]] ; then
+   #3) Kinds must match.
+   if [[ ! ${t1_r[kind]} == "${t2_r[kind]}" ]] ; then
+      echo "case 3 :: ${t1_r[kind]} != ${t2_r[kind]}" ##DEBUG
       return 1
    fi
 
-   local -n t1_items_r="${t1_r['subtype']}"
-   local -n t2_items_r="${t2_r['subtype']}"
+   #4) Nexts must match.
+   if ! type:equality "${t1_r[next]}" "${t2_r[next]}" ; then
+      echo "case 4 :: next inequality" ##DEBUG
+      return 1
+   fi
 
-   # Number of subtypes must match in number. Allows for easy iterating with a
-   # single index.
-   (( ${#t1_items_r[@]} == ${#t2_items_r[@]} )) || return 1
-
-   local -i idx
-   for idx in "${!t1_items_r[@]}" ; do
-      if ! merge_type "${t1_items_r[$idx]}" "${t2_items_r[$idx]}" ; then
-         return 1
-      fi
-   done
+   #5) Subtypes must match.
+   if ! type:equality "${t1_r[subtype]}" "${t2_r[subtype]}" ; then
+      echo "case 5 :: subtype inequality" ##DEBUG
+      return 1
+   fi
 
    return 0
+}
+
+
+function type:shallow_eq {
+   local -n t1_r="$1"
+   local -n t2_r="$2"
+   [[ ${t1_r[kind]} == "${t2_r[kind]}" ]]
 }
 
 
@@ -316,14 +339,11 @@ function symtab_typedef {
    local -n type_r="$type"
    type_r['slots']=0
    # Disallow subtypes on user-defined types.
-   #> typdef rec[str, int] as Person;
-   #> marcus Person[int];
 
    # Create Type representing Types.
-   type:new
+   type:copy "$_TYPE"
    local metatype="$TYPE"
    local -n metatype_r="$TYPE"
-   metatype_r['kind']='TYPE'
    metatype_r['subtype']="$type"
 
    symbol_r['type']="$metatype"
@@ -484,24 +504,37 @@ function symtab_type {
    if [[ "$TYPE_ANCHOR" ]] ; then
       local -n ta_r="$TYPE_ANCHOR"
       if ! (( ta_r[slots] - SLOTS )) ; then
-         e=( --anchor "${name_r[location]}"
-            --caught "${name_r[location]}"
+         e=( --anchor "$ANCHOR"
+             --caught "${name_r[location]}"
+             "${ta_r[slots]}"
          ); raise slot_error "${e[@]}"
       fi
    fi
+
+   # If haven't exceeded allowed slots, can incr. and continue.
+   (( ++SLOTS ))
 
    type:copy "${metatype_r[subtype]}"
    local type="$TYPE"
    local -n type_r="$type"
 
    if [[ "${node_r[subtype]}" ]] ; then
+      # Save previous values.
       local type_anchor="$TYPE_ANCHOR"
-      declare -g TYPE_ANCHOR="$type"
+      local anchor="$ANCHOR"
+      local -i slots="$SLOTS"
+
+      declare -g  ANCHOR="${node_r[location]}"
+      declare -g  TYPE_ANCHOR="$type"
+      declare -gi SLOTS=0
 
       walk:symtab "${node_r[subtype]}"
       type_r['subtype']="$TYPE"
 
-      declare -g TYPE_ANCHOR="$type_anchor"
+      # Restore previous values.
+      declare -gi SLOTS="$SLOTS"
+      declare -g  TYPE_ANCHOR="$type_anchor"
+      declare -g  ANCHOR="$anchor"
    fi
 
    if [[ "${node_r[next]}" ]] ; then

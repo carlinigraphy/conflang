@@ -8,7 +8,7 @@ declare -gi INDENTATION=0
 
 function debug_type {
    local -n type_r="$1"
-   printf '%s\n'  "${type_r[kind]}"
+   printf '%s (%d)\n'  "${type_r[kind]}"  "${type_r[slots]}"
 
    if [[ "${type_r[next]}" ]] ; then
       printf -- '->'
@@ -22,14 +22,10 @@ function debug_type {
 }
 
 
-
-
-
-
-
-
+#-------------------------------------------------------------------------------
 # TODO: need to rework everything below, the last time it was touched was
 # straight up months ago. Doesn't have any of the current AST nodes or props.
+#-------------------------------------------------------------------------------
 
 #───────────────────────────( pretty print symtab )─────────────────────────────
 function pprint_symtab {

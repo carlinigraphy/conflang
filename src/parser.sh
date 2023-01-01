@@ -1,5 +1,4 @@
 #!/bin/bash
-
 #===============================================================================
 # @section                            AST
 # @description               Generating tree nodes.
@@ -773,7 +772,7 @@ function parser:decl_variable {
    node_r['name']="$ident"
 
    # Type declaration.
-   local open="$TOKEN"
+   local open="${TOKEN_r[location]}"
    if parser:match 'AT' ; then
       declare -g ANCHOR="$open"
       parser:type
@@ -850,7 +849,7 @@ function parser:type {
    node_r['kind']="$ident"
 
    local anchor="$ANCHOR"
-   local open="$TOKEN"
+   local open="${TOKEN_r[location]}"
 
    if parser:match 'L_BRACKET' ; then
       declare -g ANCHOR="$open"

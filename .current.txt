@@ -4,12 +4,13 @@
    1. [x] Throw away `constrain` stuff
    2. [x] Refactor all `add_file` and related functions
    3. [x] Include statement in the HEADER section
-   4. [ ] New parsing structure, make independent tuples of {AST,Symtab}
+   4. [x] New parsing structure, make independent tuples of {AST,Symtab}
          - Much more testable
          - Easier to merge
-   5. [ ] New `merge` that respects new import rules
+   5. [x] New `merge` that respects new import rules
    6. [x] Includes use `as`, enter the identifier into the symtab
-   7. [ ] Records, arrays as single-type-only, typedefs
+   7. [x] Records, arrays as single-type-only, typedefs
+
 
 2022-12-18
    Revert types to use a linked list again. It's easier in bash to reason about
@@ -57,7 +58,7 @@
    
     It's that second line of the bullet above that's a problem. How to drop an
     anchor there, and walk that pointer forwards?
-   In the case of...  rec[rec[list[str], rec[int, str], int], str]
+    In the case of...  rec[rec[list[str], rec[int, str], int], str]
     rec
       \    (a)
        `-> rec  ->>-  str
@@ -100,3 +101,19 @@
    This is a part of the bigger theory of designing the very basics of a type
    system that I don't know/understand. Eventually I'd love to know real type
    theory.
+
+
+2022-12-31
+   Took the simple approach. Any user-defined type has 0 slots. May come back to
+   bite me later, but it's not the most complicated thing to change.
+
+   Do I begin work on the merge phase first? Or fix up the type checking and
+   evaluation?
+
+   Typecheck and evaluation first. Return to merging after.
+   - [x] parser
+   - [x] symtab   phase
+   - [ ] flatten  phase
+   - [ ] semantic phase
+   - [ ] compiler phase
+   - [ ] merge    phase

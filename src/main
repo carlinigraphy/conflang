@@ -131,9 +131,28 @@ function argparse {
 
 # main()
 # @description
-#  Wrapper function to kick off the whole parse, typcheck, and evaluation
-#  pieline.
+#  In pseudocode:
+#  ```
+#  let imports = []
+#  let files   = []
 #
+#  argparse()
+#  push(imports, argv[0])
+#  
+#  for file in imports[] do
+#     ast, symtab = parse(file)
+#     push(imports, ast.imports[])
+#     push(files, {ast,symtab})
+#  done
+#  ```
+#
+# @see   globals:init
+# @see   file:new
+# @see   file:resolve
+# @see   file:parse
+# @see   fold
+#
+# @env   FILES
 # @env   INPUT
 # @set   FILE
 # @set   IMPORTS[]
@@ -141,8 +160,6 @@ function main {
    argparse "$@"
    globals:init
 
-   # TODO: may need to pass this to "file:parse" or something. Add it as the
-   # initial parent of the first created symbol table. Hmm.
    symtab:init_globals
    local globals="$SYMTAB"
 
@@ -161,35 +178,38 @@ function main {
       local -n items_r="${header_r[items]}"
 
       for node in "${items_r[@]}" ; do
-         if [[ "${TYPEOF[$node]}" == import ]] ; then
-            local -n node_r="$node"
-            local -n import_path_r="${node_r[path]}"
-            local import_path="${import_path_r[value]}"
-
-            # Location node of the import statement, for error reporting.
-            local loc="${node_r[location]}"
-
-            # The file the import is relative *to*, i.e. the dirname of the
-            # calling file.
-            local -n loc_r="$loc"
-            local parent="${loc_r[file]%/*}"
-
-            file:new
-            file:resolve  "$import_path"  "$parent"  "$loc"
+         if [[ ! "${TYPEOF[$node]}" == import ]] ; then
+            continue
          fi
+
+         local -n node_r="$node"
+         local -n import_path_r="${node_r[path]}"
+         local import_path="${import_path_r[value]}"
+
+         # Location node of the import statement, for error reporting.
+         local loc="${node_r[location]}"
+
+         # The file the import is relative *to*, i.e. the dirname of the
+         # calling file.
+         local -n loc_r="$loc"
+         local parent="${loc_r[file]%/*}"
+
+         file:new
+         file:resolve  "$import_path"  "$parent"  "$loc"
       done
    done
 
-   # Reduces all the IMPORTS[] to a single {Symtab,AST}.
-   fold ; SYMTAB_PARENT["$SYMTAB"]="$globals"
+   ## TODO: re-enable fold & merge
+   ## Reduces all the IMPORTS[] to a single {Symtab,AST}.
+   #fold ; SYMTAB_PARENT["$SYMTAB"]="$globals"
 
-   #walk:flatten "$NODE"
-   #dependency_to_map
-   #dependency_sort
+   walk:flatten "$NODE"
+   dependency_to_map
+   dependency_sort
 
-   #for ast_node in "${ORDERED_DEPS[@]}" ; do
-   #   walk:semantics "$ast_node"
-   #done
+   for node in "${ORDERED_DEPS[@]}" ; do
+      walk:semantics "$node"
+   done
 
    #walk:compiler "$NODE"
 
