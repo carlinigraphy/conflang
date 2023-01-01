@@ -9,6 +9,8 @@
 
 Configuration language, featuring strong typing and a small but robust feature set.
 
+Written in Bash, compiles to Bash.
+
 
 == What works
 Almost nothing.
@@ -16,10 +18,10 @@ Been doing a lot of work to clean up symbol tables, the type system, and `import
 That broke everything.
 Oops.
 
-* [ ] Accessing values from input data
-* [ ] Including sub-files
-* [ ] Enforcing constraints upon child-files
+* [ ] Parsing file(s)
+* [ ] Importing files
 * [ ] Typechecking
+* [ ] Evaluates to native bash
 * [ ] VM & post-compilation validation
 
 Around a503e1b917aa or so I broke a good amount of core functionality while fixing symbol tables.
@@ -42,12 +44,12 @@ Journey over destination and all that.
 == How it look
 .Variable declarations
 ----
-# Basic, untyped key/value pairs.
+# Untyped key/value pairs.
 name : "Marcus";
 age  : 30;
 
 
-# Basic types.
+# Primitive types.
 name @str: "Marcus";
 age  @int: 30;
 
@@ -59,6 +61,12 @@ full_name @list[str]: [
 ];
 ----
 
+.Typedefs
+----
+typedef tupl[str, str, int] as Person;
+
+me @Person: {"Marcus", "Aurelius", 30};
+----
 
 .Types
 ----
@@ -67,7 +75,7 @@ full_name @list[str]: [
 # @int     Negative & positive integers:   -1, 0, 1, ...
 # @bool    Boolean values:                 true, false
 # @list    Lists, any length, same type:   [1, 2, 3], ["one", "two", "three"]
-# @tup     Tuples, set length, any type:   {"Marcus", "Aurelius", 30}
+# @tupl    Tuples, set length, any type:   {"Marcus", "Aurelius", 30}
 ----
 
 .Environment variables
@@ -78,6 +86,17 @@ configdir (path): $XDG_CONFIG_HOME;
 
 .Variables
 ----
+red    @str: "#AF5F5F";
+yellow @str: "#DFAD83";
+green  @str: "#5F8787";
+
+good  : green;
+uh_oh : yellow;
+bad   : red;
+----
+
+.Sections
+----
 key: "val";
 key2: key;
 
@@ -85,30 +104,19 @@ Section {
    key: "val";
 
    key2: key;
-   #     ^-- relative reference
+   #     ^-- relative reference,
+   #         shadows global `key2`
 
    key3: Section.key;
    #     ^-- absolute reference
 }
 ----
 
-.Sections
-----
-# Sections.
-section {
-   scope: "outer";
-
-   subsection {
-      scope: "inner";
-   }
-}
-----
-
 .Others
 ----
-# String interpolation.
-project_dir @path: '{$HOME}/projects/';
-sub_dir     @path: '{project_dir}/sub/';
+# String interpolation (f-strings).
+project_dir @path: f'{$HOME}/projects/';
+sub_dir     @path: f'{project_dir}/sub/';
 
 # Type casting.
 shell_level: $SHLVL -> int;
@@ -118,9 +126,8 @@ shell_level: $SHLVL -> int;
 ----
 common {
    colors @list[str] [
-      "#000000",
-      "#111111",
-      "#222222",
+      "#C5C5C8",
+      "#202121",
    ];
 }
 
@@ -131,8 +138,8 @@ window {
    }
 
    theme {
-      foreground: common.colors.0;
-      foreground: common.colors.1;
+      foreground : common.colors[0];
+      background : common.colors[1];
    }
 }
 ----
