@@ -39,6 +39,7 @@ function symtab:init_globals {
       [str]='STRING'
       [bool]='BOOLEAN'
       [path]='PATH'
+      [%none]='NONE'
       [%section]='SECTION'
       # User isn't allowed to declare a section. They're a logical grouping,
       # not an expression.
@@ -225,38 +226,34 @@ function type:equality {
 
    #1) Either RHS or LHS did not exist. Not good.
    if ! [[ $t1 && $t2 ]] ; then
-      echo "case 1 :: rhs or lhs not exists" ##DEBUG
       return 1
    fi
 
    local -n t1_r="$t1"
    local -n t2_r="$t2"
 
-   # TODO: need to reconsider this. Maybe add a `--strict` switch to toggle the
-   #       behavior. Would allow for easy merge, as if `type:equality()`
-   #       passes, default take the RHS' type declaration. Maybe don't allow
-   #       touching declared types though? Feel out ergonomics.
-   #
-   #2) 'ANY' type default allow.
-   if [[ ${t1_r[kind]} == 'ANY' ]] ; then
+   #2) Lhs 'ANY', always good.
+   if [[ ${t1_r[kind]} == ANY ]] ; then
       return 0
    fi
 
-   #3) Kinds must match.
+   #3) Rhs 'NONE', always good.
+   if [[ ${t2_r[kind]} == NONE ]] ; then
+      return 0
+   fi
+
+   #4) Kinds must match.
    if [[ ! ${t1_r[kind]} == "${t2_r[kind]}" ]] ; then
-      echo "case 3 :: ${t1_r[kind]} != ${t2_r[kind]}" ##DEBUG
       return 1
    fi
 
-   #4) Nexts must match.
+   #5) Nexts must match.
    if ! type:equality "${t1_r[next]}" "${t2_r[next]}" ; then
-      echo "case 4 :: next inequality" ##DEBUG
       return 1
    fi
 
-   #5) Subtypes must match.
+   #6) Subtypes must match.
    if ! type:equality "${t1_r[subtype]}" "${t2_r[subtype]}" ; then
-      echo "case 5 :: subtype inequality" ##DEBUG
       return 1
    fi
 
@@ -471,10 +468,10 @@ function symtab_decl_variable {
 #  2. `slot_error`, if the slots do not match the expected value
 #
 # @set   TYPE_ANCHOR
-# @use   TYPE_ANCHOR
+# @env   TYPE_ANCHOR
 # @set   TYPE
-# @use   TYPE
-# @use   NODE
+# @env   TYPE
+# @env   NODE
 # @noargs
 function symtab_type {
    local -n node_r="$NODE"

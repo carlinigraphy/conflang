@@ -1,108 +1,5 @@
 # vim: ft=conf tw=80
 
-2022-11-25
-   1. [x] Throw away `constrain` stuff
-   2. [x] Refactor all `add_file` and related functions
-   3. [x] Include statement in the HEADER section
-   4. [x] New parsing structure, make independent tuples of {AST,Symtab}
-         - Much more testable
-         - Easier to merge
-   5. [x] New `merge` that respects new import rules
-   6. [x] Includes use `as`, enter the identifier into the symtab
-   7. [x] Records, arrays as single-type-only, typedefs
-
-
-2022-12-18
-   Revert types to use a linked list again. It's easier in bash to reason about
-   as there are fewer namerefs, and empty arrays and whatnot. More
-   introspect-able, as some _TYPE_NUM's are not being used for the arrays, etc.
-   
-   Need this change to be reflected in the...
-   - [x] parser
-   - [x] symtab   phase
-   - [ ] merge    phase
-   - [ ] semantic phase
-   - [ ] compiler phase
-
-
-2022-12-21
-   Need record keeping for how many parameters a type has. Types are linked
-   lists with pointers to the first element of their parameters (.subtype), and
-   to the next element of a paramlist (.next).
-
-    e.g.,
-    rec[list[str], int]
-   
-    rec
-      \                     rec.subtype  = list
-       `-> list ->>- int    list.next    = int 
-              \             list.subtype = str
-               `-> str
-   
-    In the case of something such as
-    rec[list[str], rec[str, int], bool]
-   
-    rec
-      \
-       `-> list  ->>-  rec  ->>-  bool
-              \          \
-               `-> str    `-> str ->>- int
-   
-   
-    Types have a [slots] parameter. If [slots] == 0, and...
-     - There's a [subtype]
-        - Throw an error caught at the subtype
-     - There's a [next]
-        - Throw an error caught at this type...
-          ...originating at the parent type
-   
-    It's that second line of the bullet above that's a problem. How to drop an
-    anchor there, and walk that pointer forwards?
-    In the case of...  rec[rec[list[str], rec[int, str], int], str]
-    rec
-      \    (a)
-       `-> rec  ->>-  str
-             \    (a)         (a)
-              `-> list  ->>-  rec  ->>-  int
-                    \           \    (a)
-                     `-> str     `-> rec
-                                       \ 
-                                        `-> int  ->>-  str
-
-    Drop anchors on (a).
-   
-    It looks like if you drop both an anchor (a) for error tracking, we'll
-    need another anchor for keeping track of the parent Type. TYPE_ANCHOR?
-    PARENT_TYPE? Iterating first by [subtype], then by [next]. Think gives the
-    right tree.
-   
-    Maybe instead do with both a [slots_used] and [slots_avail]. Can maintain
-    a count of how many it was expecting to get for better error reporting.
-    > if ! (( type_r[slots_avail] - type_r[slots_used] )) ; then
-    >    raise type_error
-    > fi
-
-
-2022-12-30
-   Hmm. What if user does something like:
-   > typedef record[str, str, int] as Person;
-   > marcus @Person[int];
-
-   Maybe this is something that falls through to the typechecking phase? What
-   does the above actually mean. Something like this...
-   > typedef list as List;
-   > things @List[str];
-   ...sorta makes sense? But I don't really understand what a subtype to the
-   whole record declared above would be.
-
-   Do we just change the slots available of any user-declared type to 0? So
-   it's disallowed by default? Makes sense.
-
-   This is a part of the bigger theory of designing the very basics of a type
-   system that I don't know/understand. Eventually I'd love to know real type
-   theory.
-
-
 2022-12-31
    Took the simple approach. Any user-defined type has 0 slots. May come back to
    bite me later, but it's not the most complicated thing to change.
@@ -113,7 +10,27 @@
    Typecheck and evaluation first. Return to merging after.
    - [x] parser
    - [x] symtab   phase
-   - [ ] flatten  phase
+   - [x] flatten  phase
    - [ ] semantic phase
    - [ ] compiler phase
    - [ ] merge    phase
+
+
+2023-01-01
+   May need a rhs None/Empty type, to foil lhs' Any type. Use %empty as ident,
+   as with sections. User's can't declare empty types.
+
+   Complex types missing a subtype get implicit ANY:
+   > things @list;       ->   things @list[any];
+   > person @record;     ->   person @record[any];
+   > stuff  @list[list]  ->   stuff  @list[list[any]];
+
+   Empty expressions return implicit NONE:
+   > things: [];         ->  list[none]
+   > person: {};         ->  record[none]
+   > stuff:  [[]];       ->  list[list[none]]
+
+   Type match if:
+      - lhs.kind == ANY
+      - rhs.kind == EMPTY
+      - lhs.kind == rhs.kind

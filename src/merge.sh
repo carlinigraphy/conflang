@@ -41,11 +41,15 @@ function fold {
 # merge()
 # @description
 #  Merges two files by the rules below:
+#
 #  - Expressions maybe overwritten
 #  - Types may be overwritten with equal or greater specificity
-#    - [GOOD]: `arr @list;`  ->  `arr @list[str];`
-#    - [BAD]: `arr @list[str];`  ->  `arr @list[int];`
-#    - [BAD]: `arr @list[str];`  ->  `arr @str;`
+#    - (good): `arr @list;`  ->  `arr @list[str];`
+#    - (bad): `arr @list[str];`  ->  `arr @list[int];`
+#    - (bad): `arr @list[str];`  ->  `arr @str;`
+#
+#  Easier to think about it as: the rhs always overwrites the lhs unless the
+#  declared type is of lesser specificity.
 #
 # @see   merge:section
 # @see   merge:variable
@@ -151,41 +155,41 @@ function merge:section {
 }
 
 
-# merge:typedef()
-# @description
-#  This is a validation step. Cannot re-define typedefs.
+## merge:typedef()
+## @description
+##  This is a validation step. Cannot re-define typedefs.
+##
+## @see   merge
+##
+## @arg   $1    :SYMBOL
+## @arg   $2    :SYMBOL
+#function merge:typedef {
+#   local lhs_sym="$1"
+#   local rhs_sym="$2"
 #
-# @see   merge
+#   #-- LHS dogshit.
+#   local -n lhs_sym_r="$lhs_sym"
+#   local -n lhs_type_r="${lhs_sym_r[type]}"
+#   local -n lhs_node_r="${lhs_sym_r[node]}"
 #
-# @arg   $1    :SYMBOL
-# @arg   $2    :SYMBOL
-function merge:typedef {
-   local lhs_sym="$1"
-   local rhs_sym="$2"
-
-   #-- LHS dogshit.
-   local -n lhs_sym_r="$lhs_sym"
-   local -n lhs_type_r="${lhs_sym_r[type]}"
-   local -n lhs_node_r="${lhs_sym_r[node]}"
-
-   #-- RHS bullshit.
-   local -n rhs_sym_r="$rhs_sym"
-   local -n rhs_type_r="${rhs_sym_r[type]}"
-   local -n rhs_node_r="${rhs_sym_r[node]}"
-   
-   # TODO: it's acceptable to have a typedef that exactly matches. Should have
-   #       a flag to pass to merge:type, setting a 'strict' mode, in which it
-   #       may not have greater specificity.
-   #
-   #       I could see situations in which the user may want to be a bit more
-   #       verbose, and have the typedef additionally declared in their file.
-   #       Code as documentation, or whatever.
-   #
-   e=( --anchor "${lhs_node_r[location]}"
-       --caught "${rhs_name_r[location]}"
-       "may not overwrite a typedef"
-   ); raise type_error "${e[@]}"
-}
+#   #-- RHS bullshit.
+#   local -n rhs_sym_r="$rhs_sym"
+#   local -n rhs_type_r="${rhs_sym_r[type]}"
+#   local -n rhs_node_r="${rhs_sym_r[node]}"
+#   
+#   # TODO: it's acceptable to have a typedef that exactly matches. Should have
+#   #       a flag to pass to merge:type, setting a 'strict' mode, in which it
+#   #       may not have greater specificity.
+#   #
+#   #       I could see situations in which the user may want to be a bit more
+#   #       verbose, and have the typedef additionally declared in their file.
+#   #       Code as documentation, or whatever.
+#   #
+#   e=( --anchor "${lhs_node_r[location]}"
+#       --caught "${rhs_name_r[location]}"
+#       "may not overwrite a typedef"
+#   ); raise type_error "${e[@]}"
+#}
 
 
 # merge:typedef()

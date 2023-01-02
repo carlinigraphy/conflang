@@ -121,11 +121,10 @@ function flatten_identifier {
 
    symtab:from "$NODE"
    if ! symtab:get "$name" ; then
-      e=( missing_var
-         --anchor "${node_r[location]}"
-         --caught "${node_r[location]}"
-         "$name"
-      ); raise "${e[@]}"
+      e=( --anchor "${node_r[location]}"
+          --caught "${node_r[location]}"
+          "$name"
+      ); raise missing_var "${e[@]}"
    fi
 
    # Add variable target as a dependency.
@@ -220,14 +219,6 @@ function semantics_decl_section {
 
 
 function semantics_decl_variable {
-   # The Symbol.type will be set to the "evaluated" type. If there is a type,
-   # the expression's type must evaluate to *at least* the requirements of the
-   # declared type, though can be more specific.
-   #
-   #> arr (list): [0, 1];
-   #> # declared: Type('LIST')
-   #> # actual:   Type('LIST', subtype: Type(INTEGER))
-
    local -n node_r="$NODE"
    local -n name_r="${node_r[name]}"
    local name="${name_r[value]}"
@@ -235,14 +226,15 @@ function semantics_decl_variable {
    symtab:from "$NODE"
    symtab:get "$name"
 
-   # Initially set Type(ANY). Potentially overwritten by the expr.
-   type:copy "$_ANY"
+   # Initially set Type(NONE). Potentially overwritten by the expr.
+   type:copy "$_NONE"
    if [[ "${node_r[expr]}" ]] ; then
       walk:semantics "${node_r[expr]}"
    fi
    local actual="$TYPE"
 
    # As above, initial Type(ANY).
+   type:copy "$_ANY"
    if [[ "${node_r[type]}" ]] ; then
       walk:semantics "${node_r[type]}"
    fi
@@ -251,11 +243,10 @@ function semantics_decl_variable {
    if ! type:equality  "$target"  "$actual" ; then
       local -n type_r="${node_r[type]}"
       local -n expr_r="${node_r[expr]}"
-
-      e=( type_error
-         --anchor "${type_r[location]}"
-         --caught "${expr_r[location]}"
-      ); raise "${e[@]}"
+      e=( --anchor "${type_r[location]}"
+          --caught "${expr_r[location]}"
+          'expression does not match the declared type'
+      ); raise type_error "${e[@]}"
    fi
 
    local -n symbol_r="$SYMBOL"
@@ -314,11 +305,10 @@ function semantics_member {
    #  ┌── doesn't know about dynamically created $_SECTION var.
    # shellcheck disable=SC2154
    if ! type:equality  "$_SECTION"  "$TYPE" ; then
-      e=( type_error
-         --anchor "${node_r[location]}"
-         --caught "${right_r[location]}"
-         'the left hand side must evaluate to a section'
-      ); raise "${e[@]}"
+      e=( --anchor "${node_r[location]}"
+          --caught "${right_r[location]}"
+          'the left hand side must evaluate to a section'
+      ); raise type_error "${e[@]}"
    fi
 
    # Descend to section's scope (from above `walk:semantics`).
@@ -327,12 +317,10 @@ function semantics_member {
 
    local index="${right_r[value]}"
    if ! symtab:strict "$index" ; then
-      raise
-      e=( missing_var
-         --anchor "${node_r[location]}"
-         --caught "${right_r[location]}"
-         "$index"
-      ); raise "${e[@]}"
+      e=( --anchor "${node_r[location]}"
+          --caught "${right_r[location]}"
+          "$index"
+      ); raise missing_var "${e[@]}"
    fi
 
    local -n section_r="$SYMBOL"
@@ -359,8 +347,10 @@ function semantics_index {
    #  ┌── doesn't know about dynamically created $_LIST var.
    # shellcheck disable=SC2154
    if ! type:shallow_eq  "$_LIST"  "$TYPE" ; then
-      local msg='the left hand side must evaluate to a list'
-      raise type_error "$msg"
+      e=( --anchor "${node_r[location]}"
+          --caught "${lhs_r[location]}"
+          'the left hand side must evaluate to a list'
+      ); raise type_error "${e[@]}"
    fi
 
    walk:semantics "${node_r[right]}"
@@ -369,9 +359,10 @@ function semantics_index {
    #  ┌── doesn't know about dynamically created $_INTEGER var.
    # shellcheck disable=SC2154
    if ! type:equality "$_INTEGER"  "$TYPE" ; then
-      local loc="${node_r[right]}"
-      local msg="list indexes must evaluate to an integer."
-      raise type_error  "$loc"  "$msg"
+      e=( --anchor "${node_r[location]}"
+          --caught "${rhs_r[location]}"
+          'list indexes must evaluate to an integer'
+      ); raise type_error "${e[@]}"
    fi
 
    local index="${rhs_r[value]}"
@@ -379,7 +370,10 @@ function semantics_index {
    local rv="${items_r[$index]}"
 
    if [[ ! "$rv" ]] ; then
-      raise index_error "$index"
+      e=( --anchor "${node_r[location]}"
+          --caught "${rhs_r[location]}"
+          "$rv"
+      ); raise index_error "${e[@]}"
    fi
 
    walk:semantics "$rv"
@@ -394,9 +388,11 @@ function semantics_unary {
    #  ┌── doesn't know about dynamically created $_INTEGER var.
    # shellcheck disable=SC2154
    if ! type:equality  "$_INTEGER"  "$TYPE" ; then
-      local loc="${node_r[right]}"
-      local msg="may only negate integers."
-      raise type_error  "$loc"  "$msg"
+      local -n right_r="${node_r[right]}"
+      e=( --anchor "${node_r[location]}"
+          --caught "${right_r[location]}"
+          'may only negate integers'
+      ); raise type_error "${e[@]}"
    fi
 
    # If it hasn't exploded, it's an integer.
@@ -413,29 +409,28 @@ function semantics_list {
    local type="$TYPE"
    local -n type_r="$TYPE"
 
-   # If the target type is specific (e.g., list[str]), the actual type must
-   # conform to that.
-   local -A types_found=()
-   for ast_node in "${items_r[@]}" ; do
-      walk:semantics "$ast_node"
-      local -n subtype_r=$TYPE
-      local subtype="${subtype_r[kind]}"
+   type:copy "$_NONE"
+   local prev_type="$TYPE"
+   local prev_node
+   local cur_node
 
-      type_r['subtype']="$TYPE"
-      # For now we assume the array will have matching types throughout. If it
-      # does, we don't have touch this. If we're wrong, we append each found
-      # distinct type to `types_found[]`. If >1, set the subtype to ANY instead.
+   for cur_node in "${items_r[@]}" ; do
+      walk:semantics "$cur_node"
 
-      types_found[$subtype]='true'
+      if [[ $prev_node ]] && ! type:shallow_eq "$prev_type" "$TYPE" ; then
+         local -n current_r="$cur_node"
+         local -n previous_r="$prev_node"
+         e=( --anchor "${previous_r[location]}"
+             --caught "${current_r[location]}"
+             'lists must be of the same type'
+         ); raise type_error "${e[@]}"
+      fi
+
+      local prev_node="$cur_node"
+      local prev_type="$TYPE"
    done
 
-   if [[ ${#types_found[@]} -gt 1 ]] ; then
-      #  ┌── doesn't know about dynamically created $_ANY var.
-      # shellcheck disable=SC2154
-      type:copy "$_ANY"
-      type_r['subtype']="$TYPE"
-   fi
-
+   type_r['subtype']="$prev_type"
    declare -g TYPE="$type"
 }
 

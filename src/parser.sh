@@ -1109,7 +1109,7 @@ function parser:index {
    parser:advance # past L_BRACKET.
 
    ast:new index
-   local save="$NODE"
+   local node="$NODE"
    local -n index="$NODE"
 
    parser:expression
@@ -1119,11 +1119,11 @@ function parser:index {
    local close="$TOKEN"
    parser:munch 'R_BRACKET' "index must be closed by \`]'."
 
-   location:copy "$lhs"    "$node"  'file'  'start_ln'  'start_col'
-   location:copy "$close"  "$node"  'file'  'end_ln'    'end_col'
+   location:copy "$lhs"   "$node"  'file'  'start_ln'  'start_col'
+   location:copy "$NODE"  "$node"  'file'  'end_ln'    'end_col'
 
    declare -g ANCHOR="$anchor"
-   declare -g NODE="$save"
+   declare -g NODE="$node"
 }
 
 
