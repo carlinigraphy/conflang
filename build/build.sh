@@ -9,7 +9,7 @@ cat <<EOF
 usage ./$(basename "${BASH_SOURCE[0]}") <option>
 
 options.
-   -w | --strip-newlines    Removes empty lines
+   -n | --strip-newlines    Removes empty lines
    -c | --strip-comments    Removes comments
    -t | --topic <TOPIC>     Subscribes to TOPIC
 EOF
@@ -27,9 +27,9 @@ while (( $# )) ; do
          usage 0
          ;;
 
-      -w | --strip-whitespace)
+      -n | --strip-newlines)
          shift
-         awk_opts+=( -v STRIP_WHITESPACE=yes )
+         awk_opts+=( -v STRIP_NEWLINES=yes )
          ;;
 
       -c | --strip-comments)
@@ -46,7 +46,7 @@ while (( $# )) ; do
          opt="${1/-/}"; newopts=()
          while [[ "$opt" =~ . ]] ; do
             char=${BASH_REMATCH[0]}
-            newopts+=( -${char} )
+            newopts+=( -"${char}" )
             opt="${opt/${char}/}"
          done
          shift
@@ -54,7 +54,7 @@ while (( $# )) ; do
          # If there's only 1 match that hasn't been handled by a valid option
          # above, it's an error. Add to invalid, and continue.
          if (( ${#newopts[@]} == 1 )) ; then
-            invalid_opts+=( ${newopts[@]} )
+            invalid_opts+=( "${newopts[@]}" )
             continue
          fi
 
@@ -67,10 +67,6 @@ while (( $# )) ; do
    esac
 done
 
-awk_opts+=(
-   -v SUBSCRIBE="$topics"
-)
-
 if (( ${#invalid_opts[@]} )) ; then
    printf 'invalid opts:'
    printf ' [%s]'  "${invalid_opts[@]}"
@@ -78,4 +74,5 @@ if (( ${#invalid_opts[@]} )) ; then
    usage 1
 fi
 
+awk_opts+=( -v SUBSCRIBE="$topics" )
 awk "${awk_opts[@]}"  -f "${PROGDIR}"/preproc.awk  "${SRCDIR}"/*.sh  "${SRCDIR}"/main
