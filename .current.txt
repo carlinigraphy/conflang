@@ -34,3 +34,17 @@
       - lhs.kind == ANY
       - rhs.kind == EMPTY
       - lhs.kind == rhs.kind
+
+
+2023-01-02
+   The above works pretty well, excepting in the case of list items. Something
+   like this...
+   > _ @list[list[str]]: [[1], [1], []];
+
+   ...does not fail. Only the final list element is used as the subtype of the
+   list. When comparing for homogeneity, `list[-2] == list[-1]` because the rhs
+   is of type NONE, which auto-matches. Within lists, need to do a strict and
+   deep comparison.
+
+   It's an expression, so no Type(ANY). Will have inner NONEs for lists (and
+   records?). Currently I think can only occur within lists.

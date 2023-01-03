@@ -199,16 +199,13 @@ function type:copy {
    t1_r['kind']="${t0_r[kind]}"
    t1_r['slots']="${t0_r[slots]}"
 
-   local t0_next="${t0_r[next]}"
-   local t0_subtype="${t0_r[subtype]}"
-
-   if [[ "$t0_next" ]] ; then
-      type:copy "$t0_next" 
+   if [[ "${t0_r[next]}" ]] ; then
+      type:copy "${t0_r[next]}"
       t1_r['next']="$TYPE"
    fi
 
-   if [[ "$t0_subtype" ]] ; then
-      type:copy "$t0_subtype" 
+   if [[ "${t0_r[subtype]}" ]] ; then
+      type:copy "${t0_r[subtype]}"
       t1_r['subtype']="$TYPE"
    fi
 
@@ -216,7 +213,7 @@ function type:copy {
 }
 
 
-function type:equality {
+function type:eq {
    local t1="$1" t2="$2"
 
    #0) Neither type exists. All good.
@@ -248,12 +245,47 @@ function type:equality {
    fi
 
    #5) Nexts must match.
-   if ! type:equality "${t1_r[next]}" "${t2_r[next]}" ; then
+   if ! type:eq "${t1_r[next]}" "${t2_r[next]}" ; then
       return 1
    fi
 
    #6) Subtypes must match.
-   if ! type:equality "${t1_r[subtype]}" "${t2_r[subtype]}" ; then
+   if ! type:eq "${t1_r[subtype]}" "${t2_r[subtype]}" ; then
+      return 1
+   fi
+
+   return 0
+}
+
+
+function type:strict_eq {
+   local t1="$1" t2="$2"
+
+   #0) Neither type exists. All good.
+   if [[ ! $t1 && ! $t2 ]] ; then
+      return 0
+   fi
+
+   #1) Either RHS or LHS did not exist. Not good.
+   if ! [[ $t1 && $t2 ]] ; then
+      return 1
+   fi
+
+   local -n t1_r="$t1"
+   local -n t2_r="$t2"
+
+   #2) Kinds must match.
+   if [[ ! ${t1_r[kind]} == "${t2_r[kind]}" ]] ; then
+      return 1
+   fi
+
+   #3) Nexts must match.
+   if ! type:strict_eq "${t1_r[next]}" "${t2_r[next]}" ; then
+      return 1
+   fi
+
+   #4) Subtypes must match.
+   if ! type:strict_eq "${t1_r[subtype]}" "${t2_r[subtype]}" ; then
       return 1
    fi
 

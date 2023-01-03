@@ -240,7 +240,15 @@ function semantics_decl_variable {
    fi
    local target="$TYPE"
 
-   if ! type:equality  "$target"  "$actual" ; then
+   source src/debug.sh
+   echo "target:"
+   debug_type "$target"
+   echo
+   echo "actual:"
+   debug_type "$actual"
+   echo
+
+   if ! type:eq  "$target"  "$actual" ; then
       local -n type_r="${node_r[type]}"
       local -n expr_r="${node_r[expr]}"
       e=( --anchor "${type_r[location]}"
@@ -272,9 +280,17 @@ function semantics_type {
    local type="$TYPE"
    local -n type_r="$type"
 
-   if [[ ${node_r[subtype]} ]] ; then
+   if [[ ${node_r['next']} ]] ; then
+      walk:semantics "${node_r[next]}"
+      type_r['next']="$TYPE"
+   fi
+
+   if [[ ${node_r['subtype']} ]] ; then
       walk:semantics ${node_r[subtype]}
-      type_r[subtype]=$TYPE
+      type_r[subtype]="$TYPE"
+   elif (( node_r[slots] )) ; then
+      type:copy "$_ANY"
+      type_r[subtype]="$TYPE"
    fi
 
    declare -g TYPE="$type"
@@ -304,7 +320,7 @@ function semantics_member {
 
    #  ┌── doesn't know about dynamically created $_SECTION var.
    # shellcheck disable=SC2154
-   if ! type:equality  "$_SECTION"  "$TYPE" ; then
+   if ! type:eq  "$_SECTION"  "$TYPE" ; then
       e=( --anchor "${node_r[location]}"
           --caught "${right_r[location]}"
           'the left hand side must evaluate to a section'
@@ -338,6 +354,9 @@ function semantics_member {
 }
 
 
+# TODO: rewrite now that lists must be homogeneous. Don't need to use the NODE
+#       itself to look up by index. Can do based upon the subtype.
+#
 function semantics_index {
    local -n node_r="$NODE"
 
@@ -358,7 +377,7 @@ function semantics_index {
 
    #  ┌── doesn't know about dynamically created $_INTEGER var.
    # shellcheck disable=SC2154
-   if ! type:equality "$_INTEGER"  "$TYPE" ; then
+   if ! type:eq "$_INTEGER"  "$TYPE" ; then
       e=( --anchor "${node_r[location]}"
           --caught "${rhs_r[location]}"
           'list indexes must evaluate to an integer'
@@ -387,7 +406,7 @@ function semantics_unary {
 
    #  ┌── doesn't know about dynamically created $_INTEGER var.
    # shellcheck disable=SC2154
-   if ! type:equality  "$_INTEGER"  "$TYPE" ; then
+   if ! type:eq  "$_INTEGER"  "$TYPE" ; then
       local -n right_r="${node_r[right]}"
       e=( --anchor "${node_r[location]}"
           --caught "${right_r[location]}"
@@ -409,15 +428,15 @@ function semantics_list {
    local type="$TYPE"
    local -n type_r="$TYPE"
 
+   # Set initial item type to NONE. Overwritten by the 1st item of the list.
    type:copy "$_NONE"
-   local prev_type="$TYPE"
-   local prev_node
-   local cur_node
 
+   local prev_type prev_node
+   local cur_node
    for cur_node in "${items_r[@]}" ; do
       walk:semantics "$cur_node"
 
-      if [[ $prev_node ]] && ! type:shallow_eq "$prev_type" "$TYPE" ; then
+      if [[ $prev_type ]] && ! type:strict_eq "$prev_type" "$TYPE" ; then
          local -n current_r="$cur_node"
          local -n previous_r="$prev_node"
          e=( --anchor "${previous_r[location]}"
@@ -426,11 +445,11 @@ function semantics_list {
          ); raise type_error "${e[@]}"
       fi
 
-      local prev_node="$cur_node"
       local prev_type="$TYPE"
+      local prev_node="$cur_node"
    done
 
-   type_r['subtype']="$prev_type"
+   type_r['subtype']="$TYPE"
    declare -g TYPE="$type"
 }
 
@@ -448,6 +467,9 @@ function semantics_identifier {
    symtab:get "$name"
    local -n symbol_r="$SYMBOL"
 
+   # TODO: can't always get the .node, as in the case of BIT's. Need to think
+   #       of a new way of doing this for the expression.
+   #
    # Need to set the $NODE to "return" the expression referenced by this
    # variable. Necessary in index/member subscription expressions.
    local -n target_r="${symbol_r[node]}"

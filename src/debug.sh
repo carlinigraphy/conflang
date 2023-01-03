@@ -8,16 +8,19 @@ declare -gi INDENTATION=0
 
 function debug_type {
    local -n type_r="$1"
-   printf '%s (%d)\n'  "${type_r[kind]}"  "${type_r[slots]}"
+   local -i space
 
-   if [[ "${type_r[next]}" ]] ; then
-      printf -- '->'
-      debug_type "${type_r[next]}" 
-   fi
+   (( space = INDENTATION * INDENT_FACTOR )) ||:
+   printf -- "%${space}s%s\n"  ''  "${type_r[kind]}"
 
    if [[ "${type_r[subtype]}" ]] ; then
-      printf -- '- '
+      (( ++INDENTATION )) ||:
       debug_type "${type_r[subtype]}" 
+      (( --INDENTATION )) ||:
+   fi
+
+   if [[ "${type_r[next]}" ]] ; then
+      debug_type "${type_r[next]}" 
    fi
 }
 
