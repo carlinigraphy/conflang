@@ -94,9 +94,7 @@ function symtab:get {
 #  Searches only current symtab for Symbol identified by $1.
 function symtab:strict {
    local name="$1"
-   local symtab="$SYMTAB"
-   local -n symtab_r="$symtab"
-
+   local -n symtab_r="$SYMTAB"
    declare -g SYMBOL="${symtab_r[$name]}"
    [[ "$SYMBOL" ]]
 }
@@ -119,6 +117,18 @@ function symtab:set {
 function symtab:from {
    local -n node_r="$1"
    declare -g SYMTAB="${node_r[symtab]}"
+}
+
+
+# @description
+#  Assuming $1 is a Section, sets $SYMTAB to $1.node.symtab.
+#
+# @set   SYMTAB
+# @arg   $1    :str     Identifier name to search in current scope
+function symtab:descend {
+   local -n symtab_r="$SYMTAB"
+   local -n symbol_r="${symtab_r[$1]}"
+   symtab:from "${symbol_r[node]}"
 }
 
 

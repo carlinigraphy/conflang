@@ -5,8 +5,10 @@
 #  Can't typecheck off the AST directly, as some dependent nodes may occur
 #  earlier than their dependencies. Example:
 #  ```
-#  item (str): arr[0];
-#  arr: [0, 1];
+#  item (str): arr[1];
+#
+#  arr : [0, one];
+#  one : 1;
 #  ```
 #
 #  The array `arr` was declared with no type. Until we can walk its expression
@@ -53,18 +55,16 @@ function flatten_program {
 
 
 function flatten_decl_section {
-   local node="$NODE"
-   local -n node_r="$node"
+   local -n node_r="$NODE"
 
    local symtab="$SYMTAB"
-   symtab:from "$node"
+   symtab:from "$NODE"
 
    local -n items_r="${node_r[items]}"
    for var_decl in "${items_r[@]}"; do
       walk:flatten "$var_decl"
    done
 
-   declare -g NODE="$node"
    declare -g SYMTAB="$symtab"
 }
 
@@ -85,10 +85,39 @@ function flatten_typecast {
 }
 
 
+# @set   TYPE
+# @set   SYMTAB
+# @set   DEPENDENCY
 function flatten_member {
    local -n node_r="$NODE"
+
+   local -n left_r="${node_r[left]}"
+   local -n right_r="${node_r[right]}"
+
    walk:flatten "${node_r[left]}"
-   walk:flatten "${node_r[right]}"
+
+   #  ┌── doesn't know about dynamically created $_SECTION var.
+   # shellcheck disable=SC2154
+   if ! type:eq  "$_SECTION"  "$TYPE" ; then
+      e=( --anchor "${node_r[location]}"
+          --caught "${left_r[location]}"
+          'must evaluate to a section'
+      ); raise type_error "${e[@]}"
+   fi
+
+   local index="${right_r[value]}"
+   if ! symtab:strict "$index" ; then
+      e=( --anchor "${node_r[location]}"
+          --caught "${right_r[location]}"
+          "$index"
+      ); raise missing_var "${e[@]}"
+   fi
+
+   local -n dep="$DEPENDENCY"
+   local -n symbol_r="$SYMBOL"
+   dep+=( "${symbol_r[node]}" )
+
+   symtab:descend "$index"
 }
 
 
@@ -114,8 +143,9 @@ function flatten_list {
 }
 
 
+# @set   TYPE
+# @set   SYMTAB
 function flatten_identifier {
-   # Get identifier name.
    local -n node_r="$NODE"
    local name="${node_r[value]}"
 
@@ -129,9 +159,20 @@ function flatten_identifier {
 
    # Add variable target as a dependency.
    local -n symbol_r="$SYMBOL"
-   local target="${symbol_r[node]}"
+   local target="${symbol_r[node]}" 
+
+   # Ignore built-in types, which do not contain a .node ref. They are never
+   # dependencies.
+   if [[ ! "$target" ]] ; then
+      return
+   fi
+
    local -n dep="$DEPENDENCY"
    dep+=( "$target" )
+
+   local -n target_r="$target"
+   declare -g SYMTAB="${target_r[symtab]}"
+   declare -g TYPE="${symbol_r[type]}"
 }
 
 
@@ -204,20 +245,6 @@ function walk:semantics {
 }
 
 
-# Can only hit this as the LHS of a member expression.
-#> _: Section.key;   ->   index(Section, key)
-function semantics_decl_section {
-   local -n node_r="$NODE"
-   local -n name_r="${node_r[name]}"
-
-   symtab:get "${name_r[value]}"
-
-   # Need to "return" the resulting
-   local -n symbol_r="$SYMBOL"
-   declare -g TYPE="${symbol_r[type]}"
-}
-
-
 function semantics_decl_variable {
    local -n node_r="$NODE"
    local -n name_r="${node_r[name]}"
@@ -225,6 +252,7 @@ function semantics_decl_variable {
 
    symtab:from "$NODE"
    symtab:get "$name"
+   local symbol="$SYMBOL"
 
    # Initially set Type(NONE). Potentially overwritten by the expr.
    type:copy "$_NONE"
@@ -240,24 +268,17 @@ function semantics_decl_variable {
    fi
    local target="$TYPE"
 
-   source src/debug.sh
-   echo "target:"
-   debug_type "$target"
-   echo
-   echo "actual:"
-   debug_type "$actual"
-   echo
-
    if ! type:eq  "$target"  "$actual" ; then
       local -n type_r="${node_r[type]}"
       local -n expr_r="${node_r[expr]}"
       e=( --anchor "${type_r[location]}"
           --caught "${expr_r[location]}"
-          'expression does not match the declared type'
+          'expression type does not match'
+          "$target"  "$actual"
       ); raise type_error "${e[@]}"
    fi
 
-   local -n symbol_r="$SYMBOL"
+   local -n symbol_r="$symbol"
    symbol_r['type']="$actual"
 }
 
@@ -271,9 +292,6 @@ function semantics_type {
    symtab:get "$name"
    local -n symbol_r="$SYMBOL"
    local outer_type="${symbol_r[type]}"
-   # Types themselves are defined as such:
-   #> int = Type('TYPE', subtype: Type('INTEGER'))
-   #> str = Type('TYPE', subtype: Type('STRING'))
 
    local -n outer_type_r="$outer_type"
    type:copy "${outer_type_r[subtype]}"
@@ -294,7 +312,6 @@ function semantics_type {
    fi
 
    declare -g TYPE="$type"
-   declare -g NODE="$node"
 }
 
 
@@ -305,98 +322,53 @@ function semantics_typecast {
 
 
 function semantics_member {
-   local symtab="$SYMTAB"
    local -n node_r="$NODE"
 
-   # node.left is either
-   #  - AST(member)
-   #  - AST(identifier)
-   # Both must set $SYMTAB to point to either the result of the member
-   # subscription, or the target symtab of the identifier respectively. it must
-   # also set $TYPE to its resulting type.
-   walk:semantics "${node_r[left]}"
-
+   local -n left_r="${node_r[left]}"
    local -n right_r="${node_r[right]}"
 
-   #  ┌── doesn't know about dynamically created $_SECTION var.
-   # shellcheck disable=SC2154
-   if ! type:eq  "$_SECTION"  "$TYPE" ; then
-      e=( --anchor "${node_r[location]}"
-          --caught "${right_r[location]}"
-          'the left hand side must evaluate to a section'
-      ); raise type_error "${e[@]}"
-   fi
-
-   # Descend to section's scope (from above `walk:semantics`).
-   local -n symbol_r="$SYMBOL"
-   symtab:from "${symbol_r[node]}"
+   walk:semantics "${node_r[left]}"
 
    local index="${right_r[value]}"
-   if ! symtab:strict "$index" ; then
-      e=( --anchor "${node_r[location]}"
-          --caught "${right_r[location]}"
-          "$index"
-      ); raise missing_var "${e[@]}"
-   fi
+   symtab:strict "$index"
 
-   local -n section_r="$SYMBOL"
+   local -n symbol_r="$SYMBOL"
+   declare -g TYPE="${symbol_r[type]}"
 
-   # Necessary for an expression using both member & index subscription. E.g.,
-   #> _: a.b[0];
-   #
-   # Need to "return" the result of (a.b) so it can be subscripted by [0]. The
-   # symbol holds a reference to the declaration. Need the expression itself.
-   local -n result_r="${section_r[node]}"
-   declare -g NODE="${result_r[expr]}"
-
-   declare -g TYPE="${section_r[type]}"
-   declare -g SYMTAB="$symtab"
+   symtab:descend "$index"
 }
 
 
-# TODO: rewrite now that lists must be homogeneous. Don't need to use the NODE
-#       itself to look up by index. Can do based upon the subtype.
-#
 function semantics_index {
    local -n node_r="$NODE"
 
    walk:semantics "${node_r[left]}"
-   local -n lhs_r="$NODE"
+   local -n type_r="$TYPE"
 
-   #  ┌── doesn't know about dynamically created $_LIST var.
    # shellcheck disable=SC2154
    if ! type:shallow_eq  "$_LIST"  "$TYPE" ; then
+      local -n rhs_node_r="${node_r[right]}"
       e=( --anchor "${node_r[location]}"
-          --caught "${lhs_r[location]}"
-          'the left hand side must evaluate to a list'
+          --caught "${rhs_node_r[location]}"
+          'must evaluate to a list'
+          "$_LIST"  "$TYPE"
       ); raise type_error "${e[@]}"
    fi
 
    walk:semantics "${node_r[right]}"
-   local -n rhs_r="$NODE"
 
    #  ┌── doesn't know about dynamically created $_INTEGER var.
    # shellcheck disable=SC2154
    if ! type:eq "$_INTEGER"  "$TYPE" ; then
+      local -n rhs_node_r="${node_r[right]}"
       e=( --anchor "${node_r[location]}"
-          --caught "${rhs_r[location]}"
+          --caught "${rhs_node_r[location]}"
           'list indexes must evaluate to an integer'
+          "$_INTEGER"  "$TYPE"
       ); raise type_error "${e[@]}"
    fi
 
-   local index="${rhs_r[value]}"
-   local -n items_r="${lhs_r[items]}"
-   local rv="${items_r[$index]}"
-
-   if [[ ! "$rv" ]] ; then
-      e=( --anchor "${node_r[location]}"
-          --caught "${rhs_r[location]}"
-          "$rv"
-      ); raise index_error "${e[@]}"
-   fi
-
-   walk:semantics "$rv"
-   declare -g NODE="$rv"
+   declare -g TYPE="${type_r[subtype]}"
 }
 
 
@@ -411,6 +383,7 @@ function semantics_unary {
       e=( --anchor "${node_r[location]}"
           --caught "${right_r[location]}"
           'may only negate integers'
+          "$_INTEGER"  "$TYPE"
       ); raise type_error "${e[@]}"
    fi
 
@@ -442,6 +415,7 @@ function semantics_list {
          e=( --anchor "${previous_r[location]}"
              --caught "${current_r[location]}"
              'lists must be of the same type'
+             "$prev_type"  "$TYPE"
          ); raise type_error "${e[@]}"
       fi
 
@@ -455,25 +429,16 @@ function semantics_list {
 
 
 function semantics_identifier {
-   # Before this stage, we've flattened the AST to an array, and sorted by
-   # dependency order. Can safely look up the .type of the target Symbol without
-   # worry that it may be uninitialized.
-
-   # Get identifier name.
    local -n node_r="$NODE"
-   local name="${node_r[value]}"
 
    symtab:from "$NODE"
-   symtab:get "$name"
-   local -n symbol_r="$SYMBOL"
+   symtab:get "${node_r[value]}"
 
-   # TODO: can't always get the .node, as in the case of BIT's. Need to think
-   #       of a new way of doing this for the expression.
-   #
-   # Need to set the $NODE to "return" the expression referenced by this
-   # variable. Necessary in index/member subscription expressions.
-   local -n target_r="${symbol_r[node]}"
-   declare -g NODE="${target_r[expr]}"
+   local -n symbol_r="$SYMBOL"
+   local target="${symbol_r[node]}" 
+   local -n target_r="$target"
+
+   declare -g SYMTAB="${target_r[symtab]}"
    declare -g TYPE="${symbol_r[type]}"
 }
 

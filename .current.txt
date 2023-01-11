@@ -48,3 +48,180 @@
 
    It's an expression, so no Type(ANY). Will have inner NONEs for lists (and
    records?). Currently I think can only occur within lists.
+
+
+2023-01-03
+   Unrelated: random TODO items
+   - [ ] clean up naming of errors to `raise`
+         - [ ] missing_var  ->  unset_variable? unfound_variable?
+         - [ ] parse_error  ->  non specific, break out into more detailed msgs
+
+   Struggling with reconciling:
+   - Typechecking must be done after merging
+     - Allows *expectation* of expanding a "base" file
+   - Flattening must be done prior to typechecking & evaluation
+
+   Flattening phase will need to throw some errors upon undeclared identifiers.
+
+   The big concenceptual problem:
+   How to descend symbol table scopes in member subscription. Each lhs must
+   "return" the new TYPE and SYMTAB (if section).
+
+   a.b.c  ->  ((a, b), c)
+   
+   1st call
+      lhs: (a,b)
+      rhs: c
+      walk (lhs)  ->  2nd call
+                         lhs: a
+                         rhs: b
+                         walk(lhs)  ->  walk_identifier -> set TYPE & SYMTAB
+
+                         symbol = SYMTAB.strict(rhs.value)
+                         TYPE = symbol.type
+
+                         << NEED TO GET NEW SYMBOL TABLE HERE >>
+
+
+   There are two possible cases
+   1) lhs is an identifier
+      - Handled by `walk_identifier()`
+      - Always a relative (non-strict) reference
+        - Uses `symtab:get`
+      - Can set the SYMTAB to the one in which the identifier was found
+   2) lhs is another member expression
+      - Handled by `walk_member()`
+   
+   In both cases the rhs is an identifier, and must be a symtab:strict lookup.
+   They must also be compatible with how `walk_index()` initially expects a lhs
+   to look. Think it only requires a TYPE that is a LIST.
+
+   Think about the end state. What is expected, regardless of what the lhs
+   specifically IS.
+   * Must have a symbol table in which we can strictly query the rhs.name
+
+   What information do we have
+   * lhs type
+   * rhs name
+
+   I think this would be a problem that would either be checked at runtime,
+   or via a statically typed dictionary. Given that it's not actually a dict,
+   we may just need to pass extra information.
+
+   Don't think it's possible with the lhs type alone. Requires at least the
+   symbol table.
+
+   Getting back to "always end up with a symbol table"...
+
+         # Returns the TYPE of the identifier, as well as the SYMTAB in which
+         # the identifier was found.
+         #
+         fn walk_identifier(node) as
+            symtab = symtab:from(node)
+            symbol = symtab:get(symtab, node.name)
+
+            global TYPE   = symbol.type
+            global SYMTAB = symtab
+         end fn
+
+         fn walk_member(node) as
+            walk(node.left)
+            # Have the symbol table in which the lhs was found, but not the type
+            # OF the lhs section. How was I doing it before...?
+         end fn
+
+
+2023-01-05
+   Oof. Still working on symbol tables. Time to slam out some straight up
+   wordfucking below.
+
+   For something like:
+   -------------------
+   S0 {
+      _: S1.S2.key;
+   }
+
+   S1 {
+      S2 { key; }
+   }
+   -------------------
+
+   Symbol tables look like:
+
+         %container {
+            S0: Section
+            S1: Section
+         }
+
+         S0 {
+            _: Any
+         }
+
+         S1 {
+            S2: Section
+         }
+
+         S2 {
+            key: None
+         }
+
+         parent { # Mappings to parent symbol table
+            %container : None
+            S0         : %container
+            S1         : %container
+            S2         : S1
+         }
+   
+
+   S1.S2.key;
+
+   1. member(
+         lhs: member(ident(S1), ident(S2)),
+         rhs: ident(key)
+      )
+
+   2. member(
+         lhs: ident(S1),
+         rhs: ident(S2)
+      )
+
+   3. ident(S1)
+
+
+   Going in reverse order:
+   
+   3. ident(S1)
+                       sets
+      symtab:get("S1")  ->  Type(Section)
+                        ->  Symtab(%container)
+
+   2. member(
+         lhs: ident(S1),
+         rhs: ident(S2)
+      )
+
+      Check lhs.type == Section?
+      symtab:descend(lhs.value)
+      symtab:strict(rhs.value)
+
+                       sets
+                        ->  Type(SYMBOL.type)
+                        ->  Symtab(S1)
+
+   1. member(
+         lhs: member(ident(S1), ident(S2)),
+         rhs: ident(key)
+      )
+
+      symtab:descend(lhs.value)
+      # Shit, can't use the lhs ident's value to set the symtab here. Bah.
+
+
+   Walking the left side of a member expression must always return the 
+
+   SYMBOL is set from the walk_ident function... can use that to get
+   symbol.node.symtab?
+
+   Or if the walk_ident function sets it to the .symtab of the *target*. Only
+   ever walking identifiers at the top level, so it must be a relative
+   reference.

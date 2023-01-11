@@ -321,9 +321,54 @@ function raise_munch_error {
 
 
 #───────────────────────────────( type errors )─────────────────────────────────
+declare -g TYPE_AS_STR=''
+
+function type:to_str {
+   local -n type_r="$1"
+   local kind="${type_r[kind]}"
+
+   local -A short=(
+      [SECTION]='section'
+      [NONE]='none'
+      [ANY]='any'
+
+      [INTEGER]='int'
+      [STRING]='str'
+      [BOOLEAN]='bool'
+      [PATH]='path'
+
+      [TYPE]='type'
+      [LIST]='list'
+      [RECORD]='rec'
+   )
+
+   TYPE_AS_STR+="${short[$kind]}"
+
+   if [[ "${type_r[subtype]}" ]] ; then
+      TYPE_AS_STR+='['
+      type:to_str "${type_r[subtype]}" 
+      TYPE_AS_STR+=']'
+   fi
+
+   if [[ "${type_r[next]}" ]] ; then
+      TYPE_AS_STR+=', '
+      type:to_str "${type_r[next]}" 
+   fi
+}
+
+
 function raise_type_error {
    local -n error_r="$ERROR"
-   error_r[msg]="$1"
+
+   local text="$1"
+   local t1="$2"
+   local t2="$3"
+
+   unset TYPE_AS_STR ; type:to_str "$t1" ; t1_str="$TYPE_AS_STR"
+   unset TYPE_AS_STR ; type:to_str "$t2" ; t2_str="$TYPE_AS_STR"
+
+   printf -v msg '%s: %s != %s'  "$text"  "$t1_str"  "$t2_str"
+   error_r[msg]="$msg"
 }
 
 function raise_not_a_type {
