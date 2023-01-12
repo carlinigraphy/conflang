@@ -20,52 +20,48 @@
 #-------------------------------------------------------------------------------
 
 # @type
-declare -g  DEPENDENCY=
-declare -ga UNORDERED_DEPS=()
+declare -g  DEPENDENCIES=
+declare -gi _DEP_ARRAY_NUM=0
+
+declare -gA UNORDERED_DEPS=()
 declare -ga ORDERED_DEPS=()
-# UNORDERED_DEPS[] -> DEPTH_MAP{} -> ORDERED_DEPS[]
+# UNORDERED_DEPS{} -> DEPTH_MAP{} -> ORDERED_DEPS[]
 
 declare -gA DEPTH_MAP=()
 # Mapping of {NODE -> $depth}. Intermediate phase in going from unordered to
 # ordered.
 
-
+# @set   DEPENDENCIES
+# @set   UNORDERED_DEPS{}
 function dependency:new {
-   local dep="DEP_${1}"
-   declare -ga "$dep"
-   declare -g  DEPENDENCY="$dep"
-   UNORDERED_DEPS+=( "$dep" )
+   local node="$1"
+
+   (( ++_DEP_ARRAY_NUM ))
+   local deps="_DEP_ARRAY_${_DEP_ARRAY_NUM}"
+   declare -ga "$deps"
+   declare -g  DEPENDENCIES="$deps"
+
+   UNORDERED_DEPS["$node"]="$deps"
 }
 
 
+# @description
+#  Calls the appropriate `flatten` function based upon the node type. E.g.,
+#  identifiers call `flatten_identifier()`.
+#
+# @set   NODE
 function walk:flatten {
    declare -g NODE="$1"
-   flatten_"${TYPEOF[$NODE]}"
-}
-
-
-function flatten_program {
-   local -n node_r="$NODE"
-   local -n container_r="${node_r[container]}"
-   local -n items_r="${container_r[items]}"
-   for node in "${items_r[@]}" ; do
-      walk:flatten "$node"
-   done
+   flatten_${TYPEOF[$NODE]}
 }
 
 
 function flatten_decl_section {
    local -n node_r="$NODE"
-
-   local symtab="$SYMTAB"
-   symtab:from "$NODE"
-
    local -n items_r="${node_r[items]}"
-   for var_decl in "${items_r[@]}"; do
-      walk:flatten "$var_decl"
+   for node in "${items_r[@]}"; do
+      walk:flatten "$node"
    done
-
-   declare -g SYMTAB="$symtab"
 }
 
 
@@ -87,9 +83,10 @@ function flatten_typecast {
 
 # @set   TYPE
 # @set   SYMTAB
-# @set   DEPENDENCY
+# @set   DEPENDENCIES
 function flatten_member {
-   local -n node_r="$NODE"
+   local node="$NODE"
+   local -n node_r="$node"
 
    local -n left_r="${node_r[left]}"
    local -n right_r="${node_r[right]}"
@@ -113,7 +110,7 @@ function flatten_member {
       ); raise missing_var "${e[@]}"
    fi
 
-   local -n dep="$DEPENDENCY"
+   local -n dep="$DEPENDENCIES"
    local -n symbol_r="$SYMBOL"
    dep+=( "${symbol_r[node]}" )
 
@@ -161,18 +158,22 @@ function flatten_identifier {
    local -n symbol_r="$SYMBOL"
    local target="${symbol_r[node]}" 
 
-   # Ignore built-in types, which do not contain a .node ref. They are never
-   # dependencies.
+   local -n target_r="$target"
+   declare -g SYMTAB="${target_r[symtab]}"
+   declare -g TYPE="${symbol_r[type]}"
+
+   # Ignore sections.
+   if [[ ${TYPEOF[$target]} == decl_section ]] ; then
+      return
+   fi
+
+   # Ignore built-in types, which do not contain a .node ref.
    if [[ ! "$target" ]] ; then
       return
    fi
 
-   local -n dep="$DEPENDENCY"
+   local -n dep="$DEPENDENCIES"
    dep+=( "$target" )
-
-   local -n target_r="$target"
-   declare -g SYMTAB="${target_r[symtab]}"
-   declare -g TYPE="${symbol_r[type]}"
 }
 
 
@@ -182,34 +183,65 @@ function flatten_string  { :; }
 function flatten_path    { :; }
 function flatten_env_var { :; }
 
-#────────────────────────────( order dependencies )─────────────────────────────
+#===============================================================================
+# @section                      Order dependencies
+# @description
+#  Orders `UNORDERED_DEPS[]` array from the `flatten` phase. Iterates each
+#  variable declaration, counts the "depth" of its dependencies. Sorta based on
+#  minimum -> maximum depth.
+#
+#-------------------------------------------------------------------------------
+# TODO: change `UNORDERED_DEPS` to an associative array. They're inherently not
+# ordered, so not information is lost, but it makes a more clear connection from
+# the AST node itself to the array holding its dependencies.
+#
+# Also may help with checking 
+#
+#-------------------------------------------------------------------------------
+
 declare -gi DEPTH=0
+declare -gA DEPTH_VISITED=()
 
 function dependency_to_map {
-   for dep_node in "${UNORDERED_DEPS[@]}" ; do
-      dependency_depth "$dep_node"
+   local node items
 
-      local ast_node="${dep_node/DEP_/}"
-      DEPTH_MAP[$ast_node]="$DEPTH"
+   for node in "${!UNORDERED_DEPS[@]}" ; do
+      local items="${UNORDERED_DEPS[$node]}" 
+
+      DEPTH_VISITED=()
+      DEPTH_VISITED[$node]='yes'
+
+      dependency_depth "$items"
+      DEPTH_MAP[$node]="$DEPTH"
    done
 }
 
 
 function dependency_depth {
-   local -n node_r="$1"
+   local -n items_r="$1"
    local -i level="${2:-0}"
 
    # When we've reached the end of a dependency chain, return the accumulated
    # depth level.
-   if ! (( ${#node_r[@]} )) ; then
+   if ! (( ${#items_r[@]} )) ; then
       DEPTH="$level" ; return
    fi
 
    (( ++level ))
 
+   local n node
    local -a sub_levels=()
-   for ast_node in "${node_r[@]}" ; do
-      dependency_depth "DEP_${ast_node}"  "$level"
+
+   for node in "${items_r[@]}" ; do
+      if [[ ${DEPTH_VISITED[$node]} ]] ; then
+         local -n node_r="$node"
+         e=( --anchor "${node_r[location]}"
+             --caught "${node_r[location]}"
+         ); raise circular_reference "${e[@]}"
+      fi
+      DEPTH_VISITED[$node]='yes'
+
+      dependency_depth "${UNORDERED_DEPS[$node]}"  "$level"
       sub_levels+=( "$DEPTH" )
    done
 
@@ -223,14 +255,15 @@ function dependency_depth {
 
 
 function dependency_sort {
+   local node
    local -i  i=0  depth=0
 
    while (( ${#DEPTH_MAP[@]} )) ; do
-      for ast_node in "${!DEPTH_MAP[@]}" ; do
-         depth="${DEPTH_MAP[$ast_node]}"
+      for node in "${!DEPTH_MAP[@]}" ; do
+         depth="${DEPTH_MAP[$node]}"
          if (( depth == i )) ; then
-            unset 'DEPTH_MAP[$ast_node]'
-            ORDERED_DEPS+=( "$ast_node" )
+            unset 'DEPTH_MAP[$node]'
+            ORDERED_DEPS+=( "$node" )
          fi
       done
       (( ++i ))
@@ -273,7 +306,7 @@ function semantics_decl_variable {
       local -n expr_r="${node_r[expr]}"
       e=( --anchor "${type_r[location]}"
           --caught "${expr_r[location]}"
-          'expression type does not match'
+          'expression type does not match declared type'
           "$target"  "$actual"
       ); raise type_error "${e[@]}"
    fi
@@ -442,6 +475,19 @@ function semantics_identifier {
    declare -g TYPE="${symbol_r[type]}"
 }
 
+
+function semantics_env_var {
+   local -n node_r="$NODE"
+   local name="${node_r[value]}"
+
+   if [[ ! "${SNAPSHOT[$name]+_}" ]] ; then
+      raise missing_env_var "$name"
+   fi
+
+   # shellcheck disable=SC2154
+   declare -g TYPE="$_ANY"
+}
+
 # shellcheck disable=SC2154
 function semantics_path    { declare -g TYPE="$_PATH"    ;}
 
@@ -453,6 +499,3 @@ function semantics_integer { declare -g TYPE="$_INTEGER" ;}
 
 # shellcheck disable=SC2154
 function semantics_string  { declare -g TYPE="$_STRING"  ;}
-
-# shellcheck disable=SC2154
-function semantics_env_var { declare -g TYPE="$_ANY"     ;}

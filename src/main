@@ -166,6 +166,24 @@ function main {
    file:new ; file:resolve "$INPUT"  "$PWD"
    #--^ Adds initial file to IMPORTS[]
 
+   # TODO: I'm not 100% on the global symbol table being attached to each of
+   # the files. Need to make sure that works with imports. Shouldn't need to
+   # search through the lhs to reach the global table. Something like:
+   #
+   #                _file1.conf_       _file2.conf_
+   #                S1 {               S3 {
+   #                  S2 { a; }          S4 { b; }
+   #                }                  }
+   #
+   #               | GLOBALS |         | GLOBALS |
+   #               | S1      |   <==   | S3      |
+   #               | S2      |         | S4      |
+   #
+   # Top of each file's symbol table stack must always be the globals. Unless
+   # we have a single globals table that's temporarily attached to the current
+   # file during semantic analysis. Afterwards the global table is prepended to
+   # the result.
+
    for (( idx = 0 ; idx < ${#IMPORTS[@]} ; ++idx )) ; do
       local path="${IMPORTS[$idx]}"
       local file="${FILES[$path]}"
@@ -201,9 +219,12 @@ function main {
 
    ## TODO: re-enable fold & merge
    ## Reduces all the IMPORTS[] to a single {Symtab,AST}.
-   #fold ; SYMTAB_PARENT["$SYMTAB"]="$globals"
+   #fold ; local ast="$NODE"
 
-   walk:flatten "$NODE"
+   local -n node_r="$NODE"
+   local container="${node_r[container]}"
+
+   walk:flatten "$container"
    dependency_to_map
    dependency_sort
 
@@ -211,7 +232,8 @@ function main {
       walk:semantics "$node"
    done
 
-   #walk:compiler "$NODE"
+   # TODO: swap this to $ast after folding works.
+   walk:compiler "$container"
 
    #declare -f conf > "$OUTPUT"
    [[ ${!_SKELLY_*} ]] && declare -p ${!_SKELLY_*} > "$OUTPUT"  ||:

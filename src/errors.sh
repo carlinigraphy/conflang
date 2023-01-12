@@ -47,6 +47,7 @@ declare -gA ERROR_CODE=(
    [index_error]='23,Name Error'
    [name_collision]='24,Name Error'
    [missing_var]='25,Name Error'
+   [circular_reference]='26,Name Error'
 
    # Misc. errors
    [idiot_programmer]='255,Idiot Programmer Error'
@@ -358,16 +359,17 @@ function type:to_str {
 
 
 function raise_type_error {
-   local -n error_r="$ERROR"
-
    local text="$1"
    local t1="$2"
    local t2="$3"
 
    unset TYPE_AS_STR ; type:to_str "$t1" ; t1_str="$TYPE_AS_STR"
    unset TYPE_AS_STR ; type:to_str "$t2" ; t2_str="$TYPE_AS_STR"
-
    printf -v msg '%s: %s != %s'  "$text"  "$t1_str"  "$t2_str"
+   # Example:
+   # "Type Error(e19): expression type does not match declared type: int != str"
+
+   local -n error_r="$ERROR"
    error_r[msg]="$msg"
 }
 
@@ -401,6 +403,11 @@ function raise_name_collision {
 function raise_missing_var {
    local -n error_r="$ERROR"
    error_r[msg]="[${1}] undefined"
+}
+
+function raise_circular_reference {
+   local -n error_r="$ERROR"
+   error_r[msg]="circular reference"
 }
 
 #───────────────────────────────( misc. errors)───────────────────────────────

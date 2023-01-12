@@ -14,9 +14,9 @@
 function walk:compiler {
    walk:skelly "$1"
 
-   for ast_node in "${ORDERED_DEPS[@]}" ; do
-      local -n dst="${EXPR_MAP[$ast_node]}"
-      walk:evaluate "$ast_node"
+   for node in "${ORDERED_DEPS[@]}" ; do
+      local -n dst="${EXPR_MAP[$node]}"
+      walk:evaluate "$node"
       dst="$DATA"
    done
 
@@ -287,42 +287,21 @@ function evaluate_path {
 function evaluate_env_var {
    local -n node_r="$NODE"
    local ident="${node_r[value]}"
-
-   if [[ ! "${SNAPSHOT[$ident]+_}" ]] ; then
-      raise missing_env_var "$ident"
-   fi
-
    declare -g DATA="${SNAPSHOT[$ident]}"
 }
 
 
 function evaluate_identifier {
-   # Pull identifier's name out of the AST node.
    local -n node_r="$NODE"
    local name="${node_r[value]}"
 
-   # Look up the AST node referred to by this identifier. Given:
-   #
-   #> a: 1;
-   #> b: a;
-   #
-   # This function would be called on line 2 for the reference to `a`.
-   #
    symtab:from "$NODE"
    symtab:get "$name"
-   local -n symbol_r="$SYMBOL"
-   local ast_node="${symbol_r[node]}"
 
-   # Resolve the reference in the EXPR_MAP. Given:
-   #
-   #> EXPR_MAP=(
-   #>    [NODE_1]="DATA_1"
-   #> )
-   #> DATA_1="1"
-   #
-   # Resolves `a` -> DATA_1 -> "1".
-   #
-   local -n data_r="${EXPR_MAP[$ast_node]}"
+   local -n symbol_r="$SYMBOL"
+   local target="${symbol_r[node]}"
+
+   local -n data_r="${EXPR_MAP[$target]}"
    declare -g DATA="$data_r"
 }
 
