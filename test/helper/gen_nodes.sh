@@ -4,9 +4,9 @@
 # get that output more easily.
 
 declare -g  PROGDIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" ; pwd )
-declare -g  LIBDIR="${PROGDIR}"/../../lib
+declare -g  LIBDIR="${PROGDIR}"/../../src
 
-source "${LIBDIR}"/../bin/confc
+source "${LIBDIR}"/main
 source "${LIBDIR}"/files.sh
 source "${LIBDIR}"/errors.sh
 source "${LIBDIR}"/lexer.sh
