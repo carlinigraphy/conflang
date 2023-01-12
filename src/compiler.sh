@@ -50,7 +50,22 @@ declare -gA IS_SECTION=()
 declare -gA EXPR_MAP=()
 # Mapping from NODE_$n -> _SKELLY_$n
 
-function mk_compile_dict {
+
+# @description
+#  Bit of ergonomics. Wraps `_data_new_dict()` and `_data_new_list()`.
+#
+# @see   _data_new_dict
+# @see   _data_new_list
+# @arg   $1    :str     [ "dict", "list" ]
+function data:new { _data_new_"$1"; }
+
+
+# @description
+#  While these are sorta a `data` node, they're part of the "skeleton". Thus
+#  they create a `SKELLY` node. Called via `data:new 'dict'`.
+#
+# @see   data:new
+function _data_new_dict {
    (( ++SKELLY_NUM ))
    local skelly="_SKELLY_${SKELLY_NUM}"
    declare -gA "$skelly"
@@ -62,7 +77,7 @@ function mk_compile_dict {
 }
 
 
-function mk_skelly {
+function skelly:new {
    (( ++SKELLY_NUM ))
    local skelly="_SKELLY_${SKELLY_NUM}"
    declare -g "$skelly"=''
@@ -100,11 +115,11 @@ function skelly_decl_section {
    # In which  _SKELLY_1 :: middle_skelly
    #           _SKELLY_2 :: dict_skelly
    #
-   mk_skelly                                 #< _SKELLY_1
+   skelly:new                                 #< _SKELLY_1
    local middle_skelly="$SKELLY"
    local -n middle_skelly_r="$middle_skelly"
 
-   mk_compile_dict                           #< _SKELLY_2
+   data:new 'dict'                           #< _SKELLY_2
    local dict_skelly="$SKELLY"
    local -n dict_skelly_r="$dict_skelly"
 
@@ -133,7 +148,7 @@ function skelly_decl_section {
 function skelly_decl_variable {
    # Create skeleton node to be inserted into the parent section, and add
    # mapping from the AST node to the output skeleton node.
-   mk_skelly
+   skelly:new
    EXPR_MAP["$NODE"]="$SKELLY"
 }
 
@@ -142,8 +157,11 @@ function skelly_decl_variable {
 declare -g  DATA=
 declare -gi DATA_NUM=0
 
-
-function mk_compile_array {
+# @description
+#  Called via `data:new 'list'`.
+#
+# @see   data:new
+function _data_new_list {
    (( ++DATA_NUM ))
    local data="_DATA_${DATA_NUM}"
 
@@ -165,8 +183,8 @@ function walk:evaluate {
 function evaluate_decl_section {
    local -n node_r="$NODE"
    local -n items_r="${node_r[items]}"
-   for ast_node in "${items_r[@]}"; do
-      walk:evaluate "$ast_node"
+   for node in "${items_r[@]}"; do
+      walk:evaluate "$node"
    done
 }
 
@@ -227,20 +245,20 @@ function evaluate_unary {
 }
 
 
-function evaluate_array {
+function evaluate_list {
    local -n node_r="$NODE"
    local -n items_r="${node_r[items]}"
 
-   mk_compile_array
-   local array="$DATA"
-   local -n array_r="$DATA"
+   data:new 'list'
+   local list="$DATA"
+   local -n list_r="$DATA"
 
-   for ast_node in "${items_r[@]}"; do
-      walk:evaluate "$ast_node"
-      array_r+=( "$DATA" )
+   for node in "${items_r[@]}"; do
+      walk:evaluate "$node"
+      list_r+=( "$DATA" )
    done
 
-   declare -g DATA="$array"
+   declare -g DATA="$list"
 }
 
 
