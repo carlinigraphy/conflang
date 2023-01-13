@@ -166,29 +166,12 @@ function main {
    file:new ; file:resolve "$INPUT"  "$PWD"
    #--^ Adds initial file to IMPORTS[]
 
-   # TODO: I'm not 100% on the global symbol table being attached to each of
-   # the files. Need to make sure that works with imports. Shouldn't need to
-   # search through the lhs to reach the global table. Something like:
-   #
-   #                _file1.conf_       _file2.conf_
-   #                S1 {               S3 {
-   #                  S2 { a; }          S4 { b; }
-   #                }                  }
-   #
-   #               | GLOBALS |         | GLOBALS |
-   #               | S1      |   <==   | S3      |
-   #               | S2      |         | S4      |
-   #
-   # Top of each file's symbol table stack must always be the globals. Unless
-   # we have a single globals table that's temporarily attached to the current
-   # file during semantic analysis. Afterwards the global table is prepended to
-   # the result.
-
    for (( idx = 0 ; idx < ${#IMPORTS[@]} ; ++idx )) ; do
+      # Every file's parent symtab should be the globals.
+      declare -g SYMTAB="$globals"
+
       local path="${IMPORTS[$idx]}"
       local file="${FILES[$path]}"
-      local -n file_r="$file"
-
       file:parse "$file"
 
       local -n ast_r="$NODE"
@@ -217,19 +200,15 @@ function main {
       done
    done
 
-   ## TODO: re-enable fold & merge
-   ## Reduces all the IMPORTS[] to a single {Symtab,AST}.
-   #fold ; local ast="$NODE"
+   # Reduces all the IMPORTS[] to a single {Symtab,AST}.
+   fold ; local ast="$NODE"
 
-   local -n node_r="$NODE"
-   local container="${node_r[container]}"
-
-   walk:flatten "$container"
+   walk:flatten "$ast"
    dependency_to_map
    dependency_sort
 
    for node in "${ORDERED_DEPS[@]}" ; do
-      walk:semantics "$node"
+      walk:semantics "$ast"
    done
 
    # TODO: swap this to $ast after folding works.
@@ -265,8 +244,8 @@ source "${PROGDIR}"/parser.sh
 # shellcheck source=./src/symbols.sh
 source "${PROGDIR}"/symbols.sh
 
-# shellcheck source=./src/merge.sh
-source "${PROGDIR}"/merge.sh
+# shellcheck source=./src/fold.sh
+source "${PROGDIR}"/fold.sh
 
 # shellcheck source=./src/semantics.sh
 source "${PROGDIR}"/semantics.sh

@@ -1,6 +1,6 @@
 #!/bin/bash
 #===============================================================================
-# @section                        Merge trees
+# @section                         Fold trees
 # @description
 #  Functions for merging a right hand side (RHS) {AST,Symtab} tuple into the
 #  left hand side (LHS) tuple.
@@ -42,7 +42,7 @@ function fold {
 # @description
 #  Merges two files by the rules below:
 #
-#  - Expressions maybe overwritten
+#  - Expressions may be overwritten
 #  - Types may be overwritten with equal or greater specificity
 #    - (good): `arr @list;`  ->  `arr @list[str];`
 #    - (bad): `arr @list[str];`  ->  `arr @list[int];`
@@ -267,13 +267,6 @@ function merge:type {
 
    lhs_sym_r[type]="${rhs_sym_r[type]}"
 }
-
-
-# TODO(CURRENT):
-# It seems built-ins are being created as a type(type(str)), raerpb type(str).
-# Need to investigate where/why. I'm also starting to be a little less fond of
-# using an array, instead of a linked list. Linked lists actually made some
-# parts of this easier.
 
 
 # merge:variable()

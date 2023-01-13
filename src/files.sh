@@ -1,11 +1,11 @@
-#!/bin/bash
+#node!/bin/bash
 #===============================================================================
 # @section                      File operations
 #-------------------------------------------------------------------------------
 
 # file:new()
 # @description
-#  Creates new object representing "files".
+#  Creates new object representing a file.
 #
 # @set   FILE
 # @noargs
@@ -23,7 +23,7 @@ function file:new {
    file_r['path']=''             #< absolute path to file
    file_r['symtab']=''           #< root symbol table for file
    file_r['container']=''        #< .container node of AST
-   file_r['lines']="$lines"
+   file_r['lines']="$lines"      #< pointer to array of file lines
 }
 
 

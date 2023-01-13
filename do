@@ -28,7 +28,7 @@ exit "$1"
 
 declare -a FILES=(
    "${PROGDIR}"/src/main
-   "${PROGDIR}"/src/{lexer,parser,symbols,merge,files}.sh
+   "${PROGDIR}"/src/{lexer,parser,symbols,fold,files}.sh
    "${PROGDIR}"/src/{semantics,compiler,errors}.sh
 )
 
