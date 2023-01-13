@@ -396,7 +396,6 @@ function raise_index_error {
 
 function raise_name_collision {
    local -n error_r="$ERROR"
-   declare -p $ERROR
    error_r[msg]="[${1}] already defined in this scope"  
 }
 

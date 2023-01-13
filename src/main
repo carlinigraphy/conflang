@@ -235,7 +235,7 @@ function main {
    # TODO: swap this to $ast after folding works.
    walk:compiler "$container"
 
-   #declare -f conf > "$OUTPUT"
+   declare -f conf > "$OUTPUT"
    [[ ${!_SKELLY_*} ]] && declare -p ${!_SKELLY_*} > "$OUTPUT"  ||:
    [[ ${!_DATA_*}   ]] && declare -p ${!_DATA_*}   > "$OUTPUT"  ||:
 }
