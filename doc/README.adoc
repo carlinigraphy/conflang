@@ -5,40 +5,38 @@
 :pygments-style:           algol_nu
 :pygments-linenums-mode:   table
 
-<DRAFT>
-
-Configuration language, featuring strong typing and a small but robust feature set.
+Strongly typed configuration language, featuring a small but robust feature set.
 
 Written in Bash, compiles to Bash.
 
 
 == What works
-Almost nothing.
-Been doing a lot of work to clean up symbol tables, the type system, and `import` statements.
-That broke everything.
-Oops.
-
-* [ ] Parsing file(s)
+* [x] Parsing
+* [x] Typechecking
+* [x] Evaluation
 * [ ] Importing files
-* [ ] Typechecking
-* [ ] Evaluates to native bash
-* [ ] VM & post-compilation validation
+* [ ] VM, FFI, post-compilation validation
 
-Around a503e1b917aa or so I broke a good amount of core functionality while fixing symbol tables.
-Gonna be worse before it gets better.
 
-== Why it do
-Learning.
+== What it is
+Aiming to solve common problems with shell configuration files.
 
-Around 2020 I began learning to write a "real" programming language.
-Turns out it's hard.
-I found myself consistently hitting conceptual sticking points.
-Approaching these in the context of something I already understand very well (bash) is easier.
+`conflang` is strongly typed.
+Worry less if users pass in invalid data.
+Defining clear types removes both a category of errors, and a fair amount of error handling code.
 
-Many of my recent projects (`mkconf`, `conf`, `shql`) were building towards this goal.
+`conflang` is written in bash.
+Dependencies are only `realpath` and `bash` 4+.
+No need to install Python3, or other heavy depdencies, just to parse a config file.
 
-I do not intend for anyone to actually use `conflang`, just as I didn't `shql`.
-Journey over destination and all that.
+`conflang` compiles to bash.
+Run it, source the output, everything you need is included.
+
+`conflang` is fast.
+(The times below are recorded on my very modest laptop.)
+Compiling a reasonably sized file takes ~0.100ms.
+Though there's no need to re-compile every time.
+The query function can access an element nested 10 level deep 12,000 times per second.
 
 
 == How it look
@@ -61,27 +59,21 @@ full_name @list[str]: [
 ];
 ----
 
-.Typedefs
-----
-typedef tupl[str, str, int] as Person;
-
-me @Person: {"Marcus", "Aurelius", 30};
-----
-
 .Types
 ----
-# @str     Surrounded with double-quotes:  "this is a string"
-# @path    Surrounded with single-quotes:  './relative', '~/relative', '/absolute'
-# @int     Negative & positive integers:   -1, 0, 1, ...
-# @bool    Boolean values:                 true, false
-# @list    Lists, any length, same type:   [1, 2, 3], ["one", "two", "three"]
-# @tupl    Tuples, set length, any type:   {"Marcus", "Aurelius", 30}
+@str     Surrounded with double-quotes:  "this is a string"
+@path    Surrounded with single-quotes:  './relative', '~/absolute', '/absolute'
+@int     Negative & positive integers:   -1, 0, 1, ...
+@bool    Boolean values:                 true, false
+@list    Any length, of same type:       [1, 2, 3], ["one", "two", "three"]
+@rec     Set length, of any type:        {"Marcus", "Aurelius", 30}
 ----
 
-.Environment variables
+.Typedefs
 ----
-homedir   (path): $HOME;
-configdir (path): $XDG_CONFIG_HOME;
+typedef rec[str, str, int] as Person;
+
+me @Person: {"Marcus", "Aurelius", 30};
 ----
 
 .Variables
@@ -97,12 +89,10 @@ bad   : red;
 
 .Sections
 ----
-key: "val";
-key2: key;
+key  : "val";
+key2 : key;
 
 Section {
-   key: "val";
-
    key2: key;
    #     ^-- relative reference,
    #         shadows global `key2`
@@ -114,7 +104,11 @@ Section {
 
 .Others
 ----
-# String interpolation (f-strings).
+# Environment variables.
+homedir   : $HOME;
+configdir : $XDG_CONFIG_HOME;
+
+# String interpolation.
 project_dir @path: f'{$HOME}/projects/';
 sub_dir     @path: f'{project_dir}/sub/';
 
@@ -143,3 +137,67 @@ window {
    }
 }
 ----
+
+
+== What I hope to add
+=== Validation
+Declare requirements after any expression.
+These may be in the form of tests, or directives.
+
+----
+config @path: '~/.config/hre-utils/conflang' {
+   is_directory.
+}
+----
+
+`is_directory` here is a directive.
+It tests if the directory exist.
+If not, runs `mkdir -p` and returns the exit status.
+
+----
+config @path: '~/.config/hre-utils/conflang/config' {
+   is_file?
+   exists?
+}
+----
+
+`is_file` and `exists` are tests.
+If their conditions fail, an error is raised.
+
+Some useful things I can imagine:
+
+. File/directory operations
+  .. `exists`
+  .. `is_file`, `is_dir`, `is_link`
+  .. `can_read`, `can_write`, `can_execute`
+. String operations
+  .. `non_empty`
+  .. `option  [ <opt1>..<optN> ]`
+      ... Throws error if text is not present in list of opts
+. List operations
+  .. `non_empty`
+  .. `each  <function>  <args>`
+      ... Applies a function to each element of the list
+
+=== Virtual machine
+Thinking of writing a simple VM to run the validation steps.
+Compile things to a simple set of common instructions.
+
+=== FFI
+Write functions in bash that can be used as validation tests/directives.
+Hopefully will have a core standard library with things like `is_dir`, `is_file`, `exists`.
+Anything additional should be extensible without undue burden.
+
+
+== Why write this
+Learning.
+
+Around 2020 I began learning to write a "real" programming language.
+Turns out it's hard.
+I found myself consistently hitting conceptual sticking points.
+Approaching these in the context of something I already understand very well (bash) is easier.
+
+Many of my recent projects (`mkconf`, `conf`, `shql`) were building towards this goal.
+
+I do not intend for anyone to actually use `conflang`, just as I didn't `shql`.
+Journey over destination and all that.
