@@ -12,36 +12,81 @@
    - [x] symtab   phase
    - [x] flatten  phase
    - [x] semantic phase
-   - [ ] compiler phase
+   - [x] compiler phase
    - [ ] merge    phase
 
 
-2023-01-11
-   Need to throw an error on circular references. Something like this:
+2023-01-12
+   Working on merging. Thinkies...
 
-   function depth (items, level, visited, initial)
-      if (not items or #items == 0) then
-         return level
-      end
-      level = level + 1
+   * Need to iterate by symbol table
+   * Expressions may be overwritten
+   *
 
-      for _,node in ipairs(items) do
-         if (visited[node]) then
-            print("origin: " .. node .. ", anchor: " .. initial)
-            os.exit(1)
-         end
+   Merging...
+   Expressions    Expressions (if present) are always overwritten. An empty
+                  rhs will not overwrite the lhs.
 
-         visited[node] = true
-         depth(unordered[node], level, visited, initial)
-      end
-   end
+   Typedefs       A Type(TYPE) in the symbol table must match exactly if
+                  declared, and may never be overwritten. It may only serve
+                  as "documentation" in imported files.
 
-   unordered = {
-      a = { 'b' },
-      b = { 'c' },
-      c = { 'd', 'c' },
-   }
+   Types          Shares the same rules as typedefs.
 
-   for node,items in pairs(unordered) do
-      depth(items, 0, { node=true }, node)
-   end
+   Sections       Merge expressions, copy over overflow, descend into its symtab
+                  and iterate anew.
+
+
+   I would like to potentially allow for the idea of "equal to, or greater"
+   specificity for types, but the holdup is records.
+
+   Not sure how to express a record of greater specificity.
+
+   I think it's really
+   * Disallow additional `.next`
+   * Allow additional `.subtype`.
+
+   Two records match if they have the same number of parameters, and any "open"
+   Type(ANY) slots are filled.
+
+   INVALID: rec[str, str] -> rec[str, str, int]
+   INVALID: rec[str, str] -> rec[str, int]
+   VALID:   rec[list]     -> rec[list[str]]
+
+   May be able to use the same `type:eq` function. Need to look at it again.
+   See if there's a difference in the semantic use, vs this one here. Feels
+   the same tbh. Though it also allows for a rhs of None. Don't want to
+   overwrite `none` into the lhs's type.
+
+
+   The "import all overflow" can be a problem if...
+
+   a.conf
+   ---
+   import 'b.conf';
+   import 'c.conf';
+   full_name @rec[str, str];
+   ---
+
+   b.conf
+   ---
+   full_name: ["John", "Doe"];
+   random_key @int: 7;
+   ---
+
+   c.conf
+   ---
+   full_name: ["Marcus", "Aurelius"];
+   random_key @str: "";
+   ---
+
+   Both 'b.conf' and 'c.conf' are referring to the keys defined in 'a.conf'.
+   They happen to create the same intermediate key, `random_key`, but define it
+   differently. A type error is thrown in 'c.conf', which is very confusing for
+   the user.
+
+   For the future:
+   Require `import` statements have an `as <identifier>`. The compiled result
+   is entered into the symtab as a section. Or maybe do a `from ... import ...`.
+   I dunno yet. Either way feels like it's a little more explicit, and has the
+   potential to avoid a classification of problems.

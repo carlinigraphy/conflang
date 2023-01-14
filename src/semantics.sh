@@ -442,7 +442,7 @@ function semantics_list {
    for cur_node in "${items_r[@]}" ; do
       walk:semantics "$cur_node"
 
-      if [[ $prev_type ]] && ! type:strict_eq "$prev_type" "$TYPE" ; then
+      if [[ $prev_type ]] && ! type:eq "$prev_type" "$TYPE" --strict ; then
          local -n current_r="$cur_node"
          local -n previous_r="$prev_node"
          e=( --anchor "${previous_r[location]}"

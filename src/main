@@ -203,16 +203,19 @@ function main {
    # Reduces all the IMPORTS[] to a single {Symtab,AST}.
    fold ; local ast="$NODE"
 
+   ## When testing without the above `fold`, need this:
+   #local -n program_r="$NODE"
+   #local ast="${program_r[container]}"
+
    walk:flatten "$ast"
    dependency_to_map
    dependency_sort
 
    for node in "${ORDERED_DEPS[@]}" ; do
-      walk:semantics "$ast"
+      walk:semantics "$node"
    done
 
-   # TODO: swap this to $ast after folding works.
-   walk:compiler "$container"
+   walk:compiler "$ast"
 
    declare -f conf > "$OUTPUT"
    [[ ${!_SKELLY_*} ]] && declare -p ${!_SKELLY_*} > "$OUTPUT"  ||:

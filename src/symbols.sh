@@ -225,13 +225,16 @@ function type:copy {
 
 function type:eq {
    local t1="$1" t2="$2"
+   local strict="$3"
 
-   #0) Neither type exists. All good.
+   echo "==> STRICT MODE( $3 )"
+
+   # Neither type exists. All good.
    if [[ ! $t1 && ! $t2 ]] ; then
       return 0
    fi
 
-   #1) Either RHS or LHS did not exist. Not good.
+   # Either RHS or LHS did not exist. Not good.
    if ! [[ $t1 && $t2 ]] ; then
       return 1
    fi
@@ -239,63 +242,27 @@ function type:eq {
    local -n t1_r="$t1"
    local -n t2_r="$t2"
 
-   #2) Lhs 'ANY', always good.
-   if [[ ${t1_r[kind]} == ANY ]] ; then
-      return 0
+   # Lhs 'ANY' or rhs 'NONE' good if not a strict equality comparison.
+   if [[ ! $strict ]] ; then
+      if [[ ${t1_r[kind]} == ANY  ]] ||
+         [[ ${t2_r[kind]} == NONE ]]
+      then
+         return 0
+      fi
    fi
 
-   #3) Rhs 'NONE', always good.
-   if [[ ${t2_r[kind]} == NONE ]] ; then
-      return 0
-   fi
-
-   #4) Kinds must match.
+   # Kinds must match.
    if [[ ! ${t1_r[kind]} == "${t2_r[kind]}" ]] ; then
       return 1
    fi
 
-   #5) Nexts must match.
+   # Nexts must match.
    if ! type:eq "${t1_r[next]}" "${t2_r[next]}" ; then
       return 1
    fi
 
-   #6) Subtypes must match.
+   # Subtypes must match.
    if ! type:eq "${t1_r[subtype]}" "${t2_r[subtype]}" ; then
-      return 1
-   fi
-
-   return 0
-}
-
-
-function type:strict_eq {
-   local t1="$1" t2="$2"
-
-   #0) Neither type exists. All good.
-   if [[ ! $t1 && ! $t2 ]] ; then
-      return 0
-   fi
-
-   #1) Either RHS or LHS did not exist. Not good.
-   if ! [[ $t1 && $t2 ]] ; then
-      return 1
-   fi
-
-   local -n t1_r="$t1"
-   local -n t2_r="$t2"
-
-   #2) Kinds must match.
-   if [[ ! ${t1_r[kind]} == "${t2_r[kind]}" ]] ; then
-      return 1
-   fi
-
-   #3) Nexts must match.
-   if ! type:strict_eq "${t1_r[next]}" "${t2_r[next]}" ; then
-      return 1
-   fi
-
-   #4) Subtypes must match.
-   if ! type:strict_eq "${t1_r[subtype]}" "${t2_r[subtype]}" ; then
       return 1
    fi
 
