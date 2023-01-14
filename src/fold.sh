@@ -107,6 +107,11 @@ function merge {
 
       lhs_items_r+=( "$rhs_node" )
       lhs_symtab_r["$symbol_name"]="$rhs_sym"
+
+      # Walk the rhs node's expression. Ensures updating `.symtab` in any
+      # identifiers.
+      declare -g SYMTAB="$lhs_symtab"
+      walk:merge "$rhs_node"
    done
 }
 
@@ -238,8 +243,27 @@ function walk:merge {
 
 function merge_decl_variable {
    local -n node_r="$NODE"
+
+   if [[ ${node_r[type]} ]] ; then
+      walk:merge "${node_r[type]}"
+   fi
+
    if [[ ${node_r[expr]} ]] ; then
       walk:merge "${node_r[expr]}"
+   fi
+}
+
+
+function merge_type {
+   local -n node_r="$NODE"
+   walk:merge "${node_r[kind]}"
+
+   if [[ "${node_r[subtype]}" ]] ; then
+      walk:merge "${node_r[subtype]}"
+   fi
+
+   if [[ "${node_r[next]}" ]] ; then
+      walk:merge "${node_r[next]}"
    fi
 }
 

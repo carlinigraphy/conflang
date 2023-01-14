@@ -227,8 +227,6 @@ function type:eq {
    local t1="$1" t2="$2"
    local strict="$3"
 
-   echo "==> STRICT MODE( $3 )"
-
    # Neither type exists. All good.
    if [[ ! $t1 && ! $t2 ]] ; then
       return 0
