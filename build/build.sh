@@ -40,6 +40,7 @@ while (( $# )) ; do
       -t | --topic)
          shift
          topics+="${topics:=,}${1}"
+         shift
          ;;
 
       -[^-]*)

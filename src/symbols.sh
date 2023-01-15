@@ -52,6 +52,7 @@ function symtab:init_globals {
    )
 
    # Create symbols for primitive types.
+   local short
    for short in "${!primitive[@]}" ; do
       local long="${primitive[$short]}"
       type:new_meta "$short"  "$long"
@@ -194,6 +195,16 @@ function type:new_meta {
    symbol_r['type']="$metatype"
    symbol_r['name']="$name"
 
+   # Anything with >1 slots takes an implicit `ANY` subtype. May be overwritten
+   # by an explicit declaration.
+   if (( slots )) ; then
+      type:new
+      local subtype="$TYPE"
+      local -n subtype_r="$TYPE"
+      subtype_r['kind']='ANY'
+      type_r['subtype']="$subtype"
+   fi
+
    declare -g "_${kind}"="$type"
    declare -g TYPE="$metatype"
 }
@@ -320,8 +331,9 @@ function symtab_program {
 function symtab_header {
    local -n node_r="$NODE"
    local -n items_r="${node_r[items]}"
-   for ast_node in "${items_r[@]}" ; do
-      walk:symtab "$ast_node"
+   local node
+   for node in "${items_r[@]}" ; do
+      walk:symtab "$node"
    done
 }
 
@@ -392,8 +404,9 @@ function symtab_decl_section {
    node_r['symtab']="$SYMTAB"
 
    local -n items_r="${node_r[items]}"
-   for ast_node in "${items_r[@]}"; do
-      walk:symtab "$ast_node"
+   local node
+   for node in "${items_r[@]}"; do
+      walk:symtab "$node"
    done
 
    declare -g SYMTAB="$symtab"
@@ -579,8 +592,19 @@ function symtab_unary {
 function symtab_list {
    local -n node_r="$NODE"
    local -n items_r="${node_r[items]}"
-   for ast_node in "${items_r[@]}" ; do
-      walk:symtab "$ast_node"
+   local node
+   for node in "${items_r[@]}" ; do
+      walk:symtab "$node"
+   done
+}
+
+
+function symtab_record {
+   local -n node_r="$NODE"
+   local -n items_r="${node_r[items]}"
+   local node
+   for node in "${items_r[@]}" ; do
+      walk:symtab "$node"
    done
 }
 

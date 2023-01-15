@@ -280,12 +280,10 @@ function raise_no_input {
    error_r[msg]='no input file'
 }
 
-
 function raise_missing_file {
    local -n error_r="$ERROR"
    error_r[msg]="missing or unreadable source file [${1##*/}]"
 }
-
 
 function raise_circular_import {
    local -n error_r="$ERROR"
@@ -297,7 +295,6 @@ function raise_syntax_error {
    local -n error_r="$ERROR"
    error_r[msg]="${1}"
 }
-
 
 function raise_invalid_interpolation_char {
    local -n error_r="$ERROR"
@@ -356,7 +353,6 @@ function type:to_str {
       type:to_str "${type_r[next]}" 
    fi
 }
-
 
 function raise_type_error {
    local text="$1"

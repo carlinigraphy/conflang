@@ -262,6 +262,23 @@ function evaluate_list {
 }
 
 
+function evaluate_record {
+   local -n node_r="$NODE"
+   local -n items_r="${node_r[items]}"
+
+   data:new 'list'
+   local list="$DATA"
+   local -n list_r="$DATA"
+
+   for node in "${items_r[@]}"; do
+      walk:evaluate "$node"
+      list_r+=( "$DATA" )
+   done
+
+   declare -g DATA="$list"
+}
+
+
 function evaluate_boolean {
    local -n node_r="$NODE"
    declare -g DATA="${node_r[value]}"

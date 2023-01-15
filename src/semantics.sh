@@ -59,6 +59,7 @@ function walk:flatten {
 function flatten_decl_section {
    local -n node_r="$NODE"
    local -n items_r="${node_r[items]}"
+   local node
    for node in "${items_r[@]}"; do
       walk:flatten "$node"
    done
@@ -134,8 +135,19 @@ function flatten_unary {
 function flatten_list {
    local -n node_r="$NODE"
    local -n items_r="${node_r[items]}"
-   for ast_node in "${items_r[@]}"; do
-      walk:flatten "$ast_node"
+   local node
+   for node in "${items_r[@]}"; do
+      walk:flatten "$node"
+   done
+}
+
+
+function flatten_record {
+   local -n node_r="$NODE"
+   local -n items_r="${node_r[items]}"
+   local node
+   for node in "${items_r[@]}"; do
+      walk:flatten "$node"
    done
 }
 
@@ -148,6 +160,16 @@ function flatten_identifier {
 
    symtab:from "$NODE"
    if ! symtab:get "$name" ; then
+      # TODO: what if we actually didn't throw an error here, but just return.
+      # It will still be caught by the semantics phase, but it allows checking
+      # if variables exist *after* merging. Can then reference values that are
+      # known to have been declared in the parent. Mostly types. Is this a bad
+      # idea?
+      #
+      # Maybe it's a bad idea, and instead need to make a specific "exports"
+      # table from higher level things to pass them down the chain. And at that
+      # point it kinda makes sense to have specific "imports" from files down
+      # the chain as well. Oof. Looking like a pretty big lift... FOR LATER!
       e=( --anchor "${node_r[location]}"
           --caught "${node_r[location]}"
           "$name"
@@ -204,9 +226,8 @@ declare -gA DEPTH_VISITED=()
 
 function dependency_to_map {
    local node items
-
    for node in "${!UNORDERED_DEPS[@]}" ; do
-      local items="${UNORDERED_DEPS[$node]}" 
+      items="${UNORDERED_DEPS[$node]}" 
 
       DEPTH_VISITED=()
       DEPTH_VISITED[$node]='yes'
@@ -229,9 +250,8 @@ function dependency_depth {
 
    (( ++level ))
 
-   local n node
    local -a sub_levels=()
-
+   local node
    for node in "${items_r[@]}" ; do
       if [[ ${DEPTH_VISITED[$node]} ]] ; then
          local -n node_r="$node"
@@ -246,6 +266,7 @@ function dependency_depth {
    done
 
    local -i max="${sub_levels[0]}"
+   local n
    for n in "${sub_levels[@]}" ; do
       (( max = (n > max)? n : max ))
    done
@@ -461,6 +482,58 @@ function semantics_list {
 }
 
 
+# @description
+#  I don't know if this is more hacky than I'd like. What it do:
+#
+#  Given the base case...
+#        rec
+#          `-- none
+#
+#  ...and the standard case...
+#        rec
+#          `-- type1 ->>- type2 ->>- typeN
+#
+#  ...the chain of types are connected to each other's `.next` parameter, and
+#  tacked onto the parent `rec` type's `.subtype`.
+#
+#  Problem arises from how to set the first `$TYPE` to the `rec`'s `.subtype`,
+#  and the subsequent ones to *it's* `.next`.
+#
+#  Temporarily just attaching all of them like so:
+#        rec ->>- type1 ->>- type2 ->>- typeN
+#
+#  Then after iterating the subtypes, cut `rec.next`, paste onto `rec.subtype`.
+#
+function semantics_record {
+   local -n node_r="$NODE"
+   local -n items_r="${node_r[items]}"
+
+   # shellcheck disable=SC2154
+   type:copy "$_RECORD"
+   local type="$TYPE"
+   local -n type_r="$TYPE"
+
+   local node
+   for node in "${items_r[@]}" ; do
+      walk:semantics "$node"
+      type_r['next']="$TYPE"
+      local -n type_r="$TYPE"
+   done
+
+   local -n type_r="$type"
+   if [[ ${type_r[next]} ]] ; then
+      declare -g TYPE="${type_r[next]}"
+   else
+      type:copy "$_NONE"
+   fi
+
+   type_r['subtype']="$TYPE"
+   unset type_r[next]
+
+   declare -g TYPE="$type"
+}
+
+
 function semantics_identifier {
    local -n node_r="$NODE"
 
@@ -489,13 +562,13 @@ function semantics_env_var {
 }
 
 # shellcheck disable=SC2154
-function semantics_path    { declare -g TYPE="$_PATH"    ;}
+function semantics_path    { type:copy "$_PATH"    ;}
 
 # shellcheck disable=SC2154
-function semantics_boolean { declare -g TYPE="$_BOOLEAN" ;}
+function semantics_boolean { type:copy "$_BOOLEAN" ;}
 
 # shellcheck disable=SC2154
-function semantics_integer { declare -g TYPE="$_INTEGER" ;}
+function semantics_integer { type:copy "$_INTEGER" ;}
 
 # shellcheck disable=SC2154
-function semantics_string  { declare -g TYPE="$_STRING"  ;}
+function semantics_string  { type:copy "$_STRING"  ;}

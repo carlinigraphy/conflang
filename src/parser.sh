@@ -192,6 +192,29 @@ function _ast_new_list {
 }
 
 
+function _ast_new_record {
+   (( ++_NODE_NUM ))
+   local node="NODE_${_NODE_NUM}"
+   declare -gA "$node"
+   declare -g NODE="$node"
+
+   # Similar to sections, records need a .items property to hold their values.
+   (( ++_NODE_NUM ))
+   local items="NODE_${_NODE_NUM}"
+   declare -ga "$items"
+
+   # Assign .items node.
+   local -n node_r="$node"
+   node_r['items']="$items"
+
+   # Assign .location node.
+   location:new
+   node_r['location']="$LOCATION"
+
+   TYPEOF["$node"]='record'
+}
+
+
 function _ast_new_type {
    (( ++_NODE_NUM ))
    local node="NODE_${_NODE_NUM}"
@@ -916,6 +939,7 @@ declare -gA NUD=(
    [INTEGER]='parser:integer'
    [DOLLAR]='parser:env_var'
    [L_BRACKET]='parser:list'
+   [L_BRACE]='parser:record'
    [IDENTIFIER]='parser:identifier'
 )
 
@@ -1176,6 +1200,38 @@ function parser:list {
 
    local close="$TOKEN"
    parser:munch 'R_BRACKET' "list must be closed by \`]'."
+
+   location:copy "$open"   "$node"  'file'  'start_ln'  'start_col'
+   location:copy "$close"  "$node"  'file'  'end_ln'    'end_col'
+
+   declare -g ANCHOR="$anchor"
+   declare -g NODE="$node"
+}
+
+
+function parser:record {
+   # Opening `{` Token, for LOCATION information.
+   local open="$1"
+   local -n open_r="$open"
+
+   local anchor="$ANCHOR"
+   declare -g ANCHOR="${open_r[location]}"
+
+   ast:new record
+   local node="$NODE"
+   local -n node_r="$node"
+   local -n items_r="${node_r[items]}"
+
+   until parser:check 'R_BRACE' ; do
+      parser:expression
+      items_r+=( "$NODE" )
+
+      parser:check 'R_BRACE' && break
+      parser:munch 'COMMA' "record elements must be separated by \`,'"
+   done
+
+   local close="$TOKEN"
+   parser:munch 'R_BRACE' "records must be closed by \`}'."
 
    location:copy "$open"   "$node"  'file'  'start_ln'  'start_col'
    location:copy "$close"  "$node"  'file'  'end_ln'    'end_col'
