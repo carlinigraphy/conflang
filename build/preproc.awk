@@ -13,10 +13,10 @@ BEGIN {
    delete TOPIC[0]
 
    split(SUBSCRIBE, subscribed, ",")
-   for (s in subscribed) {
-      if (!s) continue
-      gsub(/\s/, "", s)
-      SUBSCRIBED_TO[subscribed[s]] = true
+   for (i in subscribed) {
+      if (!i) continue
+      sub(/(^\s*|\s*$)/, "", subscribed[i])
+      SUBSCRIBED_TO[subscribed[i]] = true
    }
 }
 
@@ -28,8 +28,8 @@ function no_topics(   i) {
 
 
 function active_topic(   t) {
-   for (t in TOPIC) {
-      if (SUBSCRIBED_TO[t]) return true
+   for (i in TOPIC) {
+      if (SUBSCRIBED_TO[i]) return true
    }
    return false
 }
@@ -69,10 +69,10 @@ match($0, /\$\{[[:alpha:]_][[:alnum:]_]*(\.[[:alpha:]_][[:alnum:]_]*)+\}/) {
    sub(/^\s*#\s*>>\s*TOPIC\s*/, "")
    split($0, topics, ",")
 
-   for (t in topics) {
-      if (!t) continue
-      gsub(/\s/, "", t)
-      TOPIC[topics[t]] = true
+   for (i in topics) {
+      if (!i) continue
+      sub(/(^\s*|\s*$)/, "", topics[i])
+      TOPIC[topics[i]] = true
    }
 
    next
@@ -83,10 +83,10 @@ match($0, /\$\{[[:alpha:]_][[:alnum:]_]*(\.[[:alpha:]_][[:alnum:]_]*)+\}/) {
    sub(/^\s*#\s*<<\s*END\s*TOPIC\s*/, "")
    split($0, topics, ",")
 
-   for (t in topics) {
-      if (!t) continue
-      gsub(/\s/, "", t)
-      delete TOPIC[topics[t]]
+   for (i in topics) {
+      if (!i) continue
+      sub(/(^\s*|\s*$)/, "", topics[i])
+      delete TOPIC[topics[i]]
    }
 
    next

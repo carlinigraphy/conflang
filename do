@@ -81,11 +81,7 @@ case "$1" in
             ;;
 
 
-   'wc')    files=(
-               "${PROGDIR}"/bin/*
-               "${PROGDIR}"/src/*
-            )
-            wc -l "${files[@]}"
+   'wc')    wc -l "${PROGDIR}"/src/*
             ;;
 
 
