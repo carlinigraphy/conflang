@@ -7,9 +7,8 @@ function setup {
 
    local SRC="${BATS_TEST_DIRNAME}/../../src"
    source "${SRC}/main"
-   source "${SRC}/files.sh"
+   source "${SRC}/locations.sh"
    source "${SRC}/lexer.sh"
-   source "${SRC}/parser.sh"
    source "${SRC}/errors.sh"
 
    export F=$( mktemp "${BATS_TEST_TMPDIR}"/XXX ) 

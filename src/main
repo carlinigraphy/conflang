@@ -235,8 +235,8 @@ declare -g PROGDIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" ; pwd )
 # shellcheck source=./src/errors.sh
 source "${PROGDIR}"/errors.sh
 
-# shellcheck source=./src/files.sh
-source "${PROGDIR}"/files.sh
+# shellcheck source=./src/locations.sh
+source "${PROGDIR}"/locations.sh
 
 # shellcheck source=./src/lexer.sh
 source "${PROGDIR}"/lexer.sh
