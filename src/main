@@ -23,8 +23,8 @@ cat <<EOF
 usage: $(basename "${BASH_SOURCE[0]}") [option] FILE
 
 options
-   -h | --help    show this message and exit
-   -o | --out     file for compiled output
+   -h | --help        show this message and exit
+   -o | --out  FILE   compiled result written to FILE
 
 Unless --out is specified, compilation result is dumped to stdout.
 

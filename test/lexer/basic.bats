@@ -5,9 +5,18 @@ function setup {
    load '/usr/lib/bats-assert/load.bash'
    load '/usr/lib/bats-support/load.bash'
 
-   export LIBDIR="${BATS_TEST_DIRNAME}/../../lib"
-   source "${LIBDIR}/lexer.sh"
-   source "${LIBDIR}/errors.sh"
+   local SRC="${BATS_TEST_DIRNAME}/../../src"
+   source "${SRC}/main"
+   source "${SRC}/files.sh"
+   source "${SRC}/lexer.sh"
+   source "${SRC}/parser.sh"
+   source "${SRC}/errors.sh"
+
+   export F=$( mktemp "${BATS_TEST_TMPDIR}"/XXX ) 
+   globals:init
+
+   file:new
+   file:resolve "$F"
 }
 
 
@@ -15,84 +24,58 @@ function setup {
    : 'While not testing every invalid token, a selection of invalid characters
       should all produce an `ERROR` token, with their value preserved.'
 
-   # All examples here are easy enough to read from stdin, rather than needing
-   # a dedicated file.
-   declare -a FILES=( /dev/stdin )
+   for char in '%'  '^'  '*' ; do
+      echo "$char" > "$F"
+      lexer:init
+      run lexer:scan
 
-   lexer:init
-   lexer:scan <<< '& ^ *'
-   # This may only be done with some form of redirection, a pipeline does not
-   # work. I think it's something to do with how bats is running the tests.
-
-   declare -A EXP_0=( [type]="ERROR"  [value]="&" )
-   declare -A EXP_1=( [type]="ERROR"  [value]="^" )
-   declare -A EXP_2=( [type]="ERROR"  [value]="*" )
-   declare -A EXP_3=( [type]="EOF"    [value]=""  )
-
-   # There must actually be tokens generated. If we only iterate the array of
-   # TOKENS (assumingly populated and included from the scanner), we run the
-   # risk of iterating a 0-member array.
-   assert [ ${#TOKENS[@]} -gt 0 ]
-
-   for idx in "${!TOKENS[@]}" ; do
-      local -- tname="${TOKENS[$idx]}"
-      local -n token="$tname"
-
-      local -- expected="EXP_${idx}"
-      local -n etoken="$expected"
-
-      assert_equal "${token[type]}"   "${etoken[type]}"
-      assert_equal "${token[value]}"  "${etoken[value]}"
+      assert_failure
+      assert_equal  "$status"  ${ERROR_CODE['syntax_error']%%,*} 
    done
 }
 
 
 @test "identify valid symbols" {
-   declare -a FILES=( /dev/stdin )
-
-   lexer:init
-   lexer:scan <<< '., ;: $% ? -> - () [] {} #Comment'
+   echo  '., ;: $ ? -> - () [] {} #Comment' > "$F"
+   lexer:init ; lexer:scan
 
    declare -A EXP_0=(  [type]="DOT"        [value]="."  )
    declare -A EXP_1=(  [type]="COMMA"      [value]=","  )
    declare -A EXP_2=(  [type]="SEMI"       [value]=";"  )
    declare -A EXP_3=(  [type]="COLON"      [value]=":"  )
    declare -A EXP_4=(  [type]="DOLLAR"     [value]="$"  )
-   declare -A EXP_5=(  [type]="PERCENT"    [value]="%"  )
-   declare -A EXP_6=(  [type]="QUESTION"   [value]="?"  )
-   declare -A EXP_7=(  [type]="ARROW"      [value]="->" )
-   declare -A EXP_8=(  [type]="MINUS"      [value]="-"  )
-   declare -A EXP_9=(  [type]="L_PAREN"    [value]="("  )
-   declare -A EXP_10=( [type]="R_PAREN"    [value]=")"  )
-   declare -A EXP_11=( [type]="L_BRACKET"  [value]="["  )
-   declare -A EXP_12=( [type]="R_BRACKET"  [value]="]"  )
-   declare -A EXP_13=( [type]="L_BRACE"    [value]="{"  )
-   declare -A EXP_14=( [type]="R_BRACE"    [value]="}"  )
-   declare -A EXP_15=( [type]="EOF"        [value]=""   )
+   declare -A EXP_5=(  [type]="QUESTION"   [value]="?"  )
+   declare -A EXP_6=(  [type]="ARROW"      [value]="->" )
+   declare -A EXP_7=(  [type]="MINUS"      [value]="-"  )
+   declare -A EXP_8=(  [type]="L_PAREN"    [value]="("  )
+   declare -A EXP_9=(  [type]="R_PAREN"    [value]=")"  )
+   declare -A EXP_10=( [type]="L_BRACKET"  [value]="["  )
+   declare -A EXP_11=( [type]="R_BRACKET"  [value]="]"  )
+   declare -A EXP_12=( [type]="L_BRACE"    [value]="{"  )
+   declare -A EXP_13=( [type]="R_BRACE"    [value]="}"  )
+   declare -A EXP_14=( [type]="EOF"        [value]=""   )
 
    assert [ ${#TOKENS[@]} -gt 0 ]
 
    for idx in "${!TOKENS[@]}" ; do
-      local -- tname="${TOKENS[$idx]}"
-      local -n token="$tname"
+      local -- token="${TOKENS[$idx]}"
+      local -n token_r="$token"
 
       local -- expected="EXP_$idx"
-      local -n etoken="$expected"
+      local -n expected_r="$expected"
 
-      assert_equal "${token[type]}"   "${etoken[type]}"
-      assert_equal "${token[value]}"  "${etoken[value]}"
+      assert_equal "${token_r[type]}"   "${expected_r[type]}"
+      assert_equal "${token_r[value]}"  "${expected_r[value]}"
    done
 }
 
 
 @test "identify valid literals" {
-   declare -a FILES=( /dev/stdin )
-   lexer:init
-
-   lexer:scan << EOF
+   cat << EOF > "$F"
       # Keywords.
-      include
-      constrain
+      import
+      as
+      typedef
       true
       false
 
@@ -110,28 +93,32 @@ function setup {
       '\''  # Path with escaped: '
 EOF
 
+   lexer:init
+   lexer:scan
+
    # Keywords.
-   declare -A EXP_0=(  [type]="INCLUDE"     [value]="include"    )
-   declare -A EXP_1=(  [type]="CONSTRAIN"   [value]="constrain"  )
-   declare -A EXP_2=(  [type]="TRUE"        [value]="true"       )
-   declare -A EXP_3=(  [type]="FALSE"       [value]="false"      )
+   declare -A EXP_0=(  [type]="IMPORT"      [value]="import"     )
+   declare -A EXP_1=(  [type]="AS"          [value]="as"         )
+   declare -A EXP_2=(  [type]="TYPEDEF"     [value]="typedef"    )
+   declare -A EXP_3=(  [type]="TRUE"        [value]="true"       )
+   declare -A EXP_4=(  [type]="FALSE"       [value]="false"      )
 
    # Integers.
-   declare -A EXP_4=(  [type]="INTEGER"     [value]="1"          )
-   declare -A EXP_5=(  [type]="INTEGER"     [value]="100"        )
-   declare -A EXP_6=(  [type]="INTEGER"     [value]="1234567890" )
+   declare -A EXP_5=(  [type]="INTEGER"     [value]="1"          )
+   declare -A EXP_6=(  [type]="INTEGER"     [value]="100"        )
+   declare -A EXP_7=(  [type]="INTEGER"     [value]="1234567890" )
 
    # Literals.
-   declare -A EXP_7=(  [type]="IDENTIFIER"  [value]="ident"      )
-   declare -A EXP_8=(  [type]="STRING"      [value]="string"     )
-   declare -A EXP_9=(  [type]="PATH"        [value]="path"       )
+   declare -A EXP_8=(  [type]="IDENTIFIER"  [value]="ident"      )
+   declare -A EXP_9=(  [type]="STRING"      [value]="string"     )
+   declare -A EXP_10=( [type]="PATH"        [value]="path"       )
 
    # Escaped quotes in string, path
-   declare -A EXP_10=( [type]="STRING"      [value]='"'          )
-   declare -A EXP_11=( [type]="PATH"        [value]="'"          )
+   declare -A EXP_11=( [type]="STRING"      [value]='"'          )
+   declare -A EXP_12=( [type]="PATH"        [value]="'"          )
 
    # EOF.
-   declare -A EXP_12=( [type]="EOF"         [value]=""           )
+   declare -A EXP_13=( [type]="EOF"         [value]=""           )
 
       
    assert [ ${#TOKENS[@]} -gt 0 ]
@@ -150,10 +137,7 @@ EOF
 
 
 @test "identify fstring, fpath" {
-   declare -a FILES=( /dev/stdin )
-   lexer:init
-
-   lexer:scan << EOF
+   cat << EOF > "$F"
       f'before{\$HERE}after'
       f"before{\$HERE}after"
 
@@ -163,6 +147,9 @@ EOF
       f'\{ \' \}'
       f"\{ \" \}"
 EOF
+
+   lexer:init
+   lexer:scan 
 
    # fpath.
    declare -A EXP_0=(  [type]='PATH'        [value]='before'       )

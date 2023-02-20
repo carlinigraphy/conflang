@@ -5,24 +5,31 @@ function setup {
    load '/usr/lib/bats-assert/load.bash'
    load '/usr/lib/bats-support/load.bash'
 
-   export LIBDIR="${BATS_TEST_DIRNAME}/../../lib"
-   export lib_lexer="${LIBDIR}/lexer.sh"
+   local SRC="${BATS_TEST_DIRNAME}/../../src"
+   source "${SRC}/main"
+   source "${SRC}/files.sh"
+   source "${SRC}/errors.sh"
+   source "${SRC}/parser.sh"
 
-   source "${LIBDIR}/errors.sh"
+   export _LEXER_SH="${SRC}/lexer.sh"
+   export F=$( mktemp "${BATS_TEST_TMPDIR}"/XXX ) 
 }
 
 
 @test "successful source, ./lib/lexer.sh" {
-   source "$lib_lexer"
+   source "$_LEXER_SH"
 }
 
 
 @test "fails with no input" {
-   source "$lib_lexer"
-   run lexer:init
+   source "$_LEXER_SH"
 
-   assert_equal  "$status" "${EXIT_STATUS[no_input]}"
-   assert_output 'File Error: missing input file.'
+   globals:init
+   file:new
+   run file:resolve
+
+   assert_equal  "$status"  "${ERROR_CODE[missing_file]%%,*}"
+   assert_output 'File Error(e12): missing or unreadable source file []'
 }
 
 
@@ -30,11 +37,15 @@ function setup {
    : 'Given an empty input file, should successfully lex, generating only the
       final EOF token when closing the file.'
 
-   declare -a FILES=( /dev/stdin )
-   source "$lib_lexer"
+   source "$_LEXER_SH"
+
+   globals:init
+   file:new
+   file:resolve "$F"
+   echo '' > "$F"
 
    lexer:init
-   lexer:scan <<< ''
+   lexer:scan
 
    # Should have only an EOF token.
    assert [ ${#TOKENS[@]} -eq 1 ]

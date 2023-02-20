@@ -59,11 +59,10 @@ function file:resolve {
 
    # throw:  circular_import
    if [[ "${FILES[$fq_path]}" ]] ; then
-      e=( circular_import
-         --anchor "${location_r[location]}"
-         --caught "${location_r[location]}"
-         "$path"
-      ); raise "${e[@]}"
+      e=( --anchor "${location_r[location]}"
+          --caught "${location_r[location]}"
+          "$path"
+      ); raise circular_import "${e[@]}"
    fi
 
    # throw:  missing_file
@@ -71,11 +70,10 @@ function file:resolve {
       [[ ! -r "$fq_path" ]] ||
       [[   -d "$fq_path" ]]
    then
-      e=( missing_file
-         --anchor "${location_r[location]}"
-         --caught "${location_r[location]}"
-         "$fq_path"
-      ); raise "${e[@]}"
+      e=( --anchor "${location_r[location]}"
+          --caught "${location_r[location]}"
+          "$fq_path"
+      ); raise missing_file "${e[@]}"
    fi
 
    local -n file_r="$FILE"
@@ -94,7 +92,7 @@ function file:resolve {
 # @set   SYMTAB
 # @env   FILE
 #
-# @arg   $1    :FILE    Globally sets $FILE pointer for lexer & parser
+# @arg   $1    :FILE
 function file:parse {
    local file="$1"
    local -n file_r="$file"

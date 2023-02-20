@@ -14,13 +14,13 @@ That's a problem.
 The first "block" takes in an absolute file path, and outputs a File object represented as a tuple of `{AST, Symtab}`.
 
 ----
-     path
-      |
-  [ LEXER ] >> tokens
-                  |
-              [ PARSER ] >> AST
-                             |
-                         [ SYMTAB ] >> {AST, Symtab}
+      path
+       |
+  [ lexer.sh ] >> TOKENS
+                    |
+              [ parser.sh ] >> AST
+                                |
+                          [ symtab.sh ] >> {AST, Symtab}
 ----
 
 This is referred to as "parsing a file".
