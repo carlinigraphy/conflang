@@ -5,51 +5,55 @@ function setup {
    load '/usr/lib/bats-assert/load.bash'
    load '/usr/lib/bats-support/load.bash'
 
-   export LIBDIR="${BATS_TEST_DIRNAME}/../../lib"
-   source "${LIBDIR}/lexer.sh"
-   source "${LIBDIR}/errors.sh"
+   local SRC="${BATS_TEST_DIRNAME}/../../src"
+   source "${SRC}/main"
+   source "${SRC}/locations.sh"
+   source "${SRC}/lexer.sh"
+   source "${SRC}/errors.sh"
+
+   export F=$( mktemp "${BATS_TEST_TMPDIR}"/XXX ) 
+   globals:init
+
+   file:new
+   file:resolve "$F"
 }
 
 
 @test "throw invalid fstring" {
-   declare -a FILES=( /dev/stdin )
-
+   echo 'f"{^str}"' > "$F"
    lexer:init
-   run lexer:scan <<< 'f"{^str}"'
+   run lexer:scan
 
-   assert_output "Syntax Error: \`^' not valid in string interpolation."
-   assert_equal  $status  "${EXIT_STATUS[invalid_interpolation_char]}"
+   assert_output --partial "invalid character in fstring [^]"
+   assert_equal  $status   "${ERROR_CODE[invalid_interpolation_char]%%,*}"
 }
 
 
 @test "throw invalid fpath" {
-   declare -a FILES=( /dev/stdin )
-
+   echo "f'{^str}'" > "$F"
    lexer:init
-   run lexer:scan <<< "f'{^str}'"
+   run lexer:scan
 
-   assert_output "Syntax Error: \`^' not valid in string interpolation."
-   assert_equal  $status  "${EXIT_STATUS[invalid_interpolation_char]}"
+   assert_output --partial "invalid character in fstring [^]"
+   assert_equal  $status   "${ERROR_CODE[invalid_interpolation_char]%%,*}"
 }
 
 
 @test "throw unescaped brace, fstring" {
-   declare -a FILES=( /dev/stdin )
-
+   echo 'f"}"' > "$F"
    lexer:init
-   run lexer:scan <<< 'f"}"'
+   run lexer:scan
 
-   assert_output "Syntax Error: single \`}' not allowed in f-string."
-   assert_equal  $status  "${EXIT_STATUS[unescaped_interpolation_brace]}"
+   assert_output --partial "single \`}' not allowed in f-string."
+   assert_equal  $status   "${ERROR_CODE[unescaped_interpolation_brace]%%,*}"
 }
 
 
 @test "throw unescaped brace, fpath" {
-   declare -a FILES=( /dev/stdin )
-
+   echo "f'}'" > "$F"
    lexer:init
-   run lexer:scan <<< "f'}'"
+   run lexer:scan
 
-   assert_output "Syntax Error: single \`}' not allowed in f-string."
-   assert_equal  $status  "${EXIT_STATUS[unescaped_interpolation_brace]}"
+   assert_output --partial "single \`}' not allowed in f-string."
+   assert_equal  $status   "${ERROR_CODE[unescaped_interpolation_brace]%%,*}"
 }

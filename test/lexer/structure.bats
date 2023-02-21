@@ -5,8 +5,8 @@ function setup {
    load '/usr/lib/bats-assert/load.bash'
    load '/usr/lib/bats-support/load.bash'
 
-   export LIBDIR="${BATS_TEST_DIRNAME}/../../lib"
-   export lib_lexer="${LIBDIR}/lexer.sh"
+   local SRC="${BATS_TEST_DIRNAME}/../../src"
+   export _LEXER_SH="${SRC}/lexer.sh"
 }
 
 
@@ -36,7 +36,7 @@ function setup {
    # Source in the lexer, compile list of function names. Iterating this,
    # and filtering out anything defined previously, should give us only those
    # created within the lexer.
-   source "$lib_lexer"
+   source "$_LEXER_SH"
    readarray -td $'\n' fns < <(declare -f | awk "${pattern} {print \$1}")
 
    local -a missing_prefix=()
@@ -70,7 +70,7 @@ function setup {
    # Source in the lexer, compile list of function names. Iterating this,
    # and filtering out anything defined previously, should give us only those
    # created within the lexer.
-   source "$lib_lexer"
+   source "$_LEXER_SH"
    readarray -td $'\n' fns < <(declare -f | awk "${pattern} {print \$1}")
 
    local -a lexer_fns=()

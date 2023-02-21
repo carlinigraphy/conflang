@@ -41,8 +41,8 @@ function setup {
    globals:init
    file:new
    file:resolve "$F"
-   echo '' > "$F"
 
+   echo '' > "$F"
    lexer:init
    lexer:scan
 
