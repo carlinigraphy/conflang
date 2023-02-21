@@ -4,25 +4,25 @@
 function setup { load '/usr/lib/bats-assert/load.bash'
    load '/usr/lib/bats-support/load.bash'
 
-   export LIBDIR="${BATS_TEST_DIRNAME}/../lib"
-   source "${LIBDIR}"/errors.sh
+   local SRC="${BATS_TEST_DIRNAME}/../src"
+   source "${SRC}/errors.sh"
 }
 
 
 @test "exit statuses should be unique" {
-   local -- expected="${#EXIT_STATUS[@]}"
+   local -i expected="${#ERROR_CODE[@]}"
    local -A codes=()
 
-   for c in "${EXIT_STATUS[@]}" ; do
+   for c in "${ERROR_CODE[@]}" ; do
       codes[$c]=''
    done
 
-   assert_equal "$expected" "${#codes[@]}"
+   assert_equal "$expected"  "${#codes[@]}"
 }
 
 
 @test "only raises error types that exist" {
    while read -r ename ; do
-      assert [ ${EXIT_STATUS[$ename]} ]
-   done < <(grep --no-filename -Po '(?<=raise )[[:alpha:]_]+' "${LIBDIR}"/*.sh)
+      assert [ ${ERROR_CODE[$ename]} ]
+   done < <(grep --no-filename -Po '(?<=raise )[[:alpha:]_]+' "${SRC}"/*)
 }

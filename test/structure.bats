@@ -5,9 +5,9 @@ function setup {
    load '/usr/lib/bats-assert/load.bash'
    load '/usr/lib/bats-support/load.bash'
 
-   export LIBDIR="${BATS_TEST_DIRNAME}/../lib"
-   export lib_lexer="${LIBDIR}/lexer.sh"
-   export lib_parser="${LIBDIR}/parser.sh"
+   local SRC="${BATS_TEST_DIRNAME}/../src"
+   export _LEXER_SH="${SRC}/lexer.sh"
+   export _PARSER_SH="${SRC}/parser.sh"
 }
 
 
@@ -21,7 +21,7 @@ function setup {
 
    # Source in the lexer, compile list of function names. None of these should
    # begin with an `parser:` prefix.
-   source "$lib_lexer"
+   source "$_LEXER_SH"
    readarray -td $'\n' fns < <(declare -f | awk "${pattern} {print \$1}")
 
    local -A filter=()
@@ -47,7 +47,7 @@ function setup {
 
    # Source in the parser, compile list of function names. None of these should
    # begin with an `lexer:` prefix.
-   source "$lib_parser"
+   source "$_PARSER_SH"
    readarray -td $'\n' fns < <(declare -f | awk "${pattern} {print \$1}")
 
    local -A filter=()
