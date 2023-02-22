@@ -5,78 +5,87 @@ function setup {
    load '/usr/lib/bats-assert/load.bash'
    load '/usr/lib/bats-support/load.bash'
 
-   export LIBDIR="${BATS_TEST_DIRNAME}/../../lib"
-   source "${LIBDIR}/lexer.sh"
-   source "${LIBDIR}/parser.sh"
-   source "${LIBDIR}/errors.sh"
+   local src="${BATS_TEST_DIRNAME}/../../src"
+   source "${src}/main"
+   source "${src}/locations.sh"
+   source "${src}/lexer.sh"
+   source "${src}/parser.sh"
+   source "${src}/errors.sh"
+
+   export F=$( mktemp "${BATS_TEST_TMPDIR}"/XXX ) 
+   globals:init
+
+   file:new
+   file:resolve "$F"
 }
 
 
-@test 'empty array' {
-   local -a FILES=( /dev/stdin )
-
+@test 'empty list' {
+   echo '_: [];' > "$F"
    lexer:init
-   lexer:scan <<< '_: [];'
+   lexer:scan
 
    parser:init
    parser:parse
 
-   local -- node_name='NODE_6'
-   local -n node="$node_name"
+   local node='NODE_8'
+   local -n node_r="$node"
+   local -n node_items_r="${node_r[items]}"
 
-   assert_equal "${TYPEOF[$node_name]}"  'array'
-   assert_equal "${#node[@]}"  0
+   assert_equal "${TYPEOF[$node]}"     'list'
+   assert_equal "${#node_items_r[@]}"  0
 }
 
 
-@test 'nested array' {
-   local -a FILES=( /dev/stdin )
-   local input='
+@test 'nested list' {
+   echo '
       a1: [
          [
             []
          ]
       ];
-   '
+   ' > "$F"
 
    lexer:init
-   lexer:scan <<< "$input"
+   lexer:scan
 
    parser:init
    parser:parse
 
-   local -- a1_name='NODE_6'
-   local -n a1="$a1_name"
+   local a1='NODE_8'
+   local -n a1_r="$a1"
+   local -n a1_items_r="${a1_r[items]}"
 
-   local -- a2_name="${a1[0]}"
-   local -n a2="$a2_name"
+   local a2="${a1_items_r[0]}"
+   local -n a2_r="$a2"
+   local -n a2_items_r="${a2_r[items]}"
 
-   local -- a3_name="${a2[0]}"
-   local -n a3="$a3_name"
+   local a3="${a2_items_r[0]}"
+   local -n a3_r="$a3"
+   local -n a3_items_r="${a3_r[items]}"
 
-   # Each item must be an array.
-   assert_equal "${TYPEOF[$a1_name]}"  'array'
-   assert_equal "${TYPEOF[$a2_name]}"  'array'
-   assert_equal "${TYPEOF[$a3_name]}"  'array'
+   # Each item must be an list.
+   assert_equal "${TYPEOF[$a1]}"  'list'
+   assert_equal "${TYPEOF[$a2]}"  'list'
+   assert_equal "${TYPEOF[$a3]}"  'list'
 
    # Each section should only contain a single sub-item, the nested section.
    # With the exception of the last, which is empty.
-   assert_equal  "${#a1[@]}"  1
-   assert_equal  "${#a2[@]}"  1
-   assert_equal  "${#a3[@]}"  0
+   assert_equal  "${#a1_items_r[@]}"  1
+   assert_equal  "${#a2_items_r[@]}"  1
+   assert_equal  "${#a3_items_r[@]}"  0
 }
 
 
-@test 'disallow assignment in arrays' {
-   local -a FILES=( /dev/stdin )
-   local input='
+@test 'disallow assignment in lists' {
+   echo '
       _: [
          key: value;
       ];
-   '
+   ' > "$F"
 
    lexer:init
-   lexer:scan <<< "$input"
+   lexer:scan
 
    parser:init
    run parser:parse
@@ -85,12 +94,11 @@ function setup {
 
 
 @test 'allow trailing comma' {
-   local -a FILES=( /dev/stdin )
-   local input="
+   echo "
       _: [
          '',
       ];
-   "
+   " > "$F"
 
    lexer:init
    lexer:scan <<< "$input"
@@ -98,51 +106,51 @@ function setup {
    parser:init
    parser:parse
 
-   local -- node_name='NODE_6'
-   local -n items="$node_name"
+   local node='NODE_8'
+   local -n node_r="$node"
+   local -n items_r="${node_r[items]}"
 
    # There should only be a single item, and no error thrown.
-   assert_equal  "${TYPEOF[$node_name]}"  'array'
-   assert_equal  "${#items[@]}"  1
+   assert_equal  "${TYPEOF[$node]}"  'list'
+   assert_equal  "${#items_r[@]}"    1
 }
 
 
 @test 'nested section' {
-   local -a FILES=( /dev/stdin )
-   local input='
+   echo '
       s1 {
          s2 {
             s3 {}
          }
       }
-   '
+   ' > "$F"
 
    lexer:init
-   lexer:scan <<< "$input"
+   lexer:scan
 
    parser:init
    parser:parse
 
-   local -- s1_name='NODE_5'
-   local -n s1="$s1_name"
-   local -n i1="${s1[items]}"
+   local s1='NODE_7'
+   local -n s1_r="$s1"
+   local -n s1_items_r="${s1_r[items]}"
 
-   local -- s2_name="${i1[0]}"
-   local -n s2="$s2_name"
-   local -n i2="${s2[items]}"
+   local s2="${s1_items_r[0]}"
+   local -n s2_r="$s2"
+   local -n s2_items_r="${s2_r[items]}"
 
-   local -- s3_name="${i2[0]}"
-   local -n s3="$s3_name"
-   local -n i3="${s3[items]}"
+   local s3="${s2_items_r[0]}"
+   local -n s3_r="$s3"
+   local -n s3_items_r="${s3_r[items]}"
 
    # Each item must be a section.
-   assert_equal "${TYPEOF[$s1_name]}"  'decl_section'
-   assert_equal "${TYPEOF[$s2_name]}"  'decl_section'
-   assert_equal "${TYPEOF[$s3_name]}"  'decl_section'
+   assert_equal "${TYPEOF[$s1]}"  'decl_section'
+   assert_equal "${TYPEOF[$s2]}"  'decl_section'
+   assert_equal "${TYPEOF[$s3]}"  'decl_section'
 
    # Each section should only contain a single sub-item, the nested section.
    # With the exception of the last, which is empty.
-   assert_equal  "${#i1[@]}"  1
-   assert_equal  "${#i2[@]}"  1
-   assert_equal  "${#i3[@]}"  0
+   assert_equal  "${#s1_items_r[@]}"  1
+   assert_equal  "${#s2_items_r[@]}"  1
+   assert_equal  "${#s3_items_r[@]}"  0
 }

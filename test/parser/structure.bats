@@ -5,11 +5,9 @@ function setup {
    load '/usr/lib/bats-assert/load.bash'
    load '/usr/lib/bats-support/load.bash'
 
-   export LIBDIR="${BATS_TEST_DIRNAME}/../../lib"
-   export lib_lexer="${LIBDIR}/lexer.sh"
-   export lib_parser="${LIBDIR}/parser.sh"
-
-   source "${LIBDIR}/errors.sh"
+   local src="${BATS_TEST_DIRNAME}/../../src"
+   export _LEXER_SH="${src}/lexer.sh"
+   export _PARSER_SH="${src}/parser.sh"
 }
 
 
@@ -28,24 +26,27 @@ function setup {
    readarray -td $'\n' _fns < <(declare -f | awk "${pattern} {print \$1}")
 
    local -A filter=(
-      [mk_array]='yes'
-      [mk_boolean]='yes'
-      [mk_use]='yes'
-      [mk_decl_section]='yes'
-      [mk_decl_variable]='yes'
-      [mk_index]='yes'
-      [mk_member]='yes'
-      [mk_variable]='yes'
-      [mk_identifier]='yes'
-      [mk_include]='yes'
-      [mk_integer]='yes'
-      [mk_path]='yes'
-      [mk_string]='yes'
-      [mk_typedef]='yes'
-      [mk_typecast]='yes'
-      [mk_unary]='yes'
-      [mk_env_var]='yes' 
-      [mk_int_var]='yes' 
+      [ast:new]='yes' 
+      [_ast_new_program]='yes'
+      [_ast_new_header]='yes'
+      [_ast_new_import]='yes'
+      [_ast_new_typedef]='yes'
+      [_ast_new_container]='yes'
+      [_ast_new_decl_section]='yes'
+      [_ast_new_decl_variable]='yes'
+      [_ast_new_list]='yes'
+      [_ast_new_record]='yes'
+      [_ast_new_type]='yes'
+      [_ast_new_typecast]='yes'
+      [_ast_new_member]='yes'
+      [_ast_new_index]='yes'
+      [_ast_new_unary]='yes'
+      [_ast_new_boolean]='yes'
+      [_ast_new_integer]='yes'
+      [_ast_new_string]='yes'
+      [_ast_new_path]='yes' 
+      [_ast_new_identifier]='yes' 
+      [_ast_new_env_var]='yes' 
    )
 
    for f in "${_fns[@]}" ; do
@@ -55,7 +56,7 @@ function setup {
    # Source in the parser, compile list of function names. Iterating this, and
    # filtering out anything defined previously, should give us only those
    # created within the parse.
-   source "$lib_parser"
+   source "$_PARSER_SH"
    readarray -td $'\n' fns < <(declare -f | awk "${pattern} {print \$1}")
 
    local -a missing_prefix=()
@@ -79,37 +80,17 @@ function setup {
 
    # Get initial list of functions from the environment. Don't want these
    # polluting the results from the lexer function names. Filter them out.
-   readarray -td $'\n' _fns < <(declare -f | awk "${pattern} {print \$1}")
+   readarray -td $'\n' _filter < <(declare -f | awk "${pattern} {print \$1}")
 
-   local -A filter=(
-      # Parser functions intentionally without a prefix.
-      [mk_array]='yes'
-      [mk_boolean]='yes'
-      [mk_use]='yes'
-      [mk_decl_section]='yes'
-      [mk_decl_variable]='yes'
-      [mk_index]='yes'
-      [mk_member]='yes'
-      [mk_variable]='yes'
-      [mk_identifier]='yes'
-      [mk_include]='yes'
-      [mk_integer]='yes'
-      [mk_path]='yes'
-      [mk_string]='yes'
-      [mk_typedef]='yes'
-      [mk_typecast]='yes'
-      [mk_unary]='yes'
-      [mk_env_var]='yes' 
-      [mk_int_var]='yes' 
-   )
-   for f in "${_fns[@]}" ; do
+   local -A filter=()
+   for f in "${_filter[@]}" ; do
       filter["$f"]='yes'
    done
 
    # Source in the parser, compile list of function names. Iterating this,
    # and filtering out anything defined previously, should give us only those
    # created within the parser.
-   source "$lib_parser"
+   source "$_PARSER_SH"
    readarray -td $'\n' fns < <(declare -f | awk "${pattern} {print \$1}")
 
    local -a parser_fns=()
@@ -163,7 +144,7 @@ function setup {
    readarray -td $'\n' filter < <(declare -f | awk "${pattern} {print \$1}" | sort)
 
    # Only lexer functions.
-   source "$lib_lexer"
+   source "$_LEXER_SH"
    readarray -td $'\n' _lex_fns < <(declare -f | awk "${pattern} {print \$1}" | sort)
    readarray -td $'\n'  lex_fns < <(
          comm -13 \
@@ -173,7 +154,7 @@ function setup {
    unset "${lex_fns[@]}" 
 
    # Only parser functions.
-   source "$lib_parser"
+   source "$_PARSER_SH"
    readarray -td $'\n' _parse_fns < <(declare -f | awk "${pattern} {print \$1}" | sort)
    readarray -td $'\n'  parse_fns < <(
          comm -13 \

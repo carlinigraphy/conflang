@@ -5,11 +5,11 @@ function setup {
    load '/usr/lib/bats-assert/load.bash'
    load '/usr/lib/bats-support/load.bash'
 
-   local SRC="${BATS_TEST_DIRNAME}/../../src"
-   source "${SRC}/main"
-   source "${SRC}/locations.sh"
-   source "${SRC}/lexer.sh"
-   source "${SRC}/errors.sh"
+   local src="${BATS_TEST_DIRNAME}/../../src"
+   source "${src}/main"
+   source "${src}/locations.sh"
+   source "${src}/lexer.sh"
+   source "${src}/errors.sh"
 
    export F=$( mktemp "${BATS_TEST_TMPDIR}"/XXX ) 
    globals:init

@@ -7,7 +7,7 @@ declare -g  PROGDIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" ; pwd )
 declare -g  LIBDIR="${PROGDIR}"/../../src
 
 source "${LIBDIR}"/main
-source "${LIBDIR}"/files.sh
+source "${LIBDIR}"/locations.sh
 source "${LIBDIR}"/errors.sh
 source "${LIBDIR}"/lexer.sh
 source "${LIBDIR}"/parser.sh
