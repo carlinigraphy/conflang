@@ -144,7 +144,7 @@ function setup {
    run utils:eval
 
    assert_failure
-   assert_equal "$status"  "${EXIT_STATUS[missing_env_var]}"
+   assert_equal "$status"  "${ERROR_CODE[missing_env_var]%%,*}"
 }
 
 

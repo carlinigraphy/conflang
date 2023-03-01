@@ -241,6 +241,15 @@ function walk:merge {
 }
 
 
+function merge_decl_section {
+   local -n node_r="$NODE"
+   local -n items_r="${node_r[items]}"
+   for ast_node in "${items_r[@]}" ; do
+      walk:merge "$ast_node"
+   done
+}
+
+
 function merge_decl_variable {
    local -n node_r="$NODE"
 

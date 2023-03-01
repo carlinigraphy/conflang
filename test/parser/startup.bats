@@ -5,28 +5,20 @@ function setup {
    load '/usr/lib/bats-assert/load.bash'
    load '/usr/lib/bats-support/load.bash'
 
-   export LIBDIR="${BATS_TEST_DIRNAME}/../../lib"
-   export lib_parser="${LIBDIR}/parser.sh"
-   export lib_lexer="${LIBDIR}/lexer.sh"
+   local src="${BATS_TEST_DIRNAME}/../../src"
+   export _LEXER_SH="${src}/lexer.sh"
+   export _PARSER_SH="${src}/parser.sh"
 
-   source "${LIBDIR}/errors.sh"
+   source "${src}/main"
+   source "${src}/errors.sh"
+   source "${src}/locations.sh"
+
+   export F=$( mktemp "${BATS_TEST_TMPDIR}"/XXX ) 
 }
 
 
 @test "successful source, ./lib/parser.sh" {
-   source "$lib_parser"
-}
-
-
-@test "fails with no tokens" {
-   source "$lib_parser"
-
-   local -a TOKENS=()
-   run parser:parse
-
-   assert_failure
-   assert_output "Parse Error: didn't receive tokens from lexer."
-   assert_equal  $status  "${EXIT_STATUS[parse_error]}"
+   source "$_PARSER_SH"
 }
 
 
@@ -34,12 +26,14 @@ function setup {
    : 'While the parser should fail given *NO* tokens in the input, it should
       successfully parse an empty file (only EOF token).'
 
-   source "$lib_parser"
+   source "$_PARSER_SH"
 
    local -A TOKEN_0=( [type]='EOF' [value]='' )
    local -a TOKENS=( 'TOKEN_0' )
 
+   parser:init
    run parser:parse
+
    assert_success
 }
 
@@ -48,13 +42,18 @@ function setup {
    : 'More complete test, starting from the lexer, transitioning into the
       parser. Testing handoff.'
 
-   source "$lib_lexer"
-   source "$lib_parser"
+   source "$_LEXER_SH"
+   source "$_PARSER_SH"
 
-   local -a FILES=( /dev/stdin )
+   globals:init
+   file:new
+   file:resolve "$F"
+
+   echo '' > "$F"
    lexer:init
+   lexer:scan
 
-   lexer:scan <<< ''
+   parser:init
    parser:parse
 }
 
@@ -63,14 +62,17 @@ function setup {
    : 'Must check the lexer successfully hands off everything to the parser.
       and no additional global vars/functions are unspecified'
 
-   source "$lib_lexer"
-   source "$lib_parser"
+   source "$_LEXER_SH"
+   source "$_PARSER_SH"
 
-   local -a FILES=( /dev/stdin )
+   globals:init
+   file:new
+   file:resolve "$F"
+
+   echo 'this @str: "that";' > "$F"
    lexer:init
+   lexer:scan
 
-   lexer:scan <<< 'this (str): "that";'
-
-   run parser:parse
-   assert_success
+   parser:init
+   parser:parse
 }

@@ -393,7 +393,6 @@ function _ast_new_env_var {
 # @section                        Parser utils
 #-------------------------------------------------------------------------------
 
-
 # parser:init()
 # @description
 #  Resets elements of the parser that cannot carry from run to run.

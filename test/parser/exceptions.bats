@@ -5,45 +5,39 @@ function setup {
    load '/usr/lib/bats-assert/load.bash'
    load '/usr/lib/bats-support/load.bash'
 
-   export LIBDIR="${BATS_TEST_DIRNAME}/../../lib"
-   source "${LIBDIR}/lexer.sh"
-   source "${LIBDIR}/parser.sh"
-   source "${LIBDIR}/errors.sh"
+   local src="${BATS_TEST_DIRNAME}/../../src"
+   source "${src}/main"
+   source "${src}/lexer.sh"
+   source "${src}/locations.sh"
+   source "${src}/parser.sh"
+   source "${src}/errors.sh"
 
-   function parse_from_str {
-      lexer:init
-      lexer:scan <<< "$1"
+   export F=$( mktemp "${BATS_TEST_TMPDIR}"/XXX ) 
+   globals:init
 
-      parser:init
-      parser:parse
-   }
-   export -f parse_from_str
+   file:new
+   file:resolve "$F"
 }
 
 
-@test "raise syntax_error on ERROR token" {
-   local -a FILES=( /dev/stdin )
-   run parse_from_str '&'
-
-   assert_failure
-   assert_output --regexp '^Syntax Error: \[[0-9]+:[0-9]+\]'   # Error base
-   assert_output          "Syntax Error: [1:1] \`&'"           # Specific text.
-}
-
+# TODO: Expect `:' before expressions, add more of these. Check that any
+#       characte which begins an expression has accurate error reporting.
 
 @test "raise munch_error on unexpected token" {
-   local -a FILES=( /dev/stdin )
-   run parse_from_str '_ (4);'
+   echo '_ (4);' > "$F"
+   lexer:init
+   lexer:scan
+
+   parser:init
+   run parser:parse
 
    assert_failure
-   assert_output --regexp  '^Parse Error: \[[0-9]+:[0-9]+\]'   # Error base
-   assert_output --partial "expected identifier, received integer"
+   assert_output --partial 'Parse Error('   # Error base
+   assert_output --partial "expecting \`:' before expression"
 }
 
 
 @test "raise parse_error on missing \`:' before expression" {
-   local -a FILES=( /dev/stdin )
-
    local -a expressions=(
       "_ 'path';"
       '_ "string";'
@@ -56,33 +50,51 @@ function setup {
    )
 
    for expr in "${expressions[@]}" ; do
-      run parse_from_str "$expr"
+      echo "$expr" > "$F"
+      lexer:init
+      lexer:scan
+
+      parser:init
+      run parser:parse
+
       assert_failure
-      assert_output --regexp  '^Parse Error: '
+      assert_output --partial 'Parse Error('
       assert_output --partial "expecting \`:' before expression"
    done
 }
 
 
-@test "raise parse_error on missing \`;' after declaration" {
-   local -a FILES=( /dev/stdin )
+@test "raise parse_error on missing \`;' after declaration, 1" {
+   echo '_: ""' > "$F"
+   lexer:init
+   lexer:scan
+
+   parser:init
+   run parser:parse
 
    # Test with EOF following.
-   run parse_from_str  '_: ""'
    assert_failure
-   assert_output --regexp  '^Parse Error: '
-   assert_output --partial "Expecting \`;' after declaration"
+   assert_output --partial 'Parse Error('
+   assert_output --partial "expecting \`;' after declaration"
+}
+
+
+@test "raise parse_error on missing \`;' after declaration, 2" {
+   echo '_: "" s{}' > "$F"
+   lexer:init
+   lexer:scan
+
+   parser:init
+   run parser:parse
 
    # Test with identifier following.
-   run parse_from_str  '_: "" s{}'
    assert_failure
-   assert_output --regexp  '^Parse Error: '
-   assert_output --partial "Expecting \`;' after declaration"
+   assert_output --partial 'Parse Error('
+   assert_output --partial "expecting \`;' after declaration"
 }
 
 
 @test "raise parse_error on non-expression (NUD)" {
-   local -a FILES=( /dev/stdin )
    local -a expressions=(
       '_: ->'
       '_: ;'
@@ -90,78 +102,29 @@ function setup {
    )
 
    for expr in "${expressions[@]}" ; do
-      run parse_from_str "$expr"
+      echo "$expr" > "$F"
+      lexer:init
+      lexer:scan
+
+      parser:init
+      run parser:parse
+
       assert_failure
-      assert_output --regexp  '^Parse Error: '
-      assert_output --partial "not an expression"
+      assert_output --partial 'Parse Error('
+      assert_output --partial "expecting an expression"
    done
 }
 
 
-@test "raise parse_error on parser statement not ending with semi" {
-   local -a FILES=( /dev/stdin )
-
-   run parse_from_str "%include ''"
-   assert_failure
-   assert_output --partial "Expecting \`;' after parser statement."
-}
-
-
-@test "raise parse_error on invalid parser statement" {
-   local -a FILES=( /dev/stdin )
-
-   run parse_from_str "%invalid"
-   assert_failure
-   assert_output --regexp  '^Parse Error: '
-   assert_output --partial 'invalid is not a parser statement'
-}
-
-
 @test "raise parse_error on include taking a non-path" {
-   local -a FILES=( /dev/stdin )
+   echo 'import "string";' > "$F"
+   lexer:init
+   lexer:scan
 
-   run parse_from_str '%include "string";'
-   assert_failure
-   assert_output --regexp  '^Parse Error: '
-   assert_output --partial 'Expecting path after %include'
-}
-
-
-@test "raise parse_error on constrain taking non- array of path" {
-   local -a FILES=( /dev/stdin )
-
-   run parse_from_str "%constrain 'path';"
-   assert_failure
-   assert_output --regexp  '^Parse Error: '
-   assert_output --partial 'to begin array of paths'
-
-   run parse_from_str "%constrain [ \"string\" ];"
-   assert_failure
-   assert_output --regexp  '^Parse Error: '
-   assert_output --partial 'Expecting an array of paths'
-}
-
-
-@test "raise parse_error on multiple constrain statements" {
-   local -a FILES=( /dev/stdin )
-
-   run parse_from_str "
-      %constrain [ 'f1' ];
-      %constrain [ 'f2' ];
-   "
+   parser:init
+   run parser:parse
 
    assert_failure
-   assert_output 'Parse Error: may not specify multiple constrain blocks.'
-}
-
-
-@test "raise parse_error on constrain occuring within a section" {
-   local -a FILES=( /dev/stdin )
-
-   run parse_from_str "
-      _{ %constrain ['f1']; }
-   "
-
-   assert_failure
-   assert_output 'Parse Error: %constrain may not occur in a section.'
+   assert_output --partial 'Parse Error('
+   assert_output --partial 'expecting import path'
 }

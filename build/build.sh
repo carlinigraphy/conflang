@@ -12,6 +12,11 @@ options.
    -n | --strip-newlines    Removes empty lines
    -c | --strip-comments    Removes comments
    -t | --topic <TOPIC>     Subscribes to TOPIC
+
+notes.
+   One may subscribe to multiple topics by passing the `--topic` flag multiple
+   times.
+
 EOF
 
 exit $1

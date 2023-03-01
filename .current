@@ -1,0 +1,76 @@
+# vim: spell: tw=80: formatoptions+=tcrn: formatoptions-=o:
+
+2023-02-23
+   Starting to work on this project again. Ramping up slowly by writing a lot of
+   tests. Re-acquaint myself with things.
+
+   Thinking of trying to grab an `md5sum` for each file that's imported, can
+   tell if re-compiling is necessary. Can insert this right after the parsing &
+   symtab phases. Though it seems that semantic analysis and compilation doesn't
+   take very long, as compared to lexing & parsing. Huh. Fraction of the time.
+   File i/o?
+
+   May want to give the user some convenience functions/variables for accessing
+   attrs more easily. They *could* just use the pre-processor and slam a:
+   >  ${_SKELLY_ROOT.query1.query2}.
+
+   Not too hard to create a series of functions to directly access each
+   variable, in case calling `conf` repeatedly is a genuine performance hit.
+   >  function __root.query  { RV='value'  ;}
+   >  function __root.list.1 { RV='value1' ;}
+
+   Alternatively set more human-friendly names for each of the pieces of the
+   skeleton.
+   >  declare -A __root=( [list]=__root__list
+   >                      [query]=__root__query )
+   >
+   >  declare -a __root__list=( [0]='value0' [1]='value1' )
+   >
+   >  declare -- __root__query='value'
+
+   User can call the path 'foo.bar' directly as:
+   >  echo "${__root__foo__bar}"
+
+   Would require namerefs for lists. But that's trivial.
+   >  declare -n list="${__root__list}"
+   >  echo "${list[1]}" # value1
+
+   It looks a little ugly, but both may present more ergonomic, and faster,
+   alternatives to the current approach:
+   >  conf foo  bar    ; echo "$RV"
+   >  conf list query  ; declare -n list="$RV"
+
+   For a long series of declarations the above could get a little tiresome.
+   As I think more about it, the ergo problems is entirely solved with the
+   preproc. Though it's even less elegant to tell someone "hey ps once you use
+   my idiot tool, also use my even more idiot preprocessor lel".
+
+
+2023-02-24
+   Going to need to pick a symbol that is not currently being used to mean
+   "enter FORTH mode".
+
+   (DISCLAIMER: I know it's not *really* going to be "a FORTH", as it's missing
+   almost all of the noteable characteristics that purists would associate with
+   one.  However it will be a stack based language built upon composable words.
+   Sounds FORTH-y to me.)
+
+   Pipe (`|') is not currently being used for anything, nor can I imagine a
+   situation in which it would be. Can use it for the FORTH-mode validation
+   stages.
+   >  conf_dir @path: $XDG_CONFIG_HOME |
+   >     is_dir ?
+   >     [ readable
+   >       writable
+   >       executable
+   >     ] hasattr each .
+   >  |;
+
+   (SIDEBAR: I kinda want an `or` operator. For mirroring something like
+   ${XDG_CONFIG_HOME:-${HOME}/.local/share}.)
+
+   I need to actually learn something about FORTH now. The month of tinkering is
+   insufficient to know how one should look/feel.
+
+   Need to profile a bunch of stack operations, try to find the fastest way of
+   manipulating a stack in bash.

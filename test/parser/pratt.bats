@@ -10,12 +10,20 @@ function setup {
    load '/usr/lib/bats-assert/load.bash'
    load '/usr/lib/bats-support/load.bash'
 
-   export LIBDIR="${BATS_TEST_DIRNAME}/../../lib"
-   source "${LIBDIR}/lexer.sh"
-   source "${LIBDIR}/parser.sh"
-   source "${LIBDIR}/errors.sh"
+   local src="${BATS_TEST_DIRNAME}/../../src"
+   source "${src}/main"
+   source "${src}/locations.sh"
+   source "${src}/lexer.sh"
+   source "${src}/parser.sh"
+   source "${src}/errors.sh"
+
+   export F=$( mktemp "${BATS_TEST_TMPDIR}"/XXX ) 
+   globals:init
+
+   file:new
+   file:resolve "$F"
 }
 
-@test "operator precedence, typecast" {
-   skip
-}
+#@test "operator precedence, typecast" {
+#   skip
+#}

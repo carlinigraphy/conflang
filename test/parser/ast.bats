@@ -6,29 +6,37 @@
 # to catch basic error in the lexer/parser.
 
 function setup {
-   load '/usr/lib/bats-assert/load.bash'
-   load '/usr/lib/bats-support/load.bash'
+   bats_load_library '/usr/lib/bats-assert/load.bash'
+   bats_load_library '/usr/lib/bats-support/load.bash'
 
-   export LIBDIR="${BATS_TEST_DIRNAME}/../../lib"
-   source "${LIBDIR}/lexer.sh"
-   source "${LIBDIR}/parser.sh"
-   source "${LIBDIR}/errors.sh"
+   local src="${BATS_TEST_DIRNAME}/../../src"
+   source "${src}/main"
+   source "${src}/locations.sh"
+   source "${src}/lexer.sh"
+   source "${src}/parser.sh"
+   source "${src}/errors.sh"
+
+   export F=$( mktemp "${BATS_TEST_TMPDIR}"/XXX ) 
 }
 
-@test "variable declaration, empty" {
-   local -a FILES=( /dev/stdin )
 
+@test "variable declaration, empty" {
+   globals:init
+   file:new
+   file:resolve "$F"
+
+   echo 'key;' > "$F"
    lexer:init
-   lexer:scan <<< 'key;'
+   lexer:scan
 
    parser:init
    parser:parse
 
    local -A EXP=(
-      [NODE_1]='identifier'
-      [NODE_2]='decl_section'
-      [NODE_4]='identifier'
-      [NODE_5]='decl_variable'
+      [NODE_3]='identifier'
+      [NODE_4]='decl_section'
+      [NODE_6]='identifier'
+      [NODE_7]='decl_variable'
    )
 
    for idx in "${!EXP[@]}" ; do
@@ -36,184 +44,217 @@ function setup {
    done
 
    # The variable declaration, and typedef, should both be empty.
-   local -n node_5="NODE_5"
-   assert_equal "${node_5[expr]}"  ''
-   assert_equal "${node_5[type]}"  ''
+   local -n node_r="NODE_7"
+   assert_equal "${node_r[expr]}"  ''
+   assert_equal "${node_r[type]}"  ''
 }
 
 
 @test "variable declaration, type and value" {
-   local -a FILES=( /dev/stdin )
+   globals:init
+   file:new
+   file:resolve "$F"
 
+   echo 'key @str: "value";' > "$F"
    lexer:init
-   lexer:scan <<< 'key (str): "value";'
+   lexer:scan
 
    parser:init
    parser:parse
 
    local -A EXP=(
-      [NODE_1]='identifier' 
-      [NODE_2]='decl_section' 
-      [NODE_4]='identifier' 
-      [NODE_5]='decl_variable' 
+      [NODE_3]='identifier' 
+      [NODE_4]='decl_section' 
       [NODE_6]='identifier' 
-      [NODE_7]='typedef' 
-      [NODE_8]='string'
+      [NODE_7]='decl_variable' 
+      [NODE_8]='identifier' 
+      [NODE_9]='type' 
+      [NODE_10]='string'
    )
 
    for idx in "${!EXP[@]}" ; do
       assert_equal "${TYPEOF[$idx]}"  "${EXP[$idx]}"
    done
 
-   local -n node_5='NODE_5'
-   assert_equal "${node_5[expr]}"  'NODE_8'
-   assert_equal "${node_5[type]}"  'NODE_7'
+   local -n node_r='NODE_7'
+   assert_equal "${node_r[expr]}"  'NODE_10'
+   assert_equal "${node_r[type]}"  'NODE_9'
 }
 
 
 @test "declaration w/ complex type" {
-   local -a FILES=( /dev/stdin )
+   globals:init
+   file:new
+   file:resolve "$F"
 
+   echo 'key @list[str];' > "$F"
    lexer:init
-   lexer:scan <<< 'key (array:str);'
+   lexer:scan
 
    parser:init
    parser:parse
 
-   local -n typedef='NODE_7'
-   local -n t_array="${typedef[kind]}"
-   assert_equal "${t_array[value]}"   'array'
+   local -n typedef_r='NODE_9'
+   local -n t_list_r="${typedef_r[kind]}"
+   assert_equal "${t_list_r[value]}"   'list'
 
-   local -n subtype="${typedef[subtype]}"
-   local -n t_string="${subtype[kind]}"
-   assert_equal "${t_string[value]}"  'str'
+   local -n subtype_r="${typedef_r[subtype]}"
+   local -n t_string_r="${subtype_r[kind]}"
+   assert_equal "${t_string_r[value]}"  'str'
 }
 
 
 @test "declaration w/ boolean" {
-   local -a FILES=( /dev/stdin )
+   globals:init
+   file:new
+   file:resolve "$F"
 
+   echo "_: true;" > "$F"
    lexer:init
-   lexer:scan <<< "_: true;"
+   lexer:scan
 
    parser:init
    parser:parse
 
-   local -n node='NODE_6'
+   local -n node='NODE_8'
    assert_equal  "${node[value]}"     'true'
-   assert_equal  "${TYPEOF[NODE_6]}"  'boolean'
+   assert_equal  "${TYPEOF[NODE_8]}"  'boolean'
 }
 
 
 @test "declaration w/ integer" {
-   local -a FILES=( /dev/stdin )
+   globals:init
+   file:new
+   file:resolve "$F"
 
+   echo '_: 100;' > "$F"
    lexer:init
-   lexer:scan <<< '_: 100;'
+   lexer:scan
 
    parser:init
    parser:parse
 
-   local -n node='NODE_6'
+   local -n node='NODE_8'
    assert_equal  "${node[value]}"     '100'
-   assert_equal  "${TYPEOF[NODE_6]}"  'integer'
+   assert_equal  "${TYPEOF[NODE_8]}"  'integer'
 }
 
 
 @test "declaration w/ string" {
-   local -a FILES=( /dev/stdin )
+   globals:init
+   file:new
+   file:resolve "$F"
 
+   echo '_: "string";' > "$F"
    lexer:init
-   lexer:scan <<< '_: "string";'
+   lexer:scan
 
    parser:init
    parser:parse
 
-   local -n node='NODE_6'
+   local -n node='NODE_8'
    assert_equal  "${node[value]}"     'string'
-   assert_equal  "${TYPEOF[NODE_6]}"  'string'
+   assert_equal  "${TYPEOF[NODE_8]}"  'string'
 }
 
 
 @test "declaration w/ path" {
-   local -a FILES=( /dev/stdin )
+   globals:init
+   file:new
+   file:resolve "$F"
 
+   echo "_: 'path';" > "$F"
    lexer:init
-   lexer:scan <<< "_: 'path';"
+   lexer:scan
 
    parser:init
    parser:parse
 
-   local -n node='NODE_6'
+   local -n node='NODE_8'
    assert_equal  "${node[value]}"     'path'
-   assert_equal  "${TYPEOF[NODE_6]}"  'path'
+   assert_equal  "${TYPEOF[NODE_8]}"  'path'
 }
 
 
 @test "declaration w/ fstring" {
-   local -a FILES=( /dev/stdin )
+   globals:init
+   file:new
+   file:resolve "$F"
 
+   echo '_: f"before{}after";' > "$F"
    lexer:init
-   lexer:scan <<< '_: f"before{}after";'
+   lexer:scan
 
    parser:init
    parser:parse
 
-   local -n node='NODE_6'
-   assert_equal  "${TYPEOF[NODE_6]}"  'string'
+   local -n node='NODE_8'
+   assert_equal  "${TYPEOF[NODE_8]}"  'string'
    assert_equal  "${node[value]}"     'before'
 
-   local -n node='NODE_7'
-   assert_equal  "${TYPEOF[NODE_6]}"  'string'
+   local -n node='NODE_9'
+   assert_equal  "${TYPEOF[NODE_8]}"  'string'
    assert_equal  "${node[value]}"     'after'
 }
 
 
 @test "declaration w/ fpath" {
-   local -a FILES=( /dev/stdin )
+   globals:init
+   file:new
+   file:resolve "$F"
 
+   echo "_: f'before{}after';" > "$F"
    lexer:init
-   lexer:scan <<< "_: f'before{}after';"
+   lexer:scan
 
    parser:init
    parser:parse
 
-   local -n node='NODE_6'
-   assert_equal  "${TYPEOF[NODE_6]}"  'path'
+   local -n node='NODE_8'
+   assert_equal  "${TYPEOF[NODE_8]}"  'path'
    assert_equal  "${node[value]}"     'before'
 
-   local -n node='NODE_7'
-   assert_equal  "${TYPEOF[NODE_6]}"  'path'
+   local -n node='NODE_9'
+   assert_equal  "${TYPEOF[NODE_8]}"  'path'
    assert_equal  "${node[value]}"     'after'
 }
 
 
-@test "declaration w/ array" {
-   local -a FILES=( /dev/stdin )
+@test "declaration w/ list" {
+   globals:init
+   file:new
+   file:resolve "$F"
 
+   echo '_: [];' > "$F"
    lexer:init
-   lexer:scan <<< '_: [];'
+   lexer:scan
 
    parser:init
    parser:parse
 
-   local -n node='NODE_6'
-   assert_equal  "${TYPEOF[NODE_6]}"  'array'
-   assert_equal  "${#node[@]}"        0
+   local node='NODE_8'
+   local -n node_r="$node"
+   local -n items_r="${node_r[items]}"
+
+   assert_equal  "${TYPEOF[$node]}"  'list'
+   assert_equal  "${#items_r[@]}"    0
 }
 
 
 @test "declaration w/ unary" {
-   local -a FILES=( /dev/stdin )
+   globals:init
+   file:new
+   file:resolve "$F"
 
+   echo '_: -1;' > "$F"
    lexer:init
-   lexer:scan <<< '_: -1;'
+   lexer:scan
 
    parser:init
    parser:parse
 
-   local -n node='NODE_6'
-   assert_equal  "${TYPEOF[NODE_6]}"  'unary'
+   local -n node='NODE_8'
+   assert_equal  "${TYPEOF[NODE_8]}"  'unary'
 
    local -- right_name="${node[right]}"
    local -n right="${node[right]}"
@@ -223,92 +264,107 @@ function setup {
 
 
 @test "declaration w/ identifier" {
-   local -a FILES=( /dev/stdin )
+   globals:init
+   file:new
+   file:resolve "$F"
 
+   echo '_: foo;' > "$F"
    lexer:init
-   lexer:scan <<< '_: foo;'
+   lexer:scan
 
    parser:init
    parser:parse
 
-   local -n node='NODE_6'
-   assert_equal  "${TYPEOF[NODE_6]}"  'identifier'
+   local -n node='NODE_8'
+   assert_equal  "${TYPEOF[NODE_8]}"  'identifier'
    assert_equal  "${node[value]}"     'foo'
 }
 
 
 @test "declaration w/ environment variable" {
-   local -a FILES=( /dev/stdin )
+   globals:init
+   file:new
+   file:resolve "$F"
 
+   echo '_: $ENV;' > "$F"
    lexer:init
-   lexer:scan <<< '_: $ENV;'
+   lexer:scan
 
    parser:init
    parser:parse
 
-   local -n node='NODE_6'
-   assert_equal  "${TYPEOF[NODE_6]}"  'env_var'
+   local -n node='NODE_8'
+   assert_equal  "${TYPEOF[NODE_8]}"  'env_var'
    assert_equal  "${node[value]}"     'ENV'
 }
 
 
 @test "declaration w/ index" {
-   local -a FILES=( /dev/stdin )
+   globals:init
+   file:new
+   file:resolve "$F"
 
+   echo '_: [0][0];' > "$F"
    lexer:init
-   lexer:scan <<< '_: [0][0];'
+   lexer:scan
 
    parser:init
    parser:parse
 
-   local -- node_name='NODE_8'
-   local -n node="$node_name"
+   local node='NODE_11'
+   local -n node_r="$node"
 
-   local -- left_name="${node[left]}"
-   local -n left="$left_name"
+   local left="${node_r[left]}"
+   local -n left_r="$left"
 
-   local -- right_name="${node[right]}"
-   local -n right="$right_name"
+   local right="${node_r[right]}"
+   local -n right_r="$right"
 
-   assert_equal  "${TYPEOF[$node_name]}"   'index'
-   assert_equal  "${TYPEOF[$left_name]}"   'array'
-   assert_equal  "${TYPEOF[$right_name]}"  'integer'
+   assert_equal  "${TYPEOF[$node]}"   'index'
+   assert_equal  "${TYPEOF[$left]}"   'list'
+   assert_equal  "${TYPEOF[$right]}"  'integer'
 }
 
 
 @test "declaration w/ typecast" {
-   local -a FILES=( /dev/stdin )
+   globals:init
+   file:new
+   file:resolve "$F"
 
+   echo '_: "to path" -> path;' > "$F"
    lexer:init
-   lexer:scan <<< '_: "to path" -> path;'
+   lexer:scan
 
    parser:init
    parser:parse
 
-   local -- node_name='NODE_7'
-   local -n node="$node_name"
-   local -- typedef="${node[typedef]}"
-   local -- expr="${node[expr]}"
+   local node='NODE_9'
+   local -n node_r="$node"
+   local type="${node_r[type]}"
+   local expr="${node_r[expr]}"
 
-   assert_equal  "${TYPEOF[$node_name]}"  'typecast'
-   assert_equal  "${TYPEOF[$typedef]}"    'typedef'
-   assert_equal  "${TYPEOF[$expr]}"       'string'
+   assert_equal  "${TYPEOF[$node]}"   'typecast'
+   assert_equal  "${TYPEOF[$type]}"   'type'
+   assert_equal  "${TYPEOF[$expr]}"   'string'
 }
 
 
 @test "section declaration" {
-   local -a FILES=( /dev/stdin )
+   globals:init
+   file:new
+   file:resolve "$F"
 
+   echo '_ { }' > "$F"
    lexer:init
-   lexer:scan <<< '_ { }'
+   lexer:scan
 
    parser:init
    parser:parse
 
-   local -- node_name='NODE_5'
-   local -n node="$node_name"
-   local -n items="${node[items]}"
+   local node='NODE_4'
+   local -n node_r="$node"
+   local -n items_r="${node_r[items]}"
 
-   assert_equal  "${TYPEOF[$node_name]}"  'decl_section'
-   assert_equal  "${#items[@]}"  0
+   assert_equal  "${TYPEOF[$node]}"  'decl_section'
+   assert_equal  "${#items[@]}"      0
 }
