@@ -82,10 +82,10 @@ function lexer:scan {
 
    # For easier lookahead, read all characters first into an array. Allows us
    # to seek/index very easily.
-   local i
-   for (( i=0; i<${#input}; ++i )) ; do
-      CHARRAY+=( "${input:${i}:1}" )
-   done
+   local char
+   while read -rN1 char ; do
+      CHARRAY+=( "$char" )
+   done <<< "$input"
 
    # For later error reporting. Easier to report errors by line number if we
    # have them in lines... by number...
