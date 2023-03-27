@@ -1,7 +1,8 @@
 #!/usr/bin/env bats
 # vim:ft=sh
 
-function setup { load '/usr/lib/bats-assert/load.bash'
+function setup {
+   load '/usr/lib/bats-assert/load.bash'
    load '/usr/lib/bats-support/load.bash'
 
    local SRC="${BATS_TEST_DIRNAME}/../src"
