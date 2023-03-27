@@ -80,8 +80,8 @@ function lexer:scan {
    # by 2.5 to 3x.
    local input=$( <"${file_r[path]}" )
 
-   # For easier lookahead, read all characters first into an array. Allows us
-   # to seek/index very easily.
+   # For easier lookahead, read all characters first into an array. Allow easy
+   # seek/index.
    local char
    while read -rN1 char ; do
       CHARRAY+=( "$char" )
