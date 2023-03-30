@@ -11,18 +11,15 @@ function setup {
    source "${SRC}/lexer.sh"
    source "${SRC}/errors.sh"
 
-   export F=$( mktemp "${BATS_TEST_TMPDIR}"/XXX ) 
    globals:init
-
    file:new
-   file:resolve "$F"
+   file:resolve "/dev/stdin"
 }
 
 
 @test "throw invalid fstring" {
-   echo 'f"{^str}"' > "$F"
    lexer:init
-   run lexer:scan
+   run lexer:scan <<< 'f"{^str}"'
 
    assert_output --partial "invalid character in fstring [^]"
    assert_equal  $status   "${ERROR_CODE[invalid_interpolation_char]%%,*}"
@@ -30,9 +27,8 @@ function setup {
 
 
 @test "throw invalid fpath" {
-   echo "f'{^str}'" > "$F"
    lexer:init
-   run lexer:scan
+   run lexer:scan <<< "f'{^str}'"
 
    assert_output --partial "invalid character in fstring [^]"
    assert_equal  $status   "${ERROR_CODE[invalid_interpolation_char]%%,*}"
@@ -40,9 +36,8 @@ function setup {
 
 
 @test "throw unescaped brace, fstring" {
-   echo 'f"}"' > "$F"
    lexer:init
-   run lexer:scan
+   run lexer:scan <<< 'f"}"'
 
    assert_output --partial "single \`}' not allowed in f-string."
    assert_equal  $status   "${ERROR_CODE[unescaped_interpolation_brace]%%,*}"
@@ -50,9 +45,8 @@ function setup {
 
 
 @test "throw unescaped brace, fpath" {
-   echo "f'}'" > "$F"
    lexer:init
-   run lexer:scan
+   run lexer:scan <<< "f'}'"
 
    assert_output --partial "single \`}' not allowed in f-string."
    assert_equal  $status   "${ERROR_CODE[unescaped_interpolation_brace]%%,*}"

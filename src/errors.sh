@@ -32,22 +32,23 @@ declare -gA ERROR_CODE=(
    [syntax_error]='14,Syntax Error'
    [invalid_interpolation_char]='15,Syntax Error'
    [unescaped_interpolation_brace]='16,Syntax Error'
+   [unterminated_string]='17,Syntax Error'
 
    # Parse errors
-   [parse_error]='17,Parse Error'
-   [munch_error]='18,Parse Error'
+   [parse_error]='18,Parse Error'
+   [munch_error]='19,Parse Error'
 
    # Type errors
-   [type_error]='19,Type Error'
-   [not_a_type]='20,Type Error'
-   [symbol_mismatch]='21,Type Error'
-   [slot_error]='22,Type Error'
+   [type_error]='20,Type Error'
+   [not_a_type]='21,Type Error'
+   [symbol_mismatch]='22,Type Error'
+   [slot_error]='23,Type Error'
 
    # Key errors
-   [index_error]='23,Name Error'
-   [name_collision]='24,Name Error'
-   [missing_var]='25,Name Error'
-   [circular_reference]='26,Name Error'
+   [index_error]='24,Name Error'
+   [name_collision]='25,Name Error'
+   [missing_var]='26,Name Error'
+   [circular_reference]='27,Name Error'
 
    # Misc. errors
    [idiot_programmer]='255,Idiot Programmer Error'
@@ -304,6 +305,11 @@ function raise_invalid_interpolation_char {
 function raise_unescaped_interpolation_brace {
    local -n error_r="$ERROR"
    error_r[msg]="single \`}' not allowed in f-string."
+}
+
+function raise_unterminated_string {
+   local -n error_r="$ERROR"
+   error_r[msg]="${1}"
 }
 
 #───────────────────────────────( parse errors )────────────────────────────────

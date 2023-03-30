@@ -11,22 +11,19 @@ function setup {
    source "${src}/lexer.sh"
    source "${src}/errors.sh"
 
-   export F=$( mktemp "${BATS_TEST_TMPDIR}"/XXX ) 
    globals:init
-
    file:new
-   file:resolve "$F"
+   file:resolve "/dev/stdin"
 }
 
 
 @test "identify invalid tokens" {
-   : 'While not testing every invalid token, a selection of invalid characters
-      should all produce an `ERROR` token, with their value preserved.'
+   # While not testing every invalid token, a selection of invalid characters
+   # should all produce an `ERROR` token, with their value preserved.
 
    for char in '%'  '^'  '*' ; do
-      echo "$char" > "$F"
       lexer:init
-      run lexer:scan
+      run lexer:scan <<< "$char"
 
       assert_failure
       assert_equal  "$status"  ${ERROR_CODE['syntax_error']%%,*} 
@@ -35,8 +32,9 @@ function setup {
 
 
 @test "identify valid symbols" {
-   echo  '., ;: $ ? -> - () [] {} #Comment' > "$F"
-   lexer:init ; lexer:scan
+   lexer:init ; lexer:scan <<< '
+      ., ;: $ ? -> - () [] {} #Comment
+   '
 
    declare -A EXP_0=(  [type]="DOT"        [value]="."  )
    declare -A EXP_1=(  [type]="COMMA"      [value]=","  )
@@ -70,7 +68,8 @@ function setup {
 
 
 @test "identify valid literals" {
-   cat << EOF > "$F"
+   lexer:init
+   lexer:scan < <(cat <<EOF
       # Keywords.
       import
       as
@@ -90,10 +89,7 @@ function setup {
 
       "\""  # String with escaped: "
       '\''  # Path with escaped: '
-EOF
-
-   lexer:init
-   lexer:scan
+EOF)
 
    # Keywords.
    declare -A EXP_0=(  [type]="IMPORT"      [value]="import"     )
@@ -136,7 +132,8 @@ EOF
 
 
 @test "identify fstring, fpath" {
-   cat << EOF > "$F"
+   lexer:init
+   lexer:scan < <(cat << EOF
       f'before{\$HERE}after'
       f"before{\$HERE}after"
 
@@ -145,10 +142,7 @@ EOF
 
       f'\{ \' \}'
       f"\{ \" \}"
-EOF
-
-   lexer:init
-   lexer:scan 
+EOF)
 
    # fpath.
    declare -A EXP_0=(  [type]='PATH'        [value]='before'       )

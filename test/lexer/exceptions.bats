@@ -15,16 +15,31 @@ function setup {
    globals:init
 
    file:new
-   file:resolve "$F"
+   file:resolve "/dev/stdin"
 }
 
 
 @test "raise syntax_error on ERROR token" {
-   echo '&' > "$F"
    lexer:init
-   run lexer:scan
+   run lexer:scan <<< '&'
 
    assert_failure
    assert_output --partial 'Syntax Error('
    assert_output --partial 'invalid character [&]'
+}
+
+
+@test "raise error on unterminated string" {
+   lexer:init
+   run lexer:scan <<< '"'
+
+   assert_failure
+}
+
+
+@test "raise error on unterminated path" {
+   lexer:init
+   run lexer:scan <<< "'"
+
+   assert_failure
 }

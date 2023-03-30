@@ -11,7 +11,6 @@ function setup {
    source "${SRC}/errors.sh"
 
    export _LEXER_SH="${SRC}/lexer.sh"
-   export F=$( mktemp "${BATS_TEST_TMPDIR}"/XXX ) 
 }
 
 
@@ -40,11 +39,10 @@ function setup {
 
    globals:init
    file:new
-   file:resolve "$F"
+   file:resolve "/dev/stdin"
 
-   echo '' > "$F"
    lexer:init
-   lexer:scan
+   lexer:scan <<< ''
 
    # Should have only an EOF token.
    assert [ ${#TOKENS[@]} -eq 1 ]

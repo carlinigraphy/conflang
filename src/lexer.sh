@@ -90,7 +90,7 @@ function lexer:scan {
    # For later error reporting. Easier to report errors by line number if we
    # have them in lines... by number...
    local -n file_lines_r="$FILE_LINES"
-   readarray -t -O1 file_lines_r <<< "$input_str"
+   readarray -t -O1 file_lines_r <<< "$input"
 
    while (( "${CURSOR[index]}" < ${#CHARRAY[@]} )) ; do
       lexer:advance ; [[ ! "$CHAR" ]] && break
@@ -271,11 +271,25 @@ function lexer:string {
 
    # Create token.
    token:new 'STRING' "$join"
+
+   # This comes after the token creation above, as it contains the cursor
+   # information for the initial quote character.
+   if [[ ! $PEEK_CHAR ]] ; then
+      local anchor="$LOCATION"
+      location:cursor
+      e=( --anchor "$anchor"
+          --caught "$LOCATION"
+          "unterminated string"
+      ); raise unterminated_string "${e[@]}"
+   fi
 }
 
 
 function lexer:path {
    local -a buffer=()
+
+   local -n t_r="${TOKENS[-1]}"
+   local anchor="${t_r[location]}"
 
    while [[ $PEEK_CHAR ]] ; do
       lexer:advance
@@ -301,16 +315,25 @@ function lexer:path {
 
    # Create token.
    token:new 'PATH' "$join"
+
+   # This comes after the token creation above, as it contains the cursor
+   # information for the initial quote character.
+   if [[ ! $PEEK_CHAR ]] ; then
+      local anchor="$LOCATION"
+      location:cursor
+      e=( --anchor "$anchor"
+          --caught "$LOCATION"
+          "unterminated path"
+      ); raise unterminated_string "${e[@]}"
+   fi
 }
 
 
 function lexer:number {
    local number="${CHAR}"
-
    while [[ $PEEK_CHAR =~ [[:digit:]] ]] ; do
       lexer:advance ; number+="$CHAR"
    done
-
    token:new 'INTEGER' "$number"
 }
 
