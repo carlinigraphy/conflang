@@ -1,5 +1,5 @@
 #!/usr/bin/bats
-# vim:ft=sh
+# vim: ft=sh:
 
 function setup {
    load '/usr/lib/bats-assert/load.bash'

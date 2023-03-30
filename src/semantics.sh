@@ -208,16 +208,9 @@ function flatten_env_var { :; }
 #===============================================================================
 # @section                      Order dependencies
 # @description
-#  Orders `UNORDERED_DEPS[]` array from the `flatten` phase. Iterates each
+#  Orders `UNORDERED_DEPS{}` array from the `flatten` phase. Iterates each
 #  variable declaration, counts the "depth" of its dependencies. Sorta based on
 #  minimum -> maximum depth.
-#
-#-------------------------------------------------------------------------------
-# TODO: change `UNORDERED_DEPS` to an associative array. They're inherently not
-# ordered, so not information is lost, but it makes a more clear connection from
-# the AST node itself to the array holding its dependencies.
-#
-# Also may help with checking 
 #
 #-------------------------------------------------------------------------------
 
