@@ -12,18 +12,15 @@ function setup {
    source "${src}/parser.sh"
    source "${src}/errors.sh"
 
-   export F=$( mktemp "${BATS_TEST_TMPDIR}"/XXX ) 
    globals:init
-
    file:new
-   file:resolve "$F"
+   file:resolve "/dev/stdin"
 }
 
 
 @test 'empty list' {
-   echo '_: [];' > "$F"
    lexer:init
-   lexer:scan
+   lexer:scan <<< '_: [];' 
 
    parser:init
    parser:parse
@@ -38,16 +35,14 @@ function setup {
 
 
 @test 'nested list' {
-   echo '
+   lexer:init
+   lexer:scan <<< '
       a1: [
          [
             []
          ]
       ];
-   ' > "$F"
-
-   lexer:init
-   lexer:scan
+   '
 
    parser:init
    parser:parse
@@ -78,14 +73,12 @@ function setup {
 
 
 @test 'disallow assignment in lists' {
-   echo '
+   lexer:init
+   lexer:scan <<< '
       _: [
          key: value;
       ];
-   ' > "$F"
-
-   lexer:init
-   lexer:scan
+   '
 
    parser:init
    run parser:parse
@@ -94,14 +87,12 @@ function setup {
 
 
 @test 'allow trailing comma' {
-   echo "
+   lexer:init
+   lexer:scan <<< "
       _: [
          '',
       ];
-   " > "$F"
-
-   lexer:init
-   lexer:scan <<< "$input"
+   "
 
    parser:init
    parser:parse
@@ -117,16 +108,15 @@ function setup {
 
 
 @test 'nested section' {
-   echo '
+   lexer:init
+   lexer:scan <<< '
       s1 {
          s2 {
             s3 {}
          }
       }
-   ' > "$F"
+   '
 
-   lexer:init
-   lexer:scan
 
    parser:init
    parser:parse

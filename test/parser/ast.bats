@@ -16,18 +16,15 @@ function setup {
    source "${src}/parser.sh"
    source "${src}/errors.sh"
 
-   export F=$( mktemp "${BATS_TEST_TMPDIR}"/XXX ) 
+   globals:init
+   file:new
+   file:resolve "/dev/stdin"
 }
 
 
 @test "variable declaration, empty" {
-   globals:init
-   file:new
-   file:resolve "$F"
-
-   echo 'key;' > "$F"
    lexer:init
-   lexer:scan
+   lexer:scan <<< 'key;'
 
    parser:init
    parser:parse
@@ -51,13 +48,8 @@ function setup {
 
 
 @test "variable declaration, type and value" {
-   globals:init
-   file:new
-   file:resolve "$F"
-
-   echo 'key @str: "value";' > "$F"
    lexer:init
-   lexer:scan
+   lexer:scan <<< 'key @str: "value";'
 
    parser:init
    parser:parse
@@ -83,13 +75,8 @@ function setup {
 
 
 @test "declaration w/ complex type" {
-   globals:init
-   file:new
-   file:resolve "$F"
-
-   echo 'key @list[str];' > "$F"
    lexer:init
-   lexer:scan
+   lexer:scan <<< 'key @list[str];' 
 
    parser:init
    parser:parse
@@ -105,13 +92,8 @@ function setup {
 
 
 @test "declaration w/ boolean" {
-   globals:init
-   file:new
-   file:resolve "$F"
-
-   echo "_: true;" > "$F"
    lexer:init
-   lexer:scan
+   lexer:scan <<< "_: true;" 
 
    parser:init
    parser:parse
@@ -123,13 +105,8 @@ function setup {
 
 
 @test "declaration w/ integer" {
-   globals:init
-   file:new
-   file:resolve "$F"
-
-   echo '_: 100;' > "$F"
    lexer:init
-   lexer:scan
+   lexer:scan <<< '_: 100;' 
 
    parser:init
    parser:parse
@@ -141,13 +118,8 @@ function setup {
 
 
 @test "declaration w/ string" {
-   globals:init
-   file:new
-   file:resolve "$F"
-
-   echo '_: "string";' > "$F"
    lexer:init
-   lexer:scan
+   lexer:scan <<< '_: "string";' 
 
    parser:init
    parser:parse
@@ -159,13 +131,8 @@ function setup {
 
 
 @test "declaration w/ path" {
-   globals:init
-   file:new
-   file:resolve "$F"
-
-   echo "_: 'path';" > "$F"
    lexer:init
-   lexer:scan
+   lexer:scan <<< "_: 'path';" 
 
    parser:init
    parser:parse
@@ -177,13 +144,8 @@ function setup {
 
 
 @test "declaration w/ fstring" {
-   globals:init
-   file:new
-   file:resolve "$F"
-
-   echo '_: f"before{}after";' > "$F"
    lexer:init
-   lexer:scan
+   lexer:scan <<< '_: f"before{}after";' 
 
    parser:init
    parser:parse
@@ -199,13 +161,8 @@ function setup {
 
 
 @test "declaration w/ fpath" {
-   globals:init
-   file:new
-   file:resolve "$F"
-
-   echo "_: f'before{}after';" > "$F"
    lexer:init
-   lexer:scan
+   lexer:scan <<< "_: f'before{}after';" 
 
    parser:init
    parser:parse
@@ -221,13 +178,8 @@ function setup {
 
 
 @test "declaration w/ list" {
-   globals:init
-   file:new
-   file:resolve "$F"
-
-   echo '_: [];' > "$F"
    lexer:init
-   lexer:scan
+   lexer:scan <<< '_: [];' 
 
    parser:init
    parser:parse
@@ -242,13 +194,8 @@ function setup {
 
 
 @test "declaration w/ unary" {
-   globals:init
-   file:new
-   file:resolve "$F"
-
-   echo '_: -1;' > "$F"
    lexer:init
-   lexer:scan
+   lexer:scan <<< '_: -1;' 
 
    parser:init
    parser:parse
@@ -264,13 +211,8 @@ function setup {
 
 
 @test "declaration w/ identifier" {
-   globals:init
-   file:new
-   file:resolve "$F"
-
-   echo '_: foo;' > "$F"
    lexer:init
-   lexer:scan
+   lexer:scan <<< '_: foo;' 
 
    parser:init
    parser:parse
@@ -282,13 +224,8 @@ function setup {
 
 
 @test "declaration w/ environment variable" {
-   globals:init
-   file:new
-   file:resolve "$F"
-
-   echo '_: $ENV;' > "$F"
    lexer:init
-   lexer:scan
+   lexer:scan <<< '_: $ENV;' 
 
    parser:init
    parser:parse
@@ -300,13 +237,8 @@ function setup {
 
 
 @test "declaration w/ index" {
-   globals:init
-   file:new
-   file:resolve "$F"
-
-   echo '_: [0][0];' > "$F"
    lexer:init
-   lexer:scan
+   lexer:scan <<< '_: [0][0];' 
 
    parser:init
    parser:parse
@@ -327,13 +259,8 @@ function setup {
 
 
 @test "declaration w/ typecast" {
-   globals:init
-   file:new
-   file:resolve "$F"
-
-   echo '_: "to path" -> path;' > "$F"
    lexer:init
-   lexer:scan
+   lexer:scan <<< '_: "to path" -> path;' 
 
    parser:init
    parser:parse
@@ -350,13 +277,8 @@ function setup {
 
 
 @test "section declaration" {
-   globals:init
-   file:new
-   file:resolve "$F"
-
-   echo '_ { }' > "$F"
    lexer:init
-   lexer:scan
+   lexer:scan <<< '_ { }' 
 
    parser:init
    parser:parse

@@ -17,11 +17,9 @@ function setup {
    source "${src}/parser.sh"
    source "${src}/errors.sh"
 
-   export F=$( mktemp "${BATS_TEST_TMPDIR}"/XXX ) 
    globals:init
-
    file:new
-   file:resolve "$F"
+   file:resolve "/dev/stdin"
 }
 
 #@test "operator precedence, typecast" {

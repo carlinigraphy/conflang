@@ -12,21 +12,15 @@ function setup {
    source "${src}/parser.sh"
    source "${src}/errors.sh"
 
-   export F=$( mktemp "${BATS_TEST_TMPDIR}"/XXX ) 
    globals:init
-
    file:new
-   file:resolve "$F"
+   file:resolve "/dev/stdin"
 }
 
 
-# TODO: Expect `:' before expressions, add more of these. Check that any
-#       characte which begins an expression has accurate error reporting.
-
 @test "raise munch_error on unexpected token" {
-   echo '_ (4);' > "$F"
    lexer:init
-   lexer:scan
+   lexer:scan <<< '_ (4);' 
 
    parser:init
    run parser:parse
@@ -50,9 +44,8 @@ function setup {
    )
 
    for expr in "${expressions[@]}" ; do
-      echo "$expr" > "$F"
       lexer:init
-      lexer:scan
+      lexer:scan <<< "$expr"
 
       parser:init
       run parser:parse
@@ -65,9 +58,8 @@ function setup {
 
 
 @test "raise parse_error on missing \`;' after declaration, 1" {
-   echo '_: ""' > "$F"
    lexer:init
-   lexer:scan
+   lexer:scan <<< '_: ""' 
 
    parser:init
    run parser:parse
@@ -80,9 +72,8 @@ function setup {
 
 
 @test "raise parse_error on missing \`;' after declaration, 2" {
-   echo '_: "" s{}' > "$F"
    lexer:init
-   lexer:scan
+   lexer:scan <<< '_: "" s{}' 
 
    parser:init
    run parser:parse
@@ -102,9 +93,8 @@ function setup {
    )
 
    for expr in "${expressions[@]}" ; do
-      echo "$expr" > "$F"
       lexer:init
-      lexer:scan
+      lexer:scan <<< "$expr"
 
       parser:init
       run parser:parse
@@ -117,9 +107,8 @@ function setup {
 
 
 @test "raise parse_error on include taking a non-path" {
-   echo 'import "string";' > "$F"
    lexer:init
-   lexer:scan
+   lexer:scan <<< 'import "string";' 
 
    parser:init
    run parser:parse

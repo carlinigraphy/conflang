@@ -12,11 +12,11 @@ function setup {
 
 
 @test "function declarations all have \`parser:\` prefix" {
-   : 'The lib/lexer.sh and lib/parser.sh files have many common functions and
-      variables, whose names could stomp eachothers. For example: advance(),
-      match(), $CURRENT, $PEEK.  To avoid name stomping, parser functions are
-      prefixed by `parser:`. Ensure that for every intended function, it
-      contains the `parser:` prefix.'
+   # The lib/lexer.sh and lib/parser.sh files have many common functions and
+   # variables, whose names could stomp eachothers. For example: advance(),
+   # match(), $CURRENT, $PEEK.  To avoid name stomping, parser functions are
+   # prefixed by `parser:`. Ensure that for every intended function, it
+   # contains the `parser:` prefix.
 
    # Awk regex pattern.
    pattern='/^[[:alpha:]_][[:alnum:]_:]* \(\)/'
@@ -71,8 +71,8 @@ function setup {
 
 
 @test "function calls have intended \`parser:\` prefix" {
-   : "Can be easy to forget to add the parser: prefix when calling simple
-      functions like advance() or munch(). Awk the full text to check"
+   # Can be easy to forget to add the parser: prefix when calling simple
+   # functions like advance() or munch(). Awk the full text to check
 
    # Awk regex pattern for identifying function names in the `declare -f`
    # output.

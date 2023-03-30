@@ -12,8 +12,6 @@ function setup {
    source "${src}/main"
    source "${src}/errors.sh"
    source "${src}/locations.sh"
-
-   export F=$( mktemp "${BATS_TEST_TMPDIR}"/XXX ) 
 }
 
 
@@ -47,11 +45,10 @@ function setup {
 
    globals:init
    file:new
-   file:resolve "$F"
+   file:resolve "/dev/stdin"
 
-   echo '' > "$F"
    lexer:init
-   lexer:scan
+   lexer:scan <<< ''
 
    parser:init
    parser:parse
@@ -67,11 +64,10 @@ function setup {
 
    globals:init
    file:new
-   file:resolve "$F"
+   file:resolve "/dev/stdin"
 
-   echo 'this @str: "that";' > "$F"
    lexer:init
-   lexer:scan
+   lexer:scan <<< 'this @str: "that";'
 
    parser:init
    parser:parse
