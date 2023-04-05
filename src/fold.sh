@@ -20,6 +20,8 @@
 # @noargs
 function fold {
    local _path="${IMPORTS[0]}"
+
+   # shellcheck disable=SC2153
    declare -g FILE="${FILES[$_path]}"
 
    local -n lhs_r="$FILE"
@@ -147,11 +149,9 @@ function merge:section {
    if [[ ! ${rhs_type_r[kind]} == SECTION ]] ; then
       local -n lhs_name_r="${lhs_node_r[name]}"
       local -n rhs_name_r="${rhs_node_r[name]}"
-
-      e=( symbol_mismatch
-         --anchor "${lhs_name_r[location]}"
-         --caught "${rhs_name_r[location]}"
-      ); raise "${e[@]}"
+      e=( --anchor "${lhs_name_r[location]}"
+          --caught "${rhs_name_r[location]}"
+      ); raise symbol_mismatch "${e[@]}"
    fi
 
    local lhs_symtab="${lhs_node_r[symtab]}"

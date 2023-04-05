@@ -132,7 +132,7 @@ function symtab:descend {
 
 
 function symbol:new {
-   local symtab="SYMTAB_$(( ++_SYMTAB_NUM ))"
+   local symbol="SYMBOL_$(( ++_SYMBOL_NUM ))"
    declare -gA "$symbol"
    declare -g SYMBOL="$symbol"
 
@@ -478,6 +478,9 @@ function symtab_decl_variable {
 #                   `-> str     `-> rec
 #                                     \ 
 #                                      `-> int  ->>-  str
+#
+#  where:
+#     (a) :: drop location (a)nchor
 #  ```
 #
 #  May throw either:

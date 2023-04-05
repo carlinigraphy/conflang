@@ -218,7 +218,9 @@ function main {
    walk:compiler "$ast"
 
    declare -f conf > "$OUTPUT"
+   # shellcheck disable=SC2086
    if [[ ${!_SKELLY_*} ]] ; then declare -p ${!_SKELLY_*} > "$OUTPUT" ; fi
+   # shellcheck disable=SC2086
    if [[ ${!_DATA_*}   ]] ; then declare -p ${!_DATA_*}   > "$OUTPUT" ; fi
 }
 
