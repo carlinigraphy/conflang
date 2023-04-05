@@ -43,8 +43,7 @@ function lexer:init {
 function token:new {
    local type=$1  value=$2
 
-   (( ++_TOKEN_NUM ))
-   local token="TOKEN_${_TOKEN_NUM}"
+   local token="TOKEN_$(( ++_TOKEN_NUM ))"
    declare -gA "$token"
    TOKENS+=( "$token" )
 
@@ -449,7 +448,7 @@ function lexer:fstring {
          # Only create the closing CONCAT token if there were contents to the
          # expression.
          local t1="$_TOKEN_NUM"
-         if (( $t0 != $t1 )) ; then
+         if (( t0 != t1 )) ; then
             token:new 'CONCAT'
          fi
 
@@ -534,7 +533,7 @@ function lexer:fpath {
          # Only create the closing CONCAT token if there were contents to the
          # expression.
          local t1="$_TOKEN_NUM"
-         if (( $t0 != $t1 )) ; then
+         if (( t0 != t1 )) ; then
             token:new 'CONCAT'
          fi
 

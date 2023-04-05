@@ -351,9 +351,9 @@ function semantics_type {
    fi
 
    if [[ ${node_r['subtype']} ]] ; then
-      walk:semantics ${node_r[subtype]}
+      walk:semantics "${node_r[subtype]}"
       type_r[subtype]="$TYPE"
-   elif (( node_r[slots] )) ; then
+   elif (( node_r["slots"] )) ; then
       type:copy "$_ANY"
       type_r[subtype]="$TYPE"
    fi
@@ -364,7 +364,7 @@ function semantics_type {
 
 function semantics_typecast {
    local -n node_r="$NODE"
-   walk:semantics ${node_r[type]}
+   walk:semantics "${node_r[type]}"
 }
 
 
@@ -421,7 +421,7 @@ function semantics_index {
 
 function semantics_unary {
    local -n node_r="$NODE"
-   walk:semantics ${node_r[right]}
+   walk:semantics "${node_r[right]}"
 
    #  ┌── doesn't know about dynamically created $_INTEGER var.
    # shellcheck disable=SC2154
@@ -521,7 +521,7 @@ function semantics_record {
    fi
 
    type_r['subtype']="$TYPE"
-   unset type_r[next]
+   unset 'type_r[next]'
 
    declare -g TYPE="$type"
 }

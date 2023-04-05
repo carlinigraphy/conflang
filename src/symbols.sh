@@ -8,13 +8,12 @@
 #-------------------------------------------------------------------------------
 
 function symtab:new {
-   (( ++_SYMTAB_NUM ))
-   local symtab="SYMTAB_${_SYMTAB_NUM}"
+   local symtab="SYMTAB_$(( ++_SYMTAB_NUM ))"
    declare -gA "$symtab"
    declare -g  SYMTAB="$symtab"
 
    if [[ "$1" == --parent ]] ; then
-      SYMTAB_PARENT[$symtab]="$2"
+      SYMTAB_PARENT["$symtab"]="$2"
    fi
 
    # Without a value, this isn't glob matched by ${!_SYMTAB_*} expansion
@@ -28,8 +27,7 @@ function symtab:new {
 # @set   TYPE
 # @noargs
 function symtab:init_globals {
-   (( ++_SYMTAB_NUM ))
-   local symtab="SYMTAB_${_SYMTAB_NUM}"
+   local symtab="SYMTAB_$(( ++_SYMTAB_NUM ))"
    declare -gA "$symtab"
    declare -g SYMTAB="$symtab"
 
@@ -109,7 +107,7 @@ function symtab:set {
    local name="${symbol_r[name]}"
 
    local -n symtab_r="$SYMTAB"
-   symtab_r[$name]="$symbol"
+   symtab_r["$name"]="$symbol"
 }
 
 
@@ -134,8 +132,7 @@ function symtab:descend {
 
 
 function symbol:new {
-   (( ++_SYMBOL_NUM ))
-   local symbol="SYMBOL_${_SYMBOL_NUM}"
+   local symtab="SYMTAB_$(( ++_SYMTAB_NUM ))"
    declare -gA "$symbol"
    declare -g SYMBOL="$symbol"
 
@@ -157,8 +154,7 @@ function symbol:new {
 function type:new {
    local -i slots="${1:-0}"
 
-   (( ++_TYPE_NUM ))
-   local type="TYPE_${_TYPE_NUM}"
+   local type="TYPE_$(( ++_TYPE_NUM ))"
    declare -gA "$type"
    declare -g  TYPE="$type"
 
@@ -357,6 +353,7 @@ function symtab_typedef {
    # Disallow subtypes on user-defined types.
 
    # Create Type representing Types.
+   # shellcheck disable=SC2153
    type:copy "$_TYPE"
    local metatype="$TYPE"
    local -n metatype_r="$TYPE"

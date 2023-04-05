@@ -161,7 +161,7 @@ function error:print {
    fi
 
    local filler='' ; local -i max
-   (( max = ${e_r[caught_col]} + 1 ))
+   (( max = e_r["caught_col"] + 1 ))
    for (( i=0; i<max ; ++i )) ; do
       filler+='-'
    done
@@ -174,7 +174,7 @@ function error:_single_file_context {
    local -n e_r="$1"
 
    local filler='' ; local -i max
-   (( max = ${e_r[anchor_col]} + 1 ))
+   (( max = e_r["anchor_col"] + 1 ))
    for (( i=0; i<max ; ++i )) ; do
       filler+='-'
    done
@@ -253,7 +253,7 @@ function error:_multi_file_context {
    local -n e_r="$1"
 
    local filler='' ; local -i max
-   (( max = ${e_r[anchor_col]} + 1 ))
+   (( max = e_r["anchor_col"] + 1 ))
    for (( i=0; i<max ; ++i )) ; do
       filler+='-'
    done

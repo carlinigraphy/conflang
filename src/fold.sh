@@ -226,7 +226,7 @@ function merge:variable {
       ); raise type_error "${e[@]}"
    fi
 
-   lhs_node_r[expr]="${rhs_node_r[expr]}"
+   lhs_node_r["expr"]="${rhs_node_r[expr]}"
 
    # Gotta walk the rhs expression to find any identifiers. Update their symtab
    # pointer to the appropriate lhs symtab.

@@ -218,8 +218,8 @@ function main {
    walk:compiler "$ast"
 
    declare -f conf > "$OUTPUT"
-   [[ ${!_SKELLY_*} ]] && declare -p ${!_SKELLY_*} > "$OUTPUT"  ||:
-   [[ ${!_DATA_*}   ]] && declare -p ${!_DATA_*}   > "$OUTPUT"  ||:
+   if [[ ${!_SKELLY_*} ]] ; then declare -p ${!_SKELLY_*} > "$OUTPUT" ; fi
+   if [[ ${!_DATA_*}   ]] ; then declare -p ${!_DATA_*}   > "$OUTPUT" ; fi
 }
 
 
@@ -232,31 +232,31 @@ fi
 # shellcheck disable=SC2155,SC2164
 declare -g PROGDIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" ; pwd )
 
-# shellcheck source=./src/errors.sh
+# shellcheck source=./errors.sh
 source "${PROGDIR}"/errors.sh
 
-# shellcheck source=./src/locations.sh
+# shellcheck source=./locations.sh
 source "${PROGDIR}"/locations.sh
 
-# shellcheck source=./src/lexer.sh
+# shellcheck source=./lexer.sh
 source "${PROGDIR}"/lexer.sh
 
-# shellcheck source=./src/parser.sh
+# shellcheck source=./parser.sh
 source "${PROGDIR}"/parser.sh
 
-# shellcheck source=./src/symbols.sh
+# shellcheck source=./symbols.sh
 source "${PROGDIR}"/symbols.sh
 
-# shellcheck source=./src/fold.sh
+# shellcheck source=./fold.sh
 source "${PROGDIR}"/fold.sh
 
-# shellcheck source=./src/semantics.sh
+# shellcheck source=./semantics.sh
 source "${PROGDIR}"/semantics.sh
 
-# shellcheck source=./src/compiler.sh
+# shellcheck source=./compiler.sh
 source "${PROGDIR}"/compiler.sh
 
-# shellcheck source=./src/api.sh
+# shellcheck source=./api.sh
 source "${PROGDIR}"/api.sh
 #<<END TOPIC SOURCE
 

@@ -13,8 +13,7 @@ function ast:new { _ast_new_"$1" ;}
 
 
 function _ast_new_program {
-   (( ++_NODE_NUM ))
-   local node="NODE_${_NODE_NUM}"
+   local node="NODE_$(( ++_NODE_NUM ))"
    declare -gA "$node"
    declare -g NODE="$node"
 
@@ -27,8 +26,7 @@ function _ast_new_program {
 
 
 function _ast_new_header {
-   (( ++_NODE_NUM ))
-   local node="NODE_${_NODE_NUM}"
+   local node="NODE_$(( ++_NODE_NUM ))"
    declare -gA "$node"
    declare -g NODE="$node"
 
@@ -49,8 +47,7 @@ function _ast_new_header {
 
 
 function _ast_new_import {
-   (( ++_NODE_NUM ))
-   local node="NODE_${_NODE_NUM}"
+   local node="NODE_$(( ++_NODE_NUM ))"
    declare -gA "$node"
    declare -g NODE="$node"
 
@@ -77,8 +74,7 @@ function _ast_new_import {
 # @see   parser:type
 # @noargs
 function _ast_new_typedef {
-   (( ++_NODE_NUM ))
-   local node="NODE_${_NODE_NUM}"
+   local node="NODE_$(( ++_NODE_NUM ))"
    declare -gA "$node"
    declare -g NODE="$node"
 
@@ -124,14 +120,12 @@ function _ast_new_container {
 
 function _ast_new_decl_section {
    # 1) create section container
-   (( ++_NODE_NUM ))
-   local node="NODE_${_NODE_NUM}"
+   local node="NODE_$(( ++_NODE_NUM ))"
    declare -gA "$node"
    declare -g NODE="$node"
 
    # 2) create list to hold the items within the section.
-   (( ++_NODE_NUM ))
-   local items="NODE_${_NODE_NUM}"
+   local items="NODE_$(( ++_NODE_NUM ))"
    declare -ga "$items"
 
    # 3) assign child node to parent.
@@ -152,8 +146,7 @@ function _ast_new_decl_section {
 
 
 function _ast_new_decl_variable {
-   (( ++_NODE_NUM ))
-   local node="NODE_${_NODE_NUM}"
+   local node="NODE_$(( ++_NODE_NUM ))"
    declare -gA "$node"
    declare -g NODE="$node"
 
@@ -170,14 +163,12 @@ function _ast_new_decl_variable {
 
 
 function _ast_new_list {
-   (( ++_NODE_NUM ))
-   local node="NODE_${_NODE_NUM}"
+   local node="NODE_$(( ++_NODE_NUM ))"
    declare -gA "$node"
    declare -g NODE="$node"
 
    # Similar to sections, lists need a .items property to hold their values.
-   (( ++_NODE_NUM ))
-   local items="NODE_${_NODE_NUM}"
+   local items="NODE_$(( ++_NODE_NUM ))"
    declare -ga "$items"
 
    # Assign .items node.
@@ -193,14 +184,12 @@ function _ast_new_list {
 
 
 function _ast_new_record {
-   (( ++_NODE_NUM ))
-   local node="NODE_${_NODE_NUM}"
+   local node="NODE_$(( ++_NODE_NUM ))"
    declare -gA "$node"
    declare -g NODE="$node"
 
    # Similar to sections, records need a .items property to hold their values.
-   (( ++_NODE_NUM ))
-   local items="NODE_${_NODE_NUM}"
+   local items="NODE_$(( ++_NODE_NUM ))"
    declare -ga "$items"
 
    # Assign .items node.
@@ -216,8 +205,7 @@ function _ast_new_record {
 
 
 function _ast_new_type {
-   (( ++_NODE_NUM ))
-   local node="NODE_${_NODE_NUM}"
+   local node="NODE_$(( ++_NODE_NUM ))"
    declare -gA "$node"
    declare -g NODE="$node"
 
@@ -234,8 +222,7 @@ function _ast_new_type {
 
 
 function _ast_new_typecast {
-   (( ++_NODE_NUM ))
-   local node="NODE_${_NODE_NUM}"
+   local node="NODE_$(( ++_NODE_NUM ))"
    declare -gA "$node"
    declare -g  NODE="$node"
 
@@ -253,8 +240,7 @@ function _ast_new_typecast {
 function _ast_new_member {
    # Only permissible in accessing section keys. Not in list indices.
 
-   (( ++_NODE_NUM ))
-   local node="NODE_${_NODE_NUM}"
+   local node="NODE_$(( ++_NODE_NUM ))"
    declare -gA "$node"
    declare -g NODE="$node"
 
@@ -272,8 +258,7 @@ function _ast_new_member {
 function _ast_new_index {
    # Only permissible in accessing list indices. Not in sections.
 
-   (( ++_NODE_NUM ))
-   local node="NODE_${_NODE_NUM}"
+   local node="NODE_$(( ++_NODE_NUM ))"
    declare -gA "$node"
    declare -g NODE="$node"
 
@@ -289,8 +274,7 @@ function _ast_new_index {
 
 
 function _ast_new_unary {
-   (( ++_NODE_NUM ))
-   local node="NODE_${_NODE_NUM}"
+   local node="NODE_$(( ++_NODE_NUM ))"
    declare -gA "$node"
    declare -g NODE="$node"
 
@@ -306,8 +290,7 @@ function _ast_new_unary {
 
 
 function _ast_new_boolean {
-   (( ++_NODE_NUM ))
-   local node="NODE_${_NODE_NUM}"
+   local node="NODE_$(( ++_NODE_NUM ))"
    declare -gA "$node"
    declare -g NODE="$node"
 
@@ -320,8 +303,7 @@ function _ast_new_boolean {
 
 
 function _ast_new_integer {
-   (( ++_NODE_NUM ))
-   local node="NODE_${_NODE_NUM}"
+   local node="NODE_$(( ++_NODE_NUM ))"
    declare -gA "$node"
    declare -g NODE="$node"
 
@@ -334,8 +316,7 @@ function _ast_new_integer {
 
 
 function _ast_new_string {
-   (( ++_NODE_NUM ))
-   local node="NODE_${_NODE_NUM}"
+   local node="NODE_$(( ++_NODE_NUM ))"
    declare -gA "$node"
    declare -g NODE="$node"
 
@@ -348,8 +329,7 @@ function _ast_new_string {
 
 
 function _ast_new_path {
-   (( ++_NODE_NUM ))
-   local node="NODE_${_NODE_NUM}"
+   local node="NODE_$(( ++_NODE_NUM ))"
    declare -gA "$node"
    declare -g NODE="$node"
 
@@ -362,8 +342,7 @@ function _ast_new_path {
 
 
 function _ast_new_identifier {
-   (( ++_NODE_NUM ))
-   local node="NODE_${_NODE_NUM}"
+   local node="NODE_$(( ++_NODE_NUM ))"
    declare -gA "$node"
    declare -g NODE="$node"
 
@@ -376,8 +355,7 @@ function _ast_new_identifier {
 
 
 function _ast_new_env_var {
-   (( ++_NODE_NUM ))
-   local node="NODE_${_NODE_NUM}"
+   local node="NODE_$(( ++_NODE_NUM ))"
    declare -gA "$node"
    declare -g NODE="$node"
 
@@ -430,10 +408,9 @@ function parser:advance {
 # @set   TOKEN_r
 # @noargs
 function parser:_advance {
-   if (( $IDX < ${#TOKENS[@]} )) ; then
-      declare -g  TOKEN="${TOKENS[$IDX]}"
+   if (( IDX < ${#TOKENS[@]} )) ; then
+      declare -g  TOKEN="${TOKENS[IDX++]}"
       declare -gn TOKEN_r="$TOKEN"
-      (( ++IDX ))
    fi
 }
 

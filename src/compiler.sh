@@ -115,7 +115,7 @@ function skelly_decl_section {
    # In which  _SKELLY_1 :: middle_skelly
    #           _SKELLY_2 :: dict_skelly
    #
-   skelly:new                                 #< _SKELLY_1
+   skelly:new                                #< _SKELLY_1
    local middle_skelly="$SKELLY"
    local -n middle_skelly_r="$middle_skelly"
 
@@ -345,6 +345,7 @@ function evaluate_identifier {
 #
 # _SKELLY_1="_SKELLY_2" ; _SKELLY_2="value"
 #             o< ---snip-snip--- >o                       <-- those are scissors
+#
 # _SKELLY_1=                        "value"
 
 function undead_yoga {
