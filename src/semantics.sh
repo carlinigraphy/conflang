@@ -35,12 +35,9 @@ declare -gA DEPTH_MAP=()
 # @set   UNORDERED_DEPS{}
 function dependency:new {
    local node="$1"
-
-   (( ++_DEP_ARRAY_NUM ))
-   local deps="_DEP_ARRAY_${_DEP_ARRAY_NUM}"
+   local deps="_DEP_ARRAY_$(( ++_DEP_ARRAY_NUM ))"
    declare -ga "$deps"
    declare -g  DEPENDENCIES="$deps"
-
    UNORDERED_DEPS["$node"]="$deps"
 }
 

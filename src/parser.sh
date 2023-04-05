@@ -30,8 +30,7 @@ function _ast_new_header {
    declare -gA "$node"
    declare -g NODE="$node"
 
-   (( ++_NODE_NUM ))
-   local items="NODE_${_NODE_NUM}"
+   local items="NODE_$(( ++_NODE_NUM ))"
    declare -ga "$items"
 
    # Assign .items node.

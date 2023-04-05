@@ -8,8 +8,7 @@
 # @set   LOCATION
 # @noargs
 function location:new {
-   (( ++_LOC_NUM ))
-   local loc="LOC_${_LOC_NUM}"
+   local loc="LOC_$(( ++_LOC_NUM ))"
    declare -gA "$loc"
    declare -g  LOCATION="$loc"
 
@@ -84,13 +83,11 @@ function location:cursor {
 # @set   FILE
 # @noargs
 function file:new {
-   (( ++_FILE_NUM ))
-   local file="FILE_${_FILE_NUM}"
+   local file="FILE_$(( ++_FILE_NUM ))"
    declare -gA "$file"
    declare -g FILE="$file"
 
-   (( ++_FILE_LINES_NUM ))
-   local lines="FILE_LINES_${_FILE_LINES_NUM}"
+   local lines="FILE_LINES_$(( ++_FILE_LINES_NUM ))"
    declare -ga "$lines"
 
    local -n file_r="$file"

@@ -58,8 +58,7 @@ declare -gA ERROR_CODE=(
 # @set ERROR
 # @noargs
 function error:new {
-   (( ++_ERROR_NUM ))
-   local err="ERROR_${_ERROR_NUM}"
+   local err="ERROR_$(( ++_ERROR_NUM ))"
    declare -gA "$err"
    declare -g  ERROR="$err"
 

@@ -66,8 +66,7 @@ function data:new { _data_new_"$1"; }
 #
 # @see   data:new
 function _data_new_dict {
-   (( ++SKELLY_NUM ))
-   local skelly="_SKELLY_${SKELLY_NUM}"
+   local skelly="_SKELLY_$(( ++SKELLY_NUM ))"
    declare -gA "$skelly"
    declare -g  SKELLY="$skelly"
 
@@ -78,8 +77,7 @@ function _data_new_dict {
 
 
 function skelly:new {
-   (( ++SKELLY_NUM ))
-   local skelly="_SKELLY_${SKELLY_NUM}"
+   local skelly="_SKELLY_$(( ++SKELLY_NUM ))"
    declare -g "$skelly"=''
    declare -g SKELLY="$skelly"
 
@@ -162,9 +160,7 @@ declare -gi DATA_NUM=0
 #
 # @see   data:new
 function _data_new_list {
-   (( ++DATA_NUM ))
-   local data="_DATA_${DATA_NUM}"
-
+   local data="_DATA_$(( ++DATA_NUM ))"
    declare -ga "$data"
    declare -g  DATA="$data"
 
