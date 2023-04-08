@@ -163,6 +163,12 @@ function main {
    symtab:init_globals
    local globals="$SYMTAB"
 
+   # TODO: I'm not entirely sure how I feel about this. Think it's okay, but
+   #       has a vibe I don't enjoy. Types themselves must be defined and
+   #       accessible before the fold & semantic analysis phases. Later files
+   #       can access previously defined types in the global symbol table.
+   declare -g GLOBALS="$globals"
+
    file:new ; file:resolve "$INPUT"  "$PWD"
    #--^ Adds initial file to IMPORTS[]
 
@@ -225,7 +231,7 @@ function main {
 }
 
 
-#>>TOPIC SOURCE
+#>SUB SOURCE
 # Equiv. to Python's >if __name__ == '__main__'
 if [[ ! "${BASH_SOURCE[0]}" == "$0" ]] ; then
    return 0
@@ -260,6 +266,6 @@ source "${PROGDIR}"/compiler.sh
 
 # shellcheck source=./api.sh
 source "${PROGDIR}"/api.sh
-#<<END TOPIC SOURCE
+#>END SUB SOURCE
 
 main "$@"
