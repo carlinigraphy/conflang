@@ -112,6 +112,29 @@ function symtab:set {
 
 
 # @description
+#  Sets ${symbol[name]} -> $symbol in GLOBAL scope
+function symtab:set_type {
+   local symbol="$1"
+   local -n symbol_r="$symbol"
+   local name="${symbol_r[name]}"
+
+   local -n symtab_r="$GLOBALS"
+   symtab_r["$name"]="$symbol"
+}
+
+
+function symbol:set_type {
+   local symbol="$1"
+   local -n symbol_r="$symbol"
+   local name="${symbol_r[name]}"
+
+   local symtab="$SYMTAB"
+
+   symtab_r["$name"]="$symbol"
+}
+
+
+# @description
 #  Sets global $SYMTAB pointer to that referenced in $node
 function symtab:from {
    local -n node_r="$1"
@@ -360,7 +383,7 @@ function symtab_typedef {
    metatype_r['subtype']="$type"
 
    symbol_r['type']="$metatype"
-   symtab:set "$symbol"
+   symtab:set_type "$symbol"
 }
 
 

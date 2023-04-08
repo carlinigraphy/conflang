@@ -90,6 +90,8 @@ function merge {
 
       unset 'overflow[$symbol_name]'
 
+      # TODO: May be unnecessary to merge types, as all typedefs are now
+      #       assigned directly to the global symbol table.
       case "${lhs_type_r[kind]}" in
          SECTION) merge:section   "$lhs_sym"  "$rhs_sym"                 ;;
          TYPE)    merge:typedef   "$lhs_sym"  "$rhs_sym"                 ;;
