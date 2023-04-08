@@ -11,6 +11,7 @@ cat <<EOF
 commands
    run         Runs \`confc\` on <FILE>
    rundb       Runs \`confc\` on <FILE> with debug flag(s) set
+   build       Compiles src/* to bin/confc
    test        Run \`BATS\` tests
    cov         Run \`BATS\` tests with \`kcov\` coverage
    check       Run \`shellcheck\`
@@ -18,7 +19,7 @@ commands
    wc-tests    Lines of BATS
    edit        Opens src files in nvim
    doc         Generates .md docs w/ \`awkdoc\`
-   html        Generates .html docs w/ `awkdoc | pandoc`.
+   html        Generates .html docs w/ \`awkdoc | pandoc\`.
 
 EOF
 
@@ -38,6 +39,16 @@ case "$1" in
             ;;
 
    'rundb') shift ; CONFC_TRACEBACK='sure'  "${PROGDIR}"/src/main  "$@"
+            ;;
+
+   'build') shift
+            pre="${PROGDIR}"/build/do.sh
+            out="${PROGDIR}"/bin/confc
+            mkdir -p "$(dirname "$out")"
+            if text=$("$pre"  "$@"  "${PROGDIR}"/src/*.sh "${PROGDIR}"/src/main)
+            then
+               echo "$text" > "$out"
+            fi
             ;;
 
    'edit')  exec nvim -O3 "${FILES[@]}"
@@ -91,7 +102,7 @@ case "$1" in
                -type  f
                -regex '.*.\(bats\|conf\)$'
             )
-            wc -l $(find "${params[@]}")
+            wc -l "$(find "${params[@]}")"
             ;;
 
    'doc')   AWKDOC_LOG_LEVEL=1 awkdoc "${FILES[@]}"
