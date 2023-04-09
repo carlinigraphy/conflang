@@ -53,7 +53,7 @@ age  @int: 30;
 
 
 # Complex types.
-full_name @list[str]: [
+full_name @rec[str, str]: [
    "Marcus",
    "Aurelius",
 ];
@@ -71,7 +71,11 @@ full_name @list[str]: [
 
 .Typedefs
 ----
-typedef rec[str, str, int] as Person;
+typedef rec[
+   str,        # First name
+   str,        # Last name
+   int,        # Age
+] as Person;
 
 me @Person: {"Marcus", "Aurelius", 30};
 ----
@@ -109,8 +113,8 @@ homedir   : $HOME;
 configdir : $XDG_CONFIG_HOME;
 
 # String interpolation.
-project_dir @path: f'{$HOME}/projects/';
-sub_dir     @path: f'{project_dir}/sub/';
+project_dir : f'{$HOME}/projects/';
+sub_dir     : f'{project_dir}/sub/';
 
 # Type casting.
 shell_level: $SHLVL -> int;
@@ -122,10 +126,10 @@ shell_level: $SHLVL -> int;
 [source,bash]
 ----
 common {
-   colors @list[str]: [
-      "#C5C5C8",
-      "#202121",
-   ];
+   colors {
+      white @str: "#C5C5C8";
+      black @str: "#202121";
+   }
 }
 
 window {
@@ -135,8 +139,8 @@ window {
    }
 
    theme {
-      foreground : common.colors[0];
-      background : common.colors[1];
+      foreground : common.colors.white;
+      background : common.colors.black;
    }
 }
 ----
@@ -144,7 +148,15 @@ window {
 .output
 [source,bash]
 ----
-# Included function in output to query output data.
+declare -- _SKELLY_ROOT="_SKELLY_2"
+declare -A _SKELLY_2=([window]="_SKELLY_10" [common]="_SKELLY_4" )
+declare -A _SKELLY_4=([colors]="_SKELLY_6" )
+declare -A _SKELLY_6=([black]="#202121" [white]="#C5C5C8" )
+declare -A _SKELLY_10=([geometry]="_SKELLY_12" [theme]="_SKELLY_16" )
+declare -A _SKELLY_12=([width]="80" [height]="100" )
+declare -A _SKELLY_16=([foreground]="#C5C5C8" [background]="#202121" )
+
+# Query function is included in output.
 conf () 
 { 
     declare -g RV="$_SKELLY_ROOT";
@@ -157,14 +169,6 @@ conf ()
         RV="${d[$arg]}";
     done
 }
-
-declare -- _SKELLY_ROOT="_SKELLY_2"
-declare -A _SKELLY_2=([common]="_SKELLY_4" [window]="_SKELLY_7")
-declare -A _SKELLY_4=([colors]="_DATA_1" )
-declare -a _DATA_1=([0]="#C5C5C8" [1]="#202121")
-declare -A _SKELLY_7=([geometry]="_SKELLY_9" [theme]="_SKELLY_13" )
-declare -A _SKELLY_9=([width]="80" [height]="100" )
-declare -A _SKELLY_13=([foreground]="#C5C5C8" [background]="#202121" )
 ----
 
 
