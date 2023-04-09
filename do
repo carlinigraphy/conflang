@@ -48,6 +48,7 @@ case "$1" in
             if text=$("$pre"  "$@"  "${PROGDIR}"/src/*.sh "${PROGDIR}"/src/main)
             then
                echo "$text" > "$out"
+               chmod +x "$out"
             fi
             ;;
 

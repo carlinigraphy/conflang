@@ -57,6 +57,7 @@ function flatten_decl_section {
    local -n node_r="$NODE"
    local -n items_r="${node_r[items]}"
    local node
+
    for node in "${items_r[@]}"; do
       walk:flatten "$node"
    done
@@ -110,7 +111,12 @@ function flatten_member {
 
    local -n dep="$DEPENDENCIES"
    local -n symbol_r="$SYMBOL"
-   dep+=( "${symbol_r[node]}" )
+
+   # Ignore sections.
+   local target="${symbol_r[node]}" 
+   if [[ ! ${TYPEOF[$target]} == decl_section ]] ; then
+      dep+=( "$target" )
+   fi
 
    symtab:descend "$index"
 }
@@ -157,16 +163,6 @@ function flatten_identifier {
 
    symtab:from "$NODE"
    if ! symtab:get "$name" ; then
-      # TODO: what if we actually didn't throw an error here, but just return.
-      # It will still be caught by the semantics phase, but it allows checking
-      # if variables exist *after* merging. Can then reference values that are
-      # known to have been declared in the parent. Mostly types. Is this a bad
-      # idea?
-      #
-      # Maybe it's a bad idea, and instead need to make a specific "exports"
-      # table from higher level things to pass them down the chain. And at that
-      # point it kinda makes sense to have specific "imports" from files down
-      # the chain as well. Oof. Looking like a pretty big lift... FOR LATER!
       e=( --anchor "${node_r[location]}"
           --caught "${node_r[location]}"
           "$name"

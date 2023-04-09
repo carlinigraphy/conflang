@@ -1,14 +1,4 @@
 #!/bin/bash
-#
-# Requires from environment:
-#  TYPEOF{}
-#  NODE_*
-#  SECTION
-#  ^-- Name of the section we're currently in. After we've iterated through a
-#    pair of symtabs, any keys remaining in the child should be copied over to
-#   the parent. We must both copy the key:value from the symtab (for semantic
-#    analysis in the next phase), but also need to append the nodes themselves
-#    to the parent section's .items array.
 
 # Abstract away all the stuff below.
 function walk:compiler {
@@ -43,12 +33,11 @@ declare -g  SKELLY=
 declare -gi SKELLY_NUM=0
 declare -ga DISPOSABLE_SKELETONS=()
 
+# Necessary when walking the result in `undead_yoga`.
 declare -gA IS_SECTION=()
-# To determine if a disposable skelly is referencing a Section. Necessary when
-# walking the result in `undead_yoga`.
 
-declare -gA EXPR_MAP=()
 # Mapping from NODE_$n -> _SKELLY_$n
+declare -gA EXPR_MAP=()
 
 
 # @description
