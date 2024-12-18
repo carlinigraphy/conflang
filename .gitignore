@@ -1,0 +1,5 @@
+doc/*.md
+doc/*.html
+bin/
+sample/
+.coverage
